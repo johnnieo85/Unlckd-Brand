@@ -1,0 +1,7 @@
+{
+  "name": "UNLCKD Pro Trainer",
+  "description": "Premium AI-powered body transformation app providing physique assessments, tailored workout and meal plans, and professional coaching reports.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
