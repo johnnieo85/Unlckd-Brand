@@ -23,20 +23,54 @@
     .no-print {
       display: none !important;
     }
-    body {
-      background: white !important;
-      color: black !important;
+    
+    html, body {
+      background: #020617 !important;
+      color: white !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
     }
+
+    .print-break-after {
+      page-break-after: always !important;
+      break-after: page !important;
+    }
+
+    .print-break-inside-avoid {
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+    }
+
+    section {
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+      padding-top: 2rem !important;
+      padding-bottom: 2rem !important;
+    }
+
+    /* Override white-print defaults if they were used */
     .print-bg-white {
-      background: white !important;
-      color: black !important;
-      border-color: #e5e7eb !important;
+      background: #0f172a !important;
+      color: white !important;
+      border-color: rgba(255,255,255,0.1) !important;
     }
-    .print-text-black {
-      color: black !important;
+
+    table tr td.bg-brand-secondary\/20 {
+      background-color: rgba(30, 41, 59, 0.4) !important;
     }
-    .print-border-gray {
-      border-color: #e5e7eb !important;
+    
+    .bg-brand-primary {
+      background-color: #10b981 !important;
+    }
+
+    .text-brand-primary {
+      color: #10b981 !important;
+    }
+
+    /* Links should stay visible and clickable in PDF */
+    a {
+      text-decoration: none !important;
+      color: #10b981 !important;
     }
   }
 }

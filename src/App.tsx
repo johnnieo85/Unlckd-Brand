@@ -438,6 +438,16 @@ export default function App() {
           </div>
           
           <div className="flex items-center gap-4 no-print">
+            <a 
+              href="https://unlckdbrand.com/unlckd-pro-trainer" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="hidden sm:flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-full text-xs font-bold text-gray-300 hover:bg-white/10 transition-all hover:text-brand-primary"
+            >
+              Get Access
+              <ExternalLink className="w-3 h-3" />
+            </a>
+
             {authError && (
               <div className="bg-red-500/10 border border-red-500/20 px-3 py-1 rounded-lg text-[10px] text-red-500 max-w-[200px] leading-tight">
                 {authError}
@@ -601,6 +611,17 @@ export default function App() {
                 <p className="text-gray-400 text-xl max-w-2xl mx-auto font-light leading-relaxed">
                   The elite digital coach that turns your data and photos into a structured, professional transformation plan.
                 </p>
+                <div className="pt-4">
+                  <a 
+                    href="https://unlckdbrand.com/unlckd-pro-trainer" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-8 py-4 bg-brand-primary text-brand-dark font-bold rounded-full hover:bg-brand-primary/90 transition-all hover:scale-105 hover:shadow-[0_0_20px_rgba(16,185,129,0.3)] shadow-lg shadow-brand-primary/10"
+                  >
+                    <Sparkles className="w-5 h-5" />
+                    Purchase Pro Access
+                  </a>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1225,16 +1246,20 @@ export default function App() {
               animate={{ opacity: 1, y: 0 }}
               className="space-y-16 max-w-5xl mx-auto relative"
             >
-              {/* Download Button */}
-              <div className="absolute top-0 right-0 flex gap-3 no-print">
+              {/* Download Button Actions */}
+              <div className="flex justify-end items-center gap-4 no-print border-b border-white/5 pb-8">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-primary/10 border border-brand-primary/20 text-brand-primary text-[10px] font-bold uppercase tracking-widest">
+                  <Sparkles className="w-3 h-3" />
+                  Print Ready
+                </div>
                 <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="gap-2 border-brand-primary/30 hover:bg-brand-primary/10"
+                  variant="primary" 
+                  size="md" 
+                  className="gap-2 bg-brand-primary text-brand-dark font-bold hover:bg-brand-primary/90 shadow-xl shadow-brand-primary/20"
                   onClick={() => window.print()}
                 >
-                  <Download className="w-4 h-4" />
-                  Download PDF
+                  <Download className="w-5 h-5" />
+                  Download PDF Report
                 </Button>
               </div>
 
@@ -1254,9 +1279,9 @@ export default function App() {
                   </p>
                 </div>
 
-                <div className="bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl overflow-hidden print-bg-white print-border-gray">
+                <div className="bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl overflow-hidden print-break-inside-avoid">
                   <table className="w-full text-sm text-left border-collapse">
-                    <tbody className="divide-y divide-gray-800 print-divide-gray">
+                    <tbody className="divide-y divide-gray-800">
                       {[
                         { label: 'Client Name', value: userData.name },
                         { label: 'Report Type', value: 
@@ -1281,8 +1306,8 @@ export default function App() {
                           : (path === 'progress' ? [] : [{ label: 'Primary Goals', value: userData.goals }])),
                       ].map((row, i) => (
                         <tr key={i}>
-                          <td className="px-6 py-3 bg-brand-secondary/20 font-bold text-gray-200 w-1/3 print-bg-gray-100 print-text-black">{row.label}</td>
-                          <td className="px-6 py-3 text-gray-300 print-text-black">{row.value}</td>
+                          <td className="px-6 py-3 bg-brand-secondary/20 font-bold text-gray-200 w-1/3">{row.label}</td>
+                          <td className="px-6 py-3 text-gray-300">{row.value}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1574,33 +1599,33 @@ export default function App() {
                         <h3 className="text-xl font-display font-bold text-gray-200">Week {week.week}</h3>
                         <Badge className="border-brand-primary/30 text-brand-primary">{week.phase}</Badge>
                       </div>
-                      <div className="overflow-x-auto bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl print-bg-white print-border-gray">
+                      <div className="overflow-x-auto bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl">
                         <table className="w-full text-sm text-left border-collapse">
-                          <thead className="bg-brand-secondary/20 text-gray-400 uppercase text-[10px] tracking-wider print-bg-gray-100 print-text-gray-600">
+                          <thead className="bg-brand-secondary/20 text-gray-400 uppercase text-[10px] tracking-wider">
                             <tr>
-                              <th className="px-4 py-3 font-semibold border-r border-gray-800 print-border-gray">Day</th>
-                              <th className="px-4 py-3 font-semibold border-r border-gray-800 print-border-gray">Focus</th>
-                              <th className="px-4 py-3 font-semibold border-r border-gray-800 print-border-gray">Warm-Up</th>
-                              <th className="px-4 py-3 font-semibold border-r border-gray-800 print-border-gray">Main Work</th>
+                              <th className="px-4 py-3 font-semibold border-r border-gray-800">Day</th>
+                              <th className="px-4 py-3 font-semibold border-r border-gray-800">Focus</th>
+                              <th className="px-4 py-3 font-semibold border-r border-gray-800">Warm-Up</th>
+                              <th className="px-4 py-3 font-semibold border-r border-gray-800">Main Work</th>
                               <th className="px-4 py-3 font-semibold">Notes</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-gray-800 print-divide-gray">
+                          <tbody className="divide-y divide-gray-800">
                             {week.days?.map((day, i) => (
-                              <tr key={i} className="hover:bg-white/5 transition-colors print:text-black">
-                                <td className="px-4 py-4 font-bold text-brand-primary border-r border-gray-800 print-text-black print:border-gray-200">{day.day}</td>
-                                <td className="px-4 py-4 border-r border-gray-800 text-gray-200 print-text-black print:border-gray-200">{day.focus}</td>
-                                <td className="px-4 py-4 border-r border-gray-800 text-gray-400 text-xs print:text-gray-700 print:border-gray-200">
+                              <tr key={i} className="hover:bg-white/5 transition-colors">
+                                <td className="px-4 py-4 font-bold text-brand-primary border-r border-gray-800">{day.day}</td>
+                                <td className="px-4 py-4 border-r border-gray-800 text-gray-200">{day.focus}</td>
+                                <td className="px-4 py-4 border-r border-gray-800 text-gray-400 text-xs">
                                   <ReactMarkdown components={{ a: ({node, ...props}) => <a {...props} className="text-brand-primary hover:underline" target="_blank" rel="noopener noreferrer" /> }}>
                                     {day.warmUp}
                                   </ReactMarkdown>
                                 </td>
-                                <td className="px-4 py-4 border-r border-gray-800 text-gray-300 font-medium print:text-black print:border-gray-200">
+                                <td className="px-4 py-4 border-r border-gray-800 text-gray-300 font-medium">
                                   <ReactMarkdown components={{ a: ({node, ...props}) => <a {...props} className="text-brand-primary hover:underline" target="_blank" rel="noopener noreferrer" /> }}>
                                     {day.mainWork}
                                   </ReactMarkdown>
                                 </td>
-                                <td className="px-4 py-4 text-gray-400 text-xs italic print:text-gray-600">{day.notes}</td>
+                                <td className="px-4 py-4 text-gray-400 text-xs italic">{day.notes}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -1620,64 +1645,64 @@ export default function App() {
                     {report.nutritionStrategy}
                   </div>
 
-                  <div className="overflow-x-auto bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl print-bg-white print-border-gray">
+                  <div className="overflow-x-auto bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl">
                     <table className="w-full text-sm text-left border-collapse">
-                      <thead className="bg-brand-secondary/20 text-gray-400 uppercase text-[10px] tracking-wider print-bg-gray-100 print-text-gray-600">
+                      <thead className="bg-brand-secondary/20 text-gray-400 uppercase text-[10px] tracking-wider">
                         <tr>
-                          <th className="px-4 py-3 font-semibold border-r border-gray-800 print-border-gray">Week</th>
-                          <th className="px-4 py-3 font-semibold border-r border-gray-800 print-border-gray">Day</th>
-                          <th className="px-4 py-3 font-semibold border-r border-gray-800 print-border-gray">Breakfast</th>
-                          <th className="px-4 py-3 font-semibold border-r border-gray-800 print-border-gray">Lunch</th>
-                          <th className="px-4 py-3 font-semibold border-r border-gray-800 print-border-gray">Dinner</th>
+                          <th className="px-4 py-3 font-semibold border-r border-gray-800">Week</th>
+                          <th className="px-4 py-3 font-semibold border-r border-gray-800">Day</th>
+                          <th className="px-4 py-3 font-semibold border-r border-gray-800">Breakfast</th>
+                          <th className="px-4 py-3 font-semibold border-r border-gray-800">Lunch</th>
+                          <th className="px-4 py-3 font-semibold border-r border-gray-800">Dinner</th>
                           <th className="px-4 py-3 font-semibold">Snack</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-800 print-divide-gray">
+                      <tbody className="divide-y divide-gray-800">
                         {report.mealPlan?.map((week, weekIdx) => (
                           <React.Fragment key={weekIdx}>
                             {week.days?.map((day, i) => (
-                              <tr key={`${weekIdx}-${i}`} className="hover:bg-white/5 transition-colors print:text-black">
+                              <tr key={`${weekIdx}-${i}`} className="hover:bg-white/5 transition-colors">
                                 {i === 0 && (
-                                  <td className="px-4 py-4 font-bold text-gray-400 border-r border-gray-800 print:border-gray-200" rowSpan={week.days.length}>
+                                  <td className="px-4 py-4 font-bold text-gray-400 border-r border-gray-800" rowSpan={week.days.length}>
                                     W{week.week}
                                   </td>
                                 )}
-                                <td className="px-4 py-4 font-bold text-brand-primary border-r border-gray-800 print-text-black print:border-gray-200">{day.day}</td>
-                                <td className="px-4 py-4 border-r border-gray-800 text-gray-300 print-text-black print:border-gray-200">
+                                <td className="px-4 py-4 font-bold text-brand-primary border-r border-gray-800">{day.day}</td>
+                                <td className="px-4 py-4 border-r border-gray-800 text-gray-300">
                                   <div className="flex flex-col gap-1">
                                     <span>{day.breakfast}</span>
                                     {day.breakfastUrl && (
-                                      <a href={day.breakfastUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-primary hover:underline flex items-center gap-1 no-print">
+                                      <a href={day.breakfastUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-primary hover:underline flex items-center gap-1">
                                         Recipe <ExternalLink className="w-2 h-2" />
                                       </a>
                                     )}
                                   </div>
                                 </td>
-                                <td className="px-4 py-4 border-r border-gray-800 text-gray-300 print-text-black print:border-gray-200">
+                                <td className="px-4 py-4 border-r border-gray-800 text-gray-300">
                                   <div className="flex flex-col gap-1">
                                     <span>{day.lunch}</span>
                                     {day.lunchUrl && (
-                                      <a href={day.lunchUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-primary hover:underline flex items-center gap-1 no-print">
+                                      <a href={day.lunchUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-primary hover:underline flex items-center gap-1">
                                         Recipe <ExternalLink className="w-2 h-2" />
                                       </a>
                                     )}
                                   </div>
                                 </td>
-                                <td className="px-4 py-4 border-r border-gray-800 text-gray-300 print-text-black print:border-gray-200">
+                                <td className="px-4 py-4 border-r border-gray-800 text-gray-300">
                                   <div className="flex flex-col gap-1">
                                     <span>{day.dinner}</span>
                                     {day.dinnerUrl && (
-                                      <a href={day.dinnerUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-primary hover:underline flex items-center gap-1 no-print">
+                                      <a href={day.dinnerUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-primary hover:underline flex items-center gap-1">
                                         Recipe <ExternalLink className="w-2 h-2" />
                                       </a>
                                     )}
                                   </div>
                                 </td>
-                                <td className="px-4 py-4 text-gray-300 print-text-black">
+                                <td className="px-4 py-4 text-gray-300">
                                   <div className="flex flex-col gap-1">
                                     <span>{day.snack}</span>
                                     {day.snackUrl && (
-                                      <a href={day.snackUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-primary hover:underline flex items-center gap-1 no-print">
+                                      <a href={day.snackUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-primary hover:underline flex items-center gap-1">
                                         Recipe <ExternalLink className="w-2 h-2" />
                                       </a>
                                     )}

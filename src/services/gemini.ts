@@ -120,7 +120,7 @@ export async function generateTransformationReport(
           7. MOBILITY: Integrate dynamic mobility in warm-ups and static stretching for recovery.
           8. TRAINING MODALITIES: Utilize Kettlebells, Resistance Bands, and Bodyweight where appropriate.
           9. If NO photos are provided, provide a text-only assessment based on the user's data (age, weight, height, goals, calorie preference).
-          10. WORKOUT VIDEOS: For each exercise in the "mainWork" and "warmUp" fields, include a direct YouTube link using markdown format: [Exercise Name](https://youtube.com/results?search_query=how+to+do+exercise+name).
+          10. WORKOUT VIDEOS: For each exercise in the "mainWork" and "warmUp" fields, you MUST provide a direct YouTube video URL (e.g., https://www.youtube.com/watch?v=...) that shows how to perform the exercise. Do NOT provide search result links. Use markdown format: [Exercise Name](Direct YouTube URL).
           11. MEAL RECIPES: For each meal in the meal plan, provide a direct Pinterest recipe link in the corresponding "Url" field (e.g., breakfastUrl).
           12. GROCERY STORE: Recommend a specific grocery store (e.g., Whole Foods, Trader Joe's, Tesco, etc.) where the user can find the majority of their grocery list items based on their location (${userData.location}) and the generated list.
           13. HYDRATION UNITS: If the user's weight unit is "lbs" (${userData.weightUnit}), provide all hydration targets and water schedules in imperial units (ounces/oz). If "kg", use metric (liters/L).
@@ -139,7 +139,7 @@ export async function generateTransformationReport(
                 - Estimated Body Fat %: Based on visual analysis of photos and user data.
                 - Health Status: A summary of their current physical health based on BMI and body fat.
                 - Focus: What they should prioritize (e.g., "Focus on a slight calorie deficit to reach a healthy BMI range").
-              - Recommended Workout: Provide a single, deeply researched workout routine (title, description, and 4-6 specific exercises) tailored to address the "concerning areas" identified in the physique comparison. For each exercise, include a direct YouTube link in the "videoUrl" field.
+              - Recommended Workout: Provide a single, deeply researched workout routine (title, description, and 4-6 specific exercises) tailored to address the "concerning areas" identified in the physique comparison. For each exercise, include a direct YouTube video URL (not a search link) in the "videoUrl" field.
               - Additional Activities: Conduct deep research and provide a section about additional activities to help reach goals, such as sauna, massages, swimming, or any other activity that may assist with becoming healthy. Include a title, description, and a list of 3-4 specific activities with their benefits and recommended frequency.
           19. Return ONLY valid JSON matching the provided schema.
         `,
