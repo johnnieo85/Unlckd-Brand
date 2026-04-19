@@ -40,7 +40,7 @@ import { cn } from './lib/utils';
 import { Path, UserData, Photos, ProgressPhotos, AssessmentResult, Rating, SavedReport } from './types';
 import { generateTransformationReport } from './services/gemini';
 import { auth } from './lib/firebase';
-import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
+import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { historyService } from './services/historyService';
 import { ensureUserProfile, checkUserAccess } from './services/accessService';
 
@@ -254,6 +254,10 @@ export default function App() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -288,27 +292,75 @@ export default function App() {
     }
   };
 
-  const handleSignIn = async () => {
+  const handleGoogleSignIn = async () => {
     setIsSigningIn(true);
     setAuthError(null);
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
+      setIsAuthModalOpen(false);
     } catch (error: any) {
-      if (error?.code === 'auth/popup-closed-by-user') {
-        return;
-      }
-      if (error?.code === 'auth/popup-blocked') {
-        setAuthError("Popup was blocked by your browser. Please enable popups and try again.");
-      } else if (error?.code === 'auth/unauthorized-domain') {
-        setAuthError("This domain is not authorized in the Firebase console. Please add the app URL to authorized domains.");
-      } else {
-        setAuthError("Sign in failed. Please try again.");
-      }
-      console.error("Sign in failed:", error);
+      handleAuthError(error);
     } finally {
       setIsSigningIn(false);
     }
+  };
+
+  const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSigningIn(true);
+    setAuthError(null);
+    try {
+      if (isSignUp) {
+        await createUserWithEmailAndPassword(auth, authEmail, authPassword);
+      } else {
+        await signInWithEmailAndPassword(auth, authEmail, authPassword);
+      }
+      setIsAuthModalOpen(false);
+      setAuthEmail('');
+      setAuthPassword('');
+    } catch (error: any) {
+      handleAuthError(error);
+    } finally {
+      setIsSigningIn(false);
+    }
+  };
+
+  const handleAuthError = (error: any) => {
+    if (error?.code === 'auth/popup-closed-by-user') return;
+    
+    let message = "Authentication failed. Please try again.";
+    
+    switch (error?.code) {
+      case 'auth/popup-blocked':
+        message = "Popup was blocked by your browser. Please enable popups and try again.";
+        break;
+      case 'auth/unauthorized-domain':
+        message = "This domain is not authorized in the Firebase console. Please add the app URL to authorized domains.";
+        break;
+      case 'auth/user-not-found':
+      case 'auth/wrong-password':
+      case 'auth/invalid-credential':
+        message = "Invalid email or password.";
+        break;
+      case 'auth/email-already-in-use':
+        message = "This email is already in use.";
+        break;
+      case 'auth/weak-password':
+        message = "Password should be at least 6 characters.";
+        break;
+      case 'auth/invalid-email':
+        message = "Please enter a valid email address.";
+        break;
+    }
+    
+    setAuthError(message);
+    console.error("Auth error:", error);
+  };
+
+  const handleSignIn = () => {
+    setAuthError(null);
+    setIsAuthModalOpen(true);
   };
 
   const handleSignOut = async () => {
@@ -469,11 +521,6 @@ export default function App() {
               <ExternalLink className="w-3 h-3" />
             </a>
 
-            {authError && (
-              <div className="bg-red-500/10 border border-red-500/20 px-3 py-1 rounded-lg text-[10px] text-red-500 max-w-[200px] leading-tight">
-                {authError}
-              </div>
-            )}
             {user ? (
               <>
                 <Button 
@@ -506,11 +553,10 @@ export default function App() {
               <Button 
                 size="sm" 
                 onClick={handleSignIn} 
-                disabled={isSigningIn}
                 className="gap-2 bg-brand-primary text-brand-dark font-bold hover:bg-brand-primary/90"
               >
-                {isSigningIn ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
-                {isSigningIn ? 'Opening Popup...' : 'Sign In'}
+                <LogIn className="w-4 h-4" />
+                Sign In
               </Button>
             )}
             
@@ -1957,6 +2003,104 @@ export default function App() {
           </p>
         </div>
       </footer>
+
+      {/* Auth Modal */}
+      <AnimatePresence>
+        {isAuthModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsAuthModalOpen(false)}
+              className="absolute inset-0 bg-brand-dark/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="w-full max-w-md bg-brand-surface border border-white/10 rounded-3xl p-8 relative z-10 shadow-2xl"
+            >
+              <div className="text-center space-y-2 mb-8">
+                <div className="w-16 h-16 rounded-2xl bg-brand-primary/10 flex items-center justify-center mx-auto mb-4">
+                  <User className="w-8 h-8 text-brand-primary" />
+                </div>
+                <h2 className="text-3xl font-display font-bold">
+                  {isSignUp ? 'Create Account' : 'Welcome Back'}
+                </h2>
+                <p className="text-gray-400 font-light">
+                  {isSignUp ? 'Join UNLCKD Pro to track your transformation.' : 'Sign in to access your professional reports.'}
+                </p>
+              </div>
+
+              {authError && (
+                <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-sm text-red-500 flex items-center gap-3">
+                  <Info className="w-4 h-4 shrink-0" />
+                  {authError}
+                </div>
+              )}
+
+              <form onSubmit={handleEmailAuth} className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-widest text-gray-500 ml-1">Email Address</label>
+                  <Input 
+                    type="email" 
+                    placeholder="name@example.com"
+                    value={authEmail}
+                    onChange={(e) => setAuthEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-widest text-gray-500 ml-1">Password</label>
+                  <Input 
+                    type="password" 
+                    placeholder="••••••••"
+                    value={authPassword}
+                    onChange={(e) => setAuthPassword(e.target.value)}
+                    required
+                  />
+                </div>
+                <Button 
+                  type="submit" 
+                  className="w-full h-12 bg-brand-primary text-brand-dark font-bold text-lg shadow-lg shadow-brand-primary/20"
+                  disabled={isSigningIn}
+                >
+                  {isSigningIn ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : (isSignUp ? 'Create Account' : 'Sign In')}
+                </Button>
+              </form>
+
+              <div className="relative my-8">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-white/5"></div>
+                </div>
+                <div className="relative flex justify-center text-xs uppercase tracking-widest">
+                  <span className="bg-brand-surface px-4 text-gray-500">Or continue with</span>
+                </div>
+              </div>
+
+              <Button 
+                variant="outline" 
+                onClick={handleGoogleSignIn}
+                className="w-full h-12 border-white/5 hover:bg-white/5 gap-3"
+                disabled={isSigningIn}
+              >
+                <img src="https://www.google.com/favicon.ico" alt="Google" className="w-4 h-4" />
+                Google Account
+              </Button>
+
+              <div className="mt-8 text-center">
+                <button 
+                  onClick={() => setIsSignUp(!isSignUp)}
+                  className="text-sm text-gray-400 hover:text-brand-primary transition-colors underline underline-offset-4"
+                >
+                  {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Create one"}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
