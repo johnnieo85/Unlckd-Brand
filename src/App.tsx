@@ -2089,13 +2089,26 @@ export default function App() {
                 Google Account
               </Button>
 
-              <div className="mt-8 text-center">
-                <button 
-                  onClick={() => setIsSignUp(!isSignUp)}
-                  className="text-sm text-gray-400 hover:text-brand-primary transition-colors underline underline-offset-4"
-                >
-                  {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Create one"}
-                </button>
+              <div className="mt-8 text-center space-y-4">
+                <p className="text-sm text-gray-400">
+                  Don't have an account? {' '}
+                  <a 
+                    href="https://unlckdbrand.com/unlckd-pro-trainer" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-brand-primary hover:underline font-bold"
+                  >
+                    Gain Access
+                  </a>
+                </p>
+                <div className="pt-2">
+                  <button 
+                    onClick={() => setIsSignUp(!isSignUp)}
+                    className="text-xs text-gray-500 hover:text-brand-primary transition-colors underline underline-offset-4"
+                  >
+                    {isSignUp ? 'Already have an account? Sign in' : "Purchased access? Create your account here"}
+                  </button>
+                </div>
               </div>
             </motion.div>
           </div>
