@@ -277,7 +277,11 @@ export default function App() {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.code === 'auth/popup-closed-by-user') {
+        // User closed the popup, handle gracefully without error log
+        return;
+      }
       console.error("Sign in failed:", error);
     }
   };
