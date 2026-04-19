@@ -2026,10 +2026,10 @@ export default function App() {
                   <User className="w-8 h-8 text-brand-primary" />
                 </div>
                 <h2 className="text-3xl font-display font-bold">
-                  {isSignUp ? 'Create Account' : 'Welcome Back'}
+                  Welcome Back
                 </h2>
                 <p className="text-gray-400 font-light">
-                  {isSignUp ? 'Join UNLCKD Pro to track your transformation.' : 'Sign in to access your professional reports.'}
+                  Sign in to access your professional reports.
                 </p>
               </div>
 
@@ -2066,7 +2066,7 @@ export default function App() {
                   className="w-full h-12 bg-brand-primary text-brand-dark font-bold text-lg shadow-lg shadow-brand-primary/20"
                   disabled={isSigningIn}
                 >
-                  {isSigningIn ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : (isSignUp ? 'Create Account' : 'Sign In')}
+                  {isSigningIn ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Sign In'}
                 </Button>
               </form>
 
@@ -2089,7 +2089,7 @@ export default function App() {
                 Google Account
               </Button>
 
-              <div className="mt-8 text-center space-y-4">
+              <div className="mt-8 text-center">
                 <p className="text-sm text-gray-400">
                   Don't have an account? {' '}
                   <a 
@@ -2101,14 +2101,6 @@ export default function App() {
                     Gain Access
                   </a>
                 </p>
-                <div className="pt-2">
-                  <button 
-                    onClick={() => setIsSignUp(!isSignUp)}
-                    className="text-xs text-gray-500 hover:text-brand-primary transition-colors underline underline-offset-4"
-                  >
-                    {isSignUp ? 'Already have an account? Sign in' : "Purchased access? Create your account here"}
-                  </button>
-                </div>
               </div>
             </motion.div>
           </div>
