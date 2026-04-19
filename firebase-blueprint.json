@@ -1,0 +1,25 @@
+{
+  "entities": {
+    "Report": {
+      "title": "Saved Transformation Report",
+      "description": "User transformation report data including photos and analysis",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "path": { "type": "string" },
+        "userData": { "type": "object" },
+        "report": { "type": "object" },
+        "photos": { "type": "object" },
+        "progressPhotos": { "type": "object" }
+      },
+      "required": ["id", "timestamp", "path", "userData", "report", "photos"]
+    }
+  },
+  "firestore": {
+    "/reports/{reportId}": {
+      "schema": "Report",
+      "description": "Collection of transformation reports"
+    }
+  }
+}
