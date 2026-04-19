@@ -247,6 +247,8 @@ export default function App() {
   const [user, setUser] = useState(auth.currentUser);
   const [savedReports, setSavedReports] = useState<SavedReport[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -274,15 +276,25 @@ export default function App() {
   };
 
   const handleSignIn = async () => {
+    setIsSigningIn(true);
+    setAuthError(null);
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
     } catch (error: any) {
       if (error?.code === 'auth/popup-closed-by-user') {
-        // User closed the popup, handle gracefully without error log
         return;
       }
+      if (error?.code === 'auth/popup-blocked') {
+        setAuthError("Popup was blocked by your browser. Please enable popups and try again.");
+      } else if (error?.code === 'auth/unauthorized-domain') {
+        setAuthError("This domain is not authorized in the Firebase console. Please add the app URL to authorized domains.");
+      } else {
+        setAuthError("Sign in failed. Please try again.");
+      }
       console.error("Sign in failed:", error);
+    } finally {
+      setIsSigningIn(false);
     }
   };
 
@@ -426,6 +438,11 @@ export default function App() {
           </div>
           
           <div className="flex items-center gap-4 no-print">
+            {authError && (
+              <div className="bg-red-500/10 border border-red-500/20 px-3 py-1 rounded-lg text-[10px] text-red-500 max-w-[200px] leading-tight">
+                {authError}
+              </div>
+            )}
             {user ? (
               <>
                 <Button 
@@ -448,9 +465,14 @@ export default function App() {
                 </div>
               </>
             ) : (
-              <Button size="sm" onClick={handleSignIn} className="gap-2 bg-brand-primary text-brand-dark font-bold hover:bg-brand-primary/90">
-                <LogIn className="w-4 h-4" />
-                Sign In
+              <Button 
+                size="sm" 
+                onClick={handleSignIn} 
+                disabled={isSigningIn}
+                className="gap-2 bg-brand-primary text-brand-dark font-bold hover:bg-brand-primary/90"
+              >
+                {isSigningIn ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
+                {isSigningIn ? 'Opening Popup...' : 'Sign In'}
               </Button>
             )}
             
