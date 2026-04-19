@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Dumbbell, 
@@ -15,10 +15,14 @@ import {
   Calendar,
   MapPin,
   Briefcase,
+  Search,
   Clock,
   Droplets,
   Footprints,
-  Info
+  Info,
+  ExternalLink,
+  Download,
+  Sparkles
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Button } from './components/ui/Button';
@@ -28,56 +32,78 @@ import { cn } from './lib/utils';
 import { Path, UserData, Photos, ProgressPhotos, AssessmentResult, Rating } from './types';
 import { generateTransformationReport } from './services/gemini';
 
-const LogoBranding = () => null;
+const LogoBranding = () => (
+  <div className="hidden print:flex items-center justify-between border-t border-gray-200 pt-4 mt-8">
+    <div className="flex items-center gap-2">
+      <div className="w-6 h-6 bg-black rounded flex items-center justify-center">
+        <Activity className="w-4 h-4 text-white" />
+      </div>
+      <span className="font-display font-bold text-sm tracking-tight uppercase text-black">UNLCKD <span className="text-gray-600">Pro</span></span>
+    </div>
+    <span className="text-[10px] text-gray-400 uppercase tracking-widest">Official Transformation Report</span>
+  </div>
+);
 
-const RatingTable = ({ title, ratings, summary, photo }: { title: string; ratings: Rating[]; summary?: string; photo?: string | null }) => (
+const RatingTable = ({ title, ratings = [], summary, photo }: { title: string; ratings?: Rating[]; summary?: string; photo?: string | null }) => (
   <div className="space-y-6">
-    <h2 className="text-2xl font-display font-bold text-brand-primary border-b border-gray-800 pb-2">{title}</h2>
-    <div className={cn("grid grid-cols-1 gap-6", photo && "md:grid-cols-2")}>
+    <h2 className="text-3xl font-display font-bold text-brand-primary tracking-tight flex items-center gap-3 print:text-black">
+      <div className="w-8 h-8 rounded-lg bg-brand-primary/10 flex items-center justify-center no-print">
+        <Activity className="w-4 h-4 text-brand-primary" />
+      </div>
+      {title}
+    </h2>
+    <div className={cn("grid grid-cols-1 gap-8", photo && "md:grid-cols-2")}>
       {photo && (
-        <div className="aspect-[3/4] rounded-xl overflow-hidden border border-gray-800">
+        <div className="aspect-[3/4] rounded-2xl overflow-hidden border border-white/5 shadow-2xl relative group print:border-gray-200">
+          <div className="absolute inset-0 bg-gradient-to-t from-brand-dark/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity no-print" />
           <img src={photo} alt={title} className="w-full h-full object-cover" />
         </div>
       )}
-      <div className="space-y-4">
-        <div className="bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl overflow-hidden">
+      <div className="space-y-6">
+        <div className="bg-white/[0.02] backdrop-blur-sm border border-white/5 rounded-2xl overflow-hidden shadow-xl print:bg-white print:border-gray-200">
           <table className="w-full text-sm text-left">
-            <thead className="bg-brand-secondary/20 text-gray-400 uppercase text-[10px] tracking-wider">
+            <thead className="bg-white/[0.05] text-gray-400 uppercase text-[10px] tracking-[0.2em] font-bold print:bg-gray-100 print:text-gray-600">
               <tr>
-                <th className="px-4 py-2 font-semibold border-r border-gray-800">Area</th>
-                <th className="px-4 py-2 font-semibold border-r border-gray-800">Rating</th>
-                <th className="px-4 py-2 font-semibold">Evaluation</th>
+                <th className="px-6 py-4 border-r border-white/5 print:border-gray-200">Area</th>
+                <th className="px-6 py-4 border-r border-white/5 print:border-gray-200">Rating</th>
+                <th className="px-6 py-4">Evaluation</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-800">
+            <tbody className="divide-y divide-white/5 print:divide-gray-200">
               {ratings.map((r, i) => (
-                <tr key={i} className="hover:bg-white/5 transition-colors">
-                  <td className="px-4 py-3 font-medium text-gray-200 border-r border-gray-800">{r.category}</td>
-                  <td className="px-4 py-3 border-r border-gray-800">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs">{r.rating}/10</span>
-                      <div className="flex gap-0.5">
+                <tr key={i} className="hover:bg-white/[0.02] transition-colors print:text-black">
+                  <td className="px-6 py-4 font-semibold text-gray-200 border-r border-white/5 print:text-black print:border-gray-200">{r.category}</td>
+                  <td className="px-6 py-4 border-r border-white/5 print:border-gray-200">
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-[10px] text-brand-primary font-bold print:text-black">{r.rating * 10}%</span>
+                        <span className="font-mono text-[10px] text-gray-500 print:text-gray-400">{r.rating}/10</span>
+                      </div>
+                      <div className="flex gap-1 h-1.5">
                         {[...Array(10)].map((_, idx) => (
                           <div 
                             key={idx} 
                             className={cn(
-                              "w-1 h-3 rounded-full",
-                              idx < r.rating ? "bg-brand-primary" : "bg-gray-800"
+                              "flex-1 rounded-full transition-all duration-500",
+                              idx < r.rating 
+                                ? "bg-brand-primary shadow-[0_0_8px_rgba(16,185,129,0.4)] print:bg-black print:shadow-none" 
+                                : "bg-white/10 print:bg-gray-200"
                             )} 
                           />
                         ))}
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-gray-400 text-xs leading-relaxed">{r.evaluation}</td>
+                  <td className="px-6 py-4 text-gray-400 text-xs leading-relaxed print:text-gray-700">{r.evaluation}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
         {summary && (
-          <div className="p-4 bg-brand-surface border border-gray-800 rounded-xl text-sm text-gray-300 leading-relaxed italic">
-            {summary}
+          <div className="p-6 bg-brand-primary/5 border border-brand-primary/10 rounded-2xl text-sm text-gray-300 leading-relaxed italic relative overflow-hidden print:bg-gray-50 print:border-gray-200 print:text-gray-700">
+            <div className="absolute top-0 left-0 w-1 h-full bg-brand-primary/40 print:bg-gray-400" />
+            "{summary}"
           </div>
         )}
       </div>
@@ -85,9 +111,9 @@ const RatingTable = ({ title, ratings, summary, photo }: { title: string; rating
   </div>
 );
 
-const ProgressComparison = ({ title, ratings, summary, beforePhoto, afterPhoto, beforeDate, afterDate }: { 
+const ProgressComparison = ({ title, ratings = [], summary, beforePhoto, afterPhoto, beforeDate, afterDate }: { 
   title: string; 
-  ratings: Rating[]; 
+  ratings?: Rating[]; 
   summary?: string; 
   beforePhoto: string | null; 
   afterPhoto: string | null;
@@ -95,63 +121,74 @@ const ProgressComparison = ({ title, ratings, summary, beforePhoto, afterPhoto, 
   afterDate: string;
 }) => (
   <div className="space-y-6">
-    <h2 className="text-2xl font-display font-bold text-brand-primary border-b border-gray-800 pb-2">{title}</h2>
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <h2 className="text-3xl font-display font-bold text-brand-primary tracking-tight flex items-center gap-3 print:text-black">
+      <div className="w-8 h-8 rounded-lg bg-brand-primary/10 flex items-center justify-center no-print">
+        <Activity className="w-4 h-4 text-brand-primary" />
+      </div>
+      {title}
+    </h2>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2 text-center">
-            <div className="aspect-[3/4] rounded-xl overflow-hidden border border-gray-800">
+          <div className="space-y-3 text-center">
+            <div className="aspect-[3/4] rounded-2xl overflow-hidden border border-white/5 shadow-xl print:border-gray-200">
               <img src={beforePhoto!} alt="Before" className="w-full h-full object-cover" />
             </div>
-            <span className="text-[10px] font-bold text-gray-500 uppercase">Before ({beforeDate})</span>
+            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest print:text-gray-600">Before ({beforeDate})</span>
           </div>
-          <div className="space-y-2 text-center">
-            <div className="aspect-[3/4] rounded-xl overflow-hidden border border-gray-800">
+          <div className="space-y-3 text-center">
+            <div className="aspect-[3/4] rounded-2xl overflow-hidden border border-brand-primary/20 shadow-xl shadow-brand-primary/5 print:border-gray-200">
               <img src={afterPhoto!} alt="After" className="w-full h-full object-cover" />
             </div>
-            <span className="text-[10px] font-bold text-brand-primary uppercase">After ({afterDate})</span>
+            <span className="text-[10px] font-bold text-brand-primary uppercase tracking-widest print:text-black">After ({afterDate})</span>
           </div>
         </div>
       </div>
-      <div className="space-y-4">
-        <div className="bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl overflow-hidden">
+      <div className="space-y-6">
+        <div className="bg-white/[0.02] backdrop-blur-sm border border-white/5 rounded-2xl overflow-hidden shadow-xl print:bg-white print:border-gray-200">
           <table className="w-full text-xs text-left border-collapse">
-            <thead className="bg-brand-secondary/20 text-gray-400 uppercase text-[10px] tracking-wider">
+            <thead className="bg-white/[0.05] text-gray-400 uppercase text-[10px] tracking-[0.2em] font-bold print:bg-gray-100 print:text-gray-600">
               <tr>
-                <th className="px-4 py-2 font-semibold border-r border-gray-800">Area</th>
-                <th className="px-4 py-2 font-semibold border-r border-gray-800">Rating</th>
-                <th className="px-4 py-2 font-semibold">Evaluation</th>
+                <th className="px-6 py-4 border-r border-white/5 print:border-gray-200">Area</th>
+                <th className="px-6 py-4 border-r border-white/5 print:border-gray-200">Rating</th>
+                <th className="px-6 py-4">Evaluation</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-800">
+            <tbody className="divide-y divide-white/5 print:divide-gray-200">
               {ratings.map((r, i) => (
-                <tr key={i} className="hover:bg-white/5 transition-colors">
-                  <td className="px-4 py-3 font-medium text-gray-200 border-r border-gray-800">{r.category}</td>
-                  <td className="px-4 py-3 border-r border-gray-800">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs">{r.rating}/10</span>
-                      <div className="flex gap-0.5">
+                <tr key={i} className="hover:bg-white/[0.02] transition-colors print:text-black">
+                  <td className="px-6 py-4 font-semibold text-gray-200 border-r border-white/5 print:text-black print:border-gray-200">{r.category}</td>
+                  <td className="px-6 py-4 border-r border-white/5 print:border-gray-200">
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-[10px] text-brand-primary font-bold print:text-black">{r.rating * 10}%</span>
+                        <span className="font-mono text-[10px] text-gray-500 print:text-gray-400">{r.rating}/10</span>
+                      </div>
+                      <div className="flex gap-1 h-1.5">
                         {[...Array(10)].map((_, idx) => (
                           <div 
                             key={idx} 
                             className={cn(
-                              "w-1 h-3 rounded-full",
-                              idx < r.rating ? "bg-brand-primary" : "bg-gray-800"
+                              "flex-1 rounded-full transition-all duration-500",
+                              idx < r.rating 
+                                ? "bg-brand-primary shadow-[0_0_8px_rgba(16,185,129,0.4)] print:bg-black print:shadow-none" 
+                                : "bg-white/10 print:bg-gray-200"
                             )} 
                           />
                         ))}
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-gray-400 text-xs leading-relaxed italic">{r.evaluation}</td>
+                  <td className="px-6 py-4 text-gray-400 text-[10px] leading-relaxed italic print:text-gray-700">{r.evaluation}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
         {summary && (
-          <div className="p-4 bg-brand-surface border border-gray-800 rounded-xl text-sm text-gray-300 leading-relaxed italic">
-            {summary}
+          <div className="p-6 bg-brand-primary/5 border border-brand-primary/10 rounded-2xl text-sm text-gray-300 leading-relaxed italic relative overflow-hidden print:bg-gray-50 print:border-gray-200 print:text-gray-700">
+            <div className="absolute top-0 left-0 w-1 h-full bg-brand-primary/40 print:bg-gray-400" />
+            "{summary}"
           </div>
         )}
       </div>
@@ -179,7 +216,9 @@ export default function App() {
     injuries: '',
     allergies: '',
     currentWorkout: '',
-    caloriePreference: 'maintain'
+    caloriePreference: 'maintain',
+    physicalActivity: 'moderate',
+    planDuration: '12-week'
   });
   const [photos, setPhotos] = useState<Photos>({
     front: null,
@@ -191,7 +230,9 @@ export default function App() {
     before: { front: null, back: null, left: null, right: null },
     after: { front: null, back: null, left: null, right: null },
     beforeDate: '',
-    afterDate: ''
+    afterDate: '',
+    beforeWeight: '',
+    afterWeight: ''
   });
   const [report, setReport] = useState<AssessmentResult | null>(null);
   const [loadingMessage, setLoadingMessage] = useState('Analyzing your physique...');
@@ -217,7 +258,7 @@ export default function App() {
     const messages = [
       'Analyzing your physique data...',
       'Calculating optimal macros...',
-      'Designing your 7-day training split...',
+      'Designing your 12-week training split...',
       'Curating your personalized meal plan...',
       'Finalizing your transformation report...'
     ];
@@ -276,21 +317,31 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-brand-dark text-gray-100 selection:bg-brand-primary selection:text-white">
-      <header className="fixed top-0 w-full z-50 bg-brand-dark/80 backdrop-blur-md border-b border-gray-800">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+    <div className="min-h-screen bg-brand-dark text-gray-100 selection:bg-brand-primary selection:text-white relative overflow-x-hidden">
+      {/* Background decorative elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-brand-primary/10 blur-[120px] rounded-full" />
+        <div className="absolute top-[20%] -right-[5%] w-[30%] h-[30%] bg-brand-accent/5 blur-[100px] rounded-full" />
+        <div className="absolute -bottom-[10%] left-[20%] w-[50%] h-[50%] bg-brand-primary/5 blur-[150px] rounded-full" />
+      </div>
+
+      <header className="fixed top-0 w-full z-50 bg-brand-dark/40 backdrop-blur-xl border-b border-white/5 no-print">
+        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className="font-display font-bold text-xl tracking-tight">UNLCKD <span className="text-brand-primary">Pro Trainer</span></span>
+            <div className="w-10 h-10 bg-brand-primary rounded-lg flex items-center justify-center shadow-lg shadow-brand-primary/20">
+              <Activity className="w-6 h-6 text-brand-dark" />
+            </div>
+            <span className="font-display font-bold text-2xl tracking-tight uppercase">UNLCKD <span className="text-brand-primary">Pro</span></span>
           </div>
           {step !== 'landing' && (
-            <Button variant="ghost" size="sm" onClick={() => setStep('landing')}>
+            <Button variant="ghost" size="sm" onClick={() => setStep('landing')} className="hover:bg-white/5">
               Exit
             </Button>
           )}
         </div>
       </header>
 
-      <main className="pt-24 pb-12 px-4 max-w-5xl mx-auto">
+      <main className="relative pt-32 pb-20 px-6 max-w-6xl mx-auto">
         <AnimatePresence mode="wait">
           {step === 'landing' && (
             <motion.div
@@ -298,71 +349,79 @@ export default function App() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="space-y-12 text-center"
+              className="space-y-16 text-center"
             >
-              <div className="space-y-4">
-                <Badge>Premium AI Coaching</Badge>
-                <h1 className="text-5xl md:text-7xl font-display font-bold tracking-tight leading-tight">
-                  Unlock Your <span className="text-brand-primary italic">Peak</span> Physique
+              <div className="space-y-6">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-primary/10 border border-brand-primary/20 text-brand-primary text-xs font-bold uppercase tracking-widest">
+                  <div className="w-1.5 h-1.5 rounded-full bg-brand-primary animate-pulse" />
+                  Premium AI Coaching
+                </div>
+                <h1 className="text-6xl md:text-8xl font-display font-bold tracking-tighter leading-[0.9] max-w-4xl mx-auto">
+                  Unlock Your <span className="text-brand-primary italic drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]">Peak</span> Physique
                 </h1>
-                <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+                <p className="text-gray-400 text-xl max-w-2xl mx-auto font-light leading-relaxed">
                   The elite digital coach that turns your data and photos into a structured, professional transformation plan.
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card className="p-6 hover:border-brand-primary/50 transition-all cursor-pointer group" onClick={() => handleStart('assessment')}>
-                  <div className="flex flex-col items-center text-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-brand-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <Camera className="w-6 h-6 text-brand-primary" />
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <Card className="p-8 bg-white/[0.02] backdrop-blur-sm border-white/5 hover:border-brand-primary/50 transition-all cursor-pointer group relative overflow-hidden" onClick={() => handleStart('assessment')}>
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/5 blur-3xl -mr-16 -mt-16 group-hover:bg-brand-primary/10 transition-colors" />
+                  <div className="flex flex-col items-center text-center gap-6 relative z-10">
+                    <div className="w-14 h-14 rounded-2xl bg-brand-primary/10 flex items-center justify-center group-hover:scale-110 group-hover:bg-brand-primary/20 transition-all duration-500">
+                      <Camera className="w-7 h-7 text-brand-primary" />
                     </div>
                     <div>
-                      <h3 className="font-display font-bold text-xl">Physique Assessment</h3>
-                      <p className="text-sm text-gray-500 mt-1">Detailed visual review and category ratings.</p>
+                      <h3 className="font-display font-bold text-2xl tracking-tight">Physique Assessment</h3>
+                      <p className="text-sm text-gray-500 mt-2 leading-relaxed">Detailed visual review and category ratings.</p>
                     </div>
                   </div>
                 </Card>
-                <Card className="p-6 hover:border-brand-primary/50 transition-all cursor-pointer group" onClick={() => handleStart('workout')}>
-                  <div className="flex flex-col items-center text-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-brand-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <Dumbbell className="w-6 h-6 text-brand-primary" />
+                <Card className="p-8 bg-white/[0.02] backdrop-blur-sm border-white/5 hover:border-brand-primary/50 transition-all cursor-pointer group relative overflow-hidden" onClick={() => handleStart('workout')}>
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/5 blur-3xl -mr-16 -mt-16 group-hover:bg-brand-primary/10 transition-colors" />
+                  <div className="flex flex-col items-center text-center gap-6 relative z-10">
+                    <div className="w-14 h-14 rounded-2xl bg-brand-primary/10 flex items-center justify-center group-hover:scale-110 group-hover:bg-brand-primary/20 transition-all duration-500">
+                      <Dumbbell className="w-7 h-7 text-brand-primary" />
                     </div>
                     <div>
-                      <h3 className="font-display font-bold text-xl">7-Day Workout Plan</h3>
-                      <p className="text-sm text-gray-500 mt-1">Tailored training split with sets and reps.</p>
+                      <h3 className="font-display font-bold text-2xl tracking-tight">Workout Plan</h3>
+                      <p className="text-sm text-gray-500 mt-2 leading-relaxed">Tailored training split with sets and reps.</p>
                     </div>
                   </div>
                 </Card>
-                <Card className="p-6 bg-brand-primary/5 border-brand-primary/30 hover:border-brand-primary transition-all cursor-pointer group md:col-span-2" onClick={() => handleStart('full')}>
-                  <div className="flex flex-col items-center text-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-brand-primary flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <FileText className="w-6 h-6 text-white" />
+                <Card className="p-8 bg-brand-primary/5 border-brand-primary/20 hover:border-brand-primary/50 transition-all cursor-pointer group relative overflow-hidden" onClick={() => handleStart('meal')}>
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/10 blur-3xl -mr-16 -mt-16 group-hover:bg-brand-primary/20 transition-colors" />
+                  <div className="flex flex-col items-center text-center gap-6 relative z-10">
+                    <div className="w-14 h-14 rounded-2xl bg-brand-primary/10 flex items-center justify-center group-hover:scale-110 group-hover:bg-brand-primary/20 transition-all duration-500">
+                      <Utensils className="w-7 h-7 text-brand-primary" />
                     </div>
                     <div>
-                      <h3 className="font-display font-bold text-xl">Full Transformation Report</h3>
-                      <p className="text-sm text-gray-500 mt-1">The complete assessment, training, and nutrition package.</p>
+                      <h3 className="font-display font-bold text-2xl tracking-tight">Meal Plan</h3>
+                      <p className="text-sm text-gray-500 mt-2 leading-relaxed">Goal-matched nutrition and grocery lists.</p>
                     </div>
                   </div>
                 </Card>
-                <Card className="p-6 hover:border-brand-primary/50 transition-all cursor-pointer group" onClick={() => handleStart('meal')}>
-                  <div className="flex flex-col items-center text-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-brand-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <Utensils className="w-6 h-6 text-brand-primary" />
+                <Card className="p-8 bg-white/[0.02] backdrop-blur-sm border-white/5 hover:border-brand-primary/50 transition-all cursor-pointer group relative overflow-hidden" onClick={() => handleStart('progress')}>
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/5 blur-3xl -mr-16 -mt-16 group-hover:bg-brand-primary/10 transition-colors" />
+                  <div className="flex flex-col items-center text-center gap-6 relative z-10">
+                    <div className="w-14 h-14 rounded-2xl bg-brand-primary/10 flex items-center justify-center group-hover:scale-110 group-hover:bg-brand-primary/20 transition-all duration-500">
+                      <Activity className="w-7 h-7 text-brand-primary" />
                     </div>
                     <div>
-                      <h3 className="font-display font-bold text-xl">7-Day Meal Plan</h3>
-                      <p className="text-sm text-gray-500 mt-1">Goal-matched nutrition and grocery lists.</p>
+                      <h3 className="font-display font-bold text-2xl tracking-tight">Weekly Progress Engine</h3>
+                      <p className="text-sm text-gray-500 mt-2 leading-relaxed">Compare before/after photos with expert feedback.</p>
                     </div>
                   </div>
                 </Card>
-                <Card className="p-6 border-brand-primary/20 hover:border-brand-primary transition-all cursor-pointer group" onClick={() => handleStart('progress')}>
-                  <div className="flex flex-col items-center text-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-brand-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <Activity className="w-6 h-6 text-brand-primary" />
+                <Card className="p-8 bg-brand-primary border-transparent hover:brightness-110 transition-all cursor-pointer group md:col-span-2 relative overflow-hidden" onClick={() => handleStart('full')}>
+                  <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 blur-3xl -mr-24 -mt-24 group-hover:bg-white/20 transition-colors" />
+                  <div className="flex flex-col items-center text-center gap-6 relative z-10">
+                    <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center group-hover:scale-110 transition-all duration-500 backdrop-blur-sm">
+                      <FileText className="w-8 h-8 text-white" />
                     </div>
                     <div>
-                      <h3 className="font-display font-bold text-xl">Progress Photo Engine</h3>
-                      <p className="text-sm text-gray-500 mt-1">Compare before/after photos with expert feedback.</p>
+                      <h3 className="font-display font-bold text-3xl tracking-tight text-white">Full Transformation Report</h3>
+                      <p className="text-white/70 mt-2 leading-relaxed max-w-md">The complete assessment, training, and nutrition package for serious results.</p>
                     </div>
                   </div>
                 </Card>
@@ -378,13 +437,14 @@ export default function App() {
               exit={{ opacity: 0, x: -20 }}
               className="max-w-2xl mx-auto space-y-8"
             >
-              <div className="space-y-2">
-                <h2 className="text-3xl font-display font-bold">Smart Intake</h2>
-                <p className="text-gray-400">Tell us about your current status and goals.</p>
+              <div className="space-y-4">
+                <h2 className="text-4xl font-display font-bold tracking-tight">Smart Intake</h2>
+                <p className="text-gray-400 text-lg font-light">Tell us about your current status and goals.</p>
               </div>
 
-              <form onSubmit={handleIntakeSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <form onSubmit={handleIntakeSubmit} className="space-y-8 bg-white/[0.02] backdrop-blur-md p-8 rounded-3xl border border-white/5 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-brand-primary to-transparent opacity-50" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <Input 
                     label="Full Name" 
                     placeholder="John Doe" 
@@ -394,79 +454,101 @@ export default function App() {
                   />
                   <Input 
                     label="Location" 
-                    placeholder="London, UK" 
+                    placeholder="e.g. London, UK" 
                     required 
                     value={userData.location}
                     onChange={e => setUserData({...userData, location: e.target.value})}
                   />
+                  <Input 
+                    label="Occupation" 
+                    placeholder="e.g. Software Engineer" 
+                    required 
+                    value={userData.occupation}
+                    onChange={e => setUserData({...userData, occupation: e.target.value})}
+                  />
 
-                  {path !== 'meal' && (
+                  <Input 
+                    label="Age" 
+                    type="number" 
+                    placeholder="25" 
+                    required 
+                    value={userData.age}
+                    onChange={e => setUserData({...userData, age: e.target.value})}
+                  />
+                  <Select 
+                    label="Sex" 
+                    options={[{label: 'Male', value: 'male'}, {label: 'Female', value: 'female'}]} 
+                    value={userData.sex}
+                    onChange={e => setUserData({...userData, sex: e.target.value})}
+                  />
+                  
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-end">
+                      <label className="text-sm font-medium text-gray-400">Height</label>
+                      <div className="flex bg-brand-surface rounded-md p-0.5 border border-gray-800">
+                        <button 
+                          type="button"
+                          className={cn("px-2 py-0.5 text-[10px] rounded", userData.heightUnit === 'cm' ? "bg-brand-primary text-white" : "text-gray-500")}
+                          onClick={() => setUserData({...userData, heightUnit: 'cm'})}
+                        >CM</button>
+                        <button 
+                          type="button"
+                          className={cn("px-2 py-0.5 text-[10px] rounded", userData.heightUnit === 'ftin' ? "bg-brand-primary text-white" : "text-gray-500")}
+                          onClick={() => setUserData({...userData, heightUnit: 'ftin'})}
+                        >FT/IN</button>
+                      </div>
+                    </div>
+                    <Input 
+                      placeholder={userData.heightUnit === 'cm' ? "180" : "6'4\""} 
+                      required 
+                      value={userData.height}
+                      onChange={e => setUserData({...userData, height: e.target.value})}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-end">
+                      <label className="text-sm font-medium text-gray-400">Weight</label>
+                      <div className="flex bg-brand-surface rounded-md p-0.5 border border-gray-800">
+                        <button 
+                          type="button"
+                          className={cn("px-2 py-0.5 text-[10px] rounded", userData.weightUnit === 'kg' ? "bg-brand-primary text-white" : "text-gray-500")}
+                          onClick={() => setUserData({...userData, weightUnit: 'kg'})}
+                        >KG</button>
+                        <button 
+                          type="button"
+                          className={cn("px-2 py-0.5 text-[10px] rounded", userData.weightUnit === 'lbs' ? "bg-brand-primary text-white" : "text-gray-500")}
+                          onClick={() => setUserData({...userData, weightUnit: 'lbs'})}
+                        >LBS</button>
+                      </div>
+                    </div>
+                    <Input 
+                      placeholder={userData.weightUnit === 'kg' ? "85" : "187"} 
+                      required 
+                      value={userData.weight}
+                      onChange={e => setUserData({...userData, weight: e.target.value})}
+                    />
+                  </div>
+
+                  {(path !== 'assessment' && path !== 'progress') && (
+                    <Select 
+                      label="Physical Activity Level"
+                      options={[
+                        {label: 'Sedentary (Office job, little exercise)', value: 'sedentary'}, 
+                        {label: 'Lightly Active (Light exercise 1-3 days/week)', value: 'light'},
+                        {label: 'Moderately Active (Moderate exercise 3-5 days/week)', value: 'moderate'},
+                        {label: 'Very Active (Hard exercise 6-7 days/week)', value: 'active'},
+                        {label: 'Extra Active (Very hard exercise & physical job)', value: 'extra'}
+                      ]} 
+                      value={userData.physicalActivity}
+                      onChange={e => setUserData({...userData, physicalActivity: e.target.value})}
+                    />
+                  )}
+
+                  {(path !== 'meal' && path !== 'assessment' && path !== 'progress') && (
                     <>
-                      <Input 
-                        label="Age" 
-                        type="number" 
-                        placeholder="25" 
-                        required 
-                        value={userData.age}
-                        onChange={e => setUserData({...userData, age: e.target.value})}
-                      />
                       <Select 
-                        label="Sex" 
-                        options={[{label: 'Male', value: 'male'}, {label: 'Female', value: 'female'}]} 
-                        value={userData.sex}
-                        onChange={e => setUserData({...userData, sex: e.target.value})}
-                      />
-                      
-                      <div className="space-y-1.5">
-                        <div className="flex justify-between items-end">
-                          <label className="text-sm font-medium text-gray-400">Height</label>
-                          <div className="flex bg-brand-surface rounded-md p-0.5 border border-gray-800">
-                            <button 
-                              type="button"
-                              className={cn("px-2 py-0.5 text-[10px] rounded", userData.heightUnit === 'cm' ? "bg-brand-primary text-white" : "text-gray-500")}
-                              onClick={() => setUserData({...userData, heightUnit: 'cm'})}
-                            >CM</button>
-                            <button 
-                              type="button"
-                              className={cn("px-2 py-0.5 text-[10px] rounded", userData.heightUnit === 'ftin' ? "bg-brand-primary text-white" : "text-gray-500")}
-                              onClick={() => setUserData({...userData, heightUnit: 'ftin'})}
-                            >FT/IN</button>
-                          </div>
-                        </div>
-                        <Input 
-                          placeholder={userData.heightUnit === 'cm' ? "180" : "6'4\""} 
-                          required 
-                          value={userData.height}
-                          onChange={e => setUserData({...userData, height: e.target.value})}
-                        />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <div className="flex justify-between items-end">
-                          <label className="text-sm font-medium text-gray-400">Weight</label>
-                          <div className="flex bg-brand-surface rounded-md p-0.5 border border-gray-800">
-                            <button 
-                              type="button"
-                              className={cn("px-2 py-0.5 text-[10px] rounded", userData.weightUnit === 'kg' ? "bg-brand-primary text-white" : "text-gray-500")}
-                              onClick={() => setUserData({...userData, weightUnit: 'kg'})}
-                            >KG</button>
-                            <button 
-                              type="button"
-                              className={cn("px-2 py-0.5 text-[10px] rounded", userData.weightUnit === 'lbs' ? "bg-brand-primary text-white" : "text-gray-500")}
-                              onClick={() => setUserData({...userData, weightUnit: 'lbs'})}
-                            >LBS</button>
-                          </div>
-                        </div>
-                        <Input 
-                          placeholder={userData.weightUnit === 'kg' ? "85" : "187"} 
-                          required 
-                          value={userData.weight}
-                          onChange={e => setUserData({...userData, weight: e.target.value})}
-                        />
-                      </div>
-
-                      <Select 
-                        label="Gym Access" 
+                        label="Gym Access"
                         options={[
                           {label: 'Full Commercial Gym', value: 'full'}, 
                           {label: 'Home Gym (Basic)', value: 'home'},
@@ -476,7 +558,7 @@ export default function App() {
                         onChange={e => setUserData({...userData, gymAccess: e.target.value})}
                       />
                       <Select 
-                        label="Preferred Physique Style" 
+                        label="Preferred Physique Style"
                         options={[
                           {label: 'Athletic', value: 'athletic'}, 
                           {label: 'Bodybuilder', value: 'bodybuilder'},
@@ -489,22 +571,38 @@ export default function App() {
                     </>
                   )}
 
-                  <Select 
-                    label="Calorie Preference" 
-                    options={[
-                      {label: 'Deficit (Fat Loss)', value: 'deficit'}, 
-                      {label: 'Maintain (Recomp)', value: 'maintain'},
-                      {label: 'Surplus (Muscle Gain)', value: 'surplus'}
-                    ]} 
-                    value={userData.caloriePreference}
-                    onChange={e => setUserData({...userData, caloriePreference: e.target.value as any})}
-                  />
+                  {path === 'meal' && (
+                    <Select 
+                      label="Calorie Preference" 
+                      options={[
+                        {label: 'Deficit (Fat Loss)', value: 'deficit'}, 
+                        {label: 'Maintain (Recomp)', value: 'maintain'},
+                        {label: 'Surplus (Muscle Gain)', value: 'surplus'}
+                      ]} 
+                      value={userData.caloriePreference}
+                      onChange={e => setUserData({...userData, caloriePreference: e.target.value as any})}
+                    />
+                  )}
+
+                  {(path === 'workout' || path === 'meal' || path === 'full') && (
+                    <Select 
+                      label="Plan Duration"
+                      options={[
+                        {label: '7-Day', value: '7-day'}, 
+                        {label: '2 Week', value: '2-week'},
+                        {label: '4 Week', value: '4-week'},
+                        {label: '12 Week', value: '12-week'}
+                      ]} 
+                      value={userData.planDuration}
+                      onChange={e => setUserData({...userData, planDuration: e.target.value as any})}
+                    />
+                  )}
                 </div>
 
-                {path !== 'meal' && (
+                {(path !== 'meal' && path !== 'assessment' && path !== 'progress') && (
                   <>
                     <Input 
-                      label="Primary Goal" 
+                      label="Primary Goal"
                       placeholder="e.g. Lose 5kg fat while maintaining muscle" 
                       required 
                       value={userData.goals}
@@ -534,31 +632,68 @@ export default function App() {
                   </>
                 )}
 
-                {(path === 'meal' || path === 'full' || path === 'progress') && (
+                {(path === 'meal' || path === 'full') && (
                   <Input 
-                    label="Food Allergies or Non-preferred Foods" 
-                    placeholder="e.g. Dairy allergy, No cilantro, Vegan" 
+                    label="Food preferences and Dietary Considerations (ex gout-prone, dislike tofu, dairy allergy)" 
+                    placeholder="e.g. Gout-prone, dislike tofu, dairy allergy" 
                     value={userData.allergies}
                     onChange={e => setUserData({...userData, allergies: e.target.value})}
                   />
                 )}
 
                 {path === 'progress' && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <Input 
-                      label="Before Photos Date" 
-                      type="date" 
-                      required 
-                      value={progressPhotos.beforeDate}
-                      onChange={e => setProgressPhotos({...progressPhotos, beforeDate: e.target.value})}
-                    />
-                    <Input 
-                      label="After Photos Date" 
-                      type="date" 
-                      required 
-                      value={progressPhotos.afterDate}
-                      onChange={e => setProgressPhotos({...progressPhotos, afterDate: e.target.value})}
-                    />
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <Input 
+                        label="Before Photos Date" 
+                        type="date" 
+                        required 
+                        value={progressPhotos.beforeDate}
+                        onChange={e => setProgressPhotos({...progressPhotos, beforeDate: e.target.value})}
+                      />
+                      <Input 
+                        label="After Photos Date" 
+                        type="date" 
+                        required 
+                        value={progressPhotos.afterDate}
+                        onChange={e => setProgressPhotos({...progressPhotos, afterDate: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-end">
+                        <h3 className="text-lg font-display font-bold text-gray-200">Weight Assessment</h3>
+                        <div className="flex bg-brand-surface rounded-md p-0.5 border border-gray-800">
+                          <button 
+                            type="button"
+                            className={cn("px-2 py-0.5 text-[10px] rounded", userData.weightUnit === 'kg' ? "bg-brand-primary text-white" : "text-gray-500")}
+                            onClick={() => setUserData({...userData, weightUnit: 'kg'})}
+                          >KG</button>
+                          <button 
+                            type="button"
+                            className={cn("px-2 py-0.5 text-[10px] rounded", userData.weightUnit === 'lbs' ? "bg-brand-primary text-white" : "text-gray-500")}
+                            onClick={() => setUserData({...userData, weightUnit: 'lbs'})}
+                          >LBS</button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <Input 
+                          label={`Before Weight (${userData.weightUnit})`}
+                          type="number" 
+                          required 
+                          placeholder="e.g. 85"
+                          value={progressPhotos.beforeWeight}
+                          onChange={e => setProgressPhotos({...progressPhotos, beforeWeight: e.target.value})}
+                        />
+                        <Input 
+                          label={`After Weight (${userData.weightUnit})`}
+                          type="number" 
+                          required 
+                          placeholder="e.g. 82"
+                          value={progressPhotos.afterWeight}
+                          onChange={e => setProgressPhotos({...progressPhotos, afterWeight: e.target.value})}
+                        />
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -694,7 +829,7 @@ export default function App() {
               className="max-w-4xl mx-auto space-y-12"
             >
               <div className="space-y-2 text-center">
-                <h2 className="text-3xl font-display font-bold">Progress Photo Engine</h2>
+                <h2 className="text-3xl font-display font-bold">Weekly Progress Engine</h2>
                 <p className="text-gray-400">Upload your before and after photos for a detailed comparison.</p>
               </div>
 
@@ -849,364 +984,607 @@ export default function App() {
               key="report"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="space-y-16 max-w-5xl mx-auto"
+              className="space-y-16 max-w-5xl mx-auto relative"
             >
+              {/* Download Button */}
+              <div className="absolute top-0 right-0 flex gap-3 no-print">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="gap-2 border-brand-primary/30 hover:bg-brand-primary/10"
+                  onClick={() => window.print()}
+                >
+                  <Download className="w-4 h-4" />
+                  Download PDF
+                </Button>
+              </div>
+
               {/* Page 1: Header & Baseline Info */}
               <section className="space-y-8">
                 <div className="text-center space-y-2">
-                  <h1 className="text-4xl font-display font-bold text-brand-primary">UNLCKD Transformation Report</h1>
-                  <p className="text-gray-500">Baseline Assessment, 7-Day Training Plan, and Nutrition Strategy</p>
+                  <h1 className="text-4xl font-display font-bold text-brand-primary">
+                    {path === 'meal' ? 'UNLCKD Meal Plan' : 
+                     path === 'workout' ? 'UNLCKD Workout Plan' : 
+                     path === 'progress' ? 'UNLCKD Weekly Comparison Report' :
+                     'UNLCKD Transformation Report'}
+                  </h1>
+                  <p className="text-gray-500">
+                    {path === 'meal' ? 'Nutrition Strategy, Meal Plan, and Grocery List' :
+                     path === 'workout' ? 'Training Plan, Recovery, and Hydration Strategy' :
+                     'Baseline Assessment, Training Plan, and Nutrition Strategy'}
+                  </p>
                 </div>
 
-                <div className="bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl overflow-hidden">
+                <div className="bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl overflow-hidden print-bg-white print-border-gray">
                   <table className="w-full text-sm text-left border-collapse">
-                    <tbody className="divide-y divide-gray-800">
+                    <tbody className="divide-y divide-gray-800 print-divide-gray">
                       {[
                         { label: 'Client Name', value: userData.name },
-                        { label: 'Report Type', value: path === 'progress' ? 'Progress Photo Engine' : 'Transformation Report' },
+                        { label: 'Report Type', value: 
+                          path === 'progress' ? 'UNLCKD Weekly Comparison Report' : 
+                          path === 'meal' ? 'Meal Plan' :
+                          path === 'workout' ? 'Workout Plan' :
+                          'Transformation Report' 
+                        },
                         { label: 'Date', value: new Date().toLocaleDateString() },
                         { label: 'Age / Sex', value: `${userData.age} / ${userData.sex.charAt(0).toUpperCase() + userData.sex.slice(1)}` },
                         { label: 'Height / Weight', value: `${userData.height} ${userData.heightUnit} / ${userData.weight} ${userData.weightUnit}` },
                         { label: 'Location', value: userData.location },
-                        { label: 'Current Workout', value: userData.currentWorkout || 'None' },
-                        { label: 'Primary Goals', value: userData.goals },
+                        { label: 'Occupation', value: userData.occupation },
+                        ...(path !== 'meal' ? [{ label: 'Current Workout', value: userData.currentWorkout || 'None' }] : []),
+                        ...(path === 'meal' 
+                          ? [{ 
+                              label: 'Diet Strategy', 
+                              value: userData.caloriePreference === 'deficit' ? 'Lose Weight (Caloric Deficit)' : 
+                                     userData.caloriePreference === 'surplus' ? 'Gain Weight (Caloric Surplus)' : 
+                                     'Maintain Weight (Maintenance)' 
+                            }] 
+                          : (path === 'progress' ? [] : [{ label: 'Primary Goals', value: userData.goals }])),
                       ].map((row, i) => (
                         <tr key={i}>
-                          <td className="px-6 py-3 bg-brand-secondary/20 font-bold text-gray-200 w-1/3">{row.label}</td>
-                          <td className="px-6 py-3 text-gray-300">{row.value}</td>
+                          <td className="px-6 py-3 bg-brand-secondary/20 font-bold text-gray-200 w-1/3 print-bg-gray-100 print-text-black">{row.label}</td>
+                          <td className="px-6 py-3 text-gray-300 print-text-black">{row.value}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
 
-                {path !== 'progress' ? (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2 text-center">
-                      <div className="aspect-[3/4] rounded-xl overflow-hidden border border-gray-800">
-                        <img src={photos.front!} alt="Front" className="w-full h-full object-cover" />
+                {(path !== 'meal' && path !== 'workout') && (
+                  <>
+                    {path !== 'progress' ? (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2 text-center">
+                          <div className="aspect-[3/4] rounded-xl overflow-hidden border border-gray-800">
+                            <img src={photos.front!} alt="Front" className="w-full h-full object-cover" />
+                          </div>
+                          <span className="text-xs font-bold text-gray-500 uppercase">Front</span>
+                        </div>
+                        <div className="space-y-2 text-center">
+                          <div className="aspect-[3/4] rounded-xl overflow-hidden border border-gray-800">
+                            <img src={photos.back!} alt="Back" className="w-full h-full object-cover" />
+                          </div>
+                          <span className="text-xs font-bold text-gray-500 uppercase">Back</span>
+                        </div>
                       </div>
-                      <span className="text-xs font-bold text-gray-500 uppercase">Front</span>
-                    </div>
-                    <div className="space-y-2 text-center">
-                      <div className="aspect-[3/4] rounded-xl overflow-hidden border border-gray-800">
-                        <img src={photos.back!} alt="Back" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2 text-center">
+                          <div className="aspect-[3/4] rounded-xl overflow-hidden border border-gray-800">
+                            <img src={progressPhotos.after.front!} alt="After Front" className="w-full h-full object-cover" />
+                          </div>
+                          <span className="text-xs font-bold text-brand-primary uppercase">Latest Front View</span>
+                        </div>
+                        <div className="space-y-2 text-center">
+                          <div className="aspect-[3/4] rounded-xl overflow-hidden border border-gray-800">
+                            <img src={progressPhotos.after.back!} alt="After Back" className="w-full h-full object-cover" />
+                          </div>
+                          <span className="text-xs font-bold text-brand-primary uppercase">Latest Back View</span>
+                        </div>
                       </div>
-                      <span className="text-xs font-bold text-gray-500 uppercase">Back</span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2 text-center">
-                      <div className="aspect-[3/4] rounded-xl overflow-hidden border border-gray-800">
-                        <img src={progressPhotos.after.front!} alt="After Front" className="w-full h-full object-cover" />
-                      </div>
-                      <span className="text-xs font-bold text-brand-primary uppercase">Latest Front View</span>
-                    </div>
-                    <div className="space-y-2 text-center">
-                      <div className="aspect-[3/4] rounded-xl overflow-hidden border border-gray-800">
-                        <img src={progressPhotos.after.back!} alt="After Back" className="w-full h-full object-cover" />
-                      </div>
-                      <span className="text-xs font-bold text-brand-primary uppercase">Latest Back View</span>
-                    </div>
-                  </div>
+                    )}
+                  </>
                 )}
                 <LogoBranding />
               </section>
 
               {/* Page 2: Topline Assessment */}
-              <section className="space-y-8 pt-16 border-t border-gray-800">
-                {path !== 'progress' ? (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2 text-center">
-                      <div className="aspect-[3/4] rounded-xl overflow-hidden border border-gray-800">
-                        <img src={photos.left!} alt="Left" className="w-full h-full object-cover" />
+              {(path !== 'meal' && path !== 'workout') && (
+                <section className="space-y-8 pt-16 border-t border-gray-800">
+                  {path !== 'progress' ? (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2 text-center">
+                        <div className="aspect-[3/4] rounded-xl overflow-hidden border border-gray-800">
+                          <img src={photos.left!} alt="Left" className="w-full h-full object-cover" />
+                        </div>
+                        <span className="text-xs font-bold text-gray-500 uppercase">Left Side</span>
                       </div>
-                      <span className="text-xs font-bold text-gray-500 uppercase">Left Side</span>
-                    </div>
-                    <div className="space-y-2 text-center">
-                      <div className="aspect-[3/4] rounded-xl overflow-hidden border border-gray-800">
-                        <img src={photos.right!} alt="Right" className="w-full h-full object-cover" />
+                      <div className="space-y-2 text-center">
+                        <div className="aspect-[3/4] rounded-xl overflow-hidden border border-gray-800">
+                          <img src={photos.right!} alt="Right" className="w-full h-full object-cover" />
+                        </div>
+                        <span className="text-xs font-bold text-gray-500 uppercase">Right Side</span>
                       </div>
-                      <span className="text-xs font-bold text-gray-500 uppercase">Right Side</span>
                     </div>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2 text-center">
-                      <div className="aspect-[3/4] rounded-xl overflow-hidden border border-gray-800">
-                        <img src={progressPhotos.after.left!} alt="After Left" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2 text-center">
+                        <div className="aspect-[3/4] rounded-xl overflow-hidden border border-gray-800">
+                          <img src={progressPhotos.after.left!} alt="After Left" className="w-full h-full object-cover" />
+                        </div>
+                        <span className="text-xs font-bold text-brand-primary uppercase">Latest Left View</span>
                       </div>
-                      <span className="text-xs font-bold text-brand-primary uppercase">Latest Left View</span>
-                    </div>
-                    <div className="space-y-2 text-center">
-                      <div className="aspect-[3/4] rounded-xl overflow-hidden border border-gray-800">
-                        <img src={progressPhotos.after.right!} alt="After Right" className="w-full h-full object-cover" />
+                      <div className="space-y-2 text-center">
+                        <div className="aspect-[3/4] rounded-xl overflow-hidden border border-gray-800">
+                          <img src={progressPhotos.after.right!} alt="After Right" className="w-full h-full object-cover" />
+                        </div>
+                        <span className="text-xs font-bold text-brand-primary uppercase">Latest Right View</span>
                       </div>
-                      <span className="text-xs font-bold text-brand-primary uppercase">Latest Right View</span>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                <div className="p-6 bg-brand-surface border border-gray-800 rounded-xl text-gray-300 leading-relaxed">
-                  {report.toplineSummary}
-                </div>
+                  <div className="p-6 bg-brand-surface border border-gray-800 rounded-xl text-gray-300 leading-relaxed">
+                    {report.toplineSummary}
+                  </div>
 
-                <RatingTable title={path === 'progress' ? "Progress Ratings" : "Topline Ratings"} ratings={report.toplineRatings} />
-                <LogoBranding />
-              </section>
+                  <RatingTable title={path === 'progress' ? "Progress Ratings" : "Topline Ratings"} ratings={report.toplineRatings} />
+
+                  {path === 'progress' && report.healthMetrics && (
+                    <div className="space-y-6 pt-8 border-t border-gray-800">
+                      <h2 className="text-3xl font-display font-bold text-brand-primary">Health Metrics & Status</h2>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <Card className="p-6 bg-brand-surface border-gray-800">
+                          <div className="flex items-center gap-3 mb-4">
+                            <Activity className="w-5 h-5 text-brand-primary" />
+                            <h3 className="font-bold text-gray-200">Body Composition</h3>
+                          </div>
+                          <div className="space-y-4">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-gray-400">Estimated BMI</span>
+                              <span className="text-lg font-mono font-bold text-brand-primary">{report.healthMetrics.bmi}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-gray-400">BMI Category</span>
+                              <Badge className="border-brand-primary/30 text-brand-primary">{report.healthMetrics.bmiCategory}</Badge>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-gray-400">Est. Body Fat %</span>
+                              <span className="text-lg font-mono font-bold text-brand-primary">{report.healthMetrics.estimatedBodyFat}</span>
+                            </div>
+                          </div>
+                        </Card>
+                        <Card className="p-6 bg-brand-surface border-gray-800">
+                          <div className="flex items-center gap-3 mb-4">
+                            <Target className="w-5 h-5 text-brand-primary" />
+                            <h3 className="font-bold text-gray-200">Health Status & Focus</h3>
+                          </div>
+                          <div className="space-y-4">
+                            <div>
+                              <span className="text-xs font-bold text-gray-500 uppercase block mb-1">Current Status</span>
+                              <p className="text-sm text-gray-300 leading-relaxed">{report.healthMetrics.healthStatus}</p>
+                            </div>
+                            <div>
+                              <span className="text-xs font-bold text-gray-500 uppercase block mb-1">Recommended Focus</span>
+                              <p className="text-sm text-gray-300 leading-relaxed font-medium text-brand-primary">{report.healthMetrics.focus}</p>
+                            </div>
+                          </div>
+                        </Card>
+                      </div>
+                    </div>
+                  )}
+                  <LogoBranding />
+                </section>
+              )}
 
               {/* View Comparisons */}
-              <section className="space-y-16 pt-16 border-t border-gray-800">
-                {path !== 'progress' ? (
-                  <>
-                    <RatingTable title="Front View Comparison" ratings={report.frontViewAnalysis.ratings} summary={report.frontViewAnalysis.summary} photo={photos.front} />
-                    <RatingTable title="Left Side Comparison" ratings={report.leftViewAnalysis.ratings} summary={report.leftViewAnalysis.summary} photo={photos.left} />
-                    <RatingTable title="Back View Comparison" ratings={report.backViewAnalysis.ratings} summary={report.backViewAnalysis.summary} photo={photos.back} />
-                    <RatingTable title="Right Side Comparison" ratings={report.rightViewAnalysis.ratings} summary={report.rightViewAnalysis.summary} photo={photos.right} />
-                  </>
-                ) : (
-                  <>
-                    <ProgressComparison 
-                      title="Front View Comparison" 
-                      ratings={report.frontViewAnalysis.ratings} 
-                      summary={report.frontViewAnalysis.summary} 
-                      beforePhoto={progressPhotos.before.front} 
-                      afterPhoto={progressPhotos.after.front}
-                      beforeDate={progressPhotos.beforeDate}
-                      afterDate={progressPhotos.afterDate}
-                    />
-                    <ProgressComparison 
-                      title="Left Side Comparison" 
-                      ratings={report.leftViewAnalysis.ratings} 
-                      summary={report.leftViewAnalysis.summary} 
-                      beforePhoto={progressPhotos.before.left} 
-                      afterPhoto={progressPhotos.after.left}
-                      beforeDate={progressPhotos.beforeDate}
-                      afterDate={progressPhotos.afterDate}
-                    />
-                    <ProgressComparison 
-                      title="Back View Comparison" 
-                      ratings={report.backViewAnalysis.ratings} 
-                      summary={report.backViewAnalysis.summary} 
-                      beforePhoto={progressPhotos.before.back} 
-                      afterPhoto={progressPhotos.after.back}
-                      beforeDate={progressPhotos.beforeDate}
-                      afterDate={progressPhotos.afterDate}
-                    />
-                    <ProgressComparison 
-                      title="Right Side Comparison" 
-                      ratings={report.rightViewAnalysis.ratings} 
-                      summary={report.rightViewAnalysis.summary} 
-                      beforePhoto={progressPhotos.before.right} 
-                      afterPhoto={progressPhotos.after.right}
-                      beforeDate={progressPhotos.beforeDate}
-                      afterDate={progressPhotos.afterDate}
-                    />
-                  </>
-                )}
-                <LogoBranding />
-              </section>
+              {(path !== 'meal' && path !== 'workout') && (
+                <section className="space-y-16 pt-16 border-t border-gray-800">
+                    {path !== 'progress' ? (
+                      <>
+                        <RatingTable title="Front View Comparison" ratings={report.frontViewAnalysis?.ratings} summary={report.frontViewAnalysis?.summary} photo={photos.front} />
+                        <RatingTable title="Left Side Comparison" ratings={report.leftViewAnalysis?.ratings} summary={report.leftViewAnalysis?.summary} photo={photos.left} />
+                        <RatingTable title="Back View Comparison" ratings={report.backViewAnalysis?.ratings} summary={report.backViewAnalysis?.summary} photo={photos.back} />
+                        <RatingTable title="Right Side Comparison" ratings={report.rightViewAnalysis?.ratings} summary={report.rightViewAnalysis?.summary} photo={photos.right} />
+                      </>
+                    ) : (
+                      <>
+                        <ProgressComparison 
+                          title="Front View Comparison" 
+                          ratings={report.frontViewAnalysis?.ratings} 
+                          summary={report.frontViewAnalysis?.summary} 
+                          beforePhoto={progressPhotos.before.front} 
+                          afterPhoto={progressPhotos.after.front}
+                          beforeDate={progressPhotos.beforeDate}
+                          afterDate={progressPhotos.afterDate}
+                        />
+                        <ProgressComparison 
+                          title="Left Side Comparison" 
+                          ratings={report.leftViewAnalysis?.ratings} 
+                          summary={report.leftViewAnalysis?.summary} 
+                          beforePhoto={progressPhotos.before.left} 
+                          afterPhoto={progressPhotos.after.left}
+                          beforeDate={progressPhotos.beforeDate}
+                          afterDate={progressPhotos.afterDate}
+                        />
+                        <ProgressComparison 
+                          title="Back View Comparison" 
+                          ratings={report.backViewAnalysis?.ratings} 
+                          summary={report.backViewAnalysis?.summary} 
+                          beforePhoto={progressPhotos.before.back} 
+                          afterPhoto={progressPhotos.after.back}
+                          beforeDate={progressPhotos.beforeDate}
+                          afterDate={progressPhotos.afterDate}
+                        />
+                        <ProgressComparison 
+                          title="Right Side Comparison" 
+                          ratings={report.rightViewAnalysis?.ratings} 
+                          summary={report.rightViewAnalysis?.summary} 
+                          beforePhoto={progressPhotos.before.right} 
+                          afterPhoto={progressPhotos.after.right}
+                          beforeDate={progressPhotos.beforeDate}
+                          afterDate={progressPhotos.afterDate}
+                        />
+                      </>
+                    )}
+                  <LogoBranding />
+                </section>
+              )}
 
               {/* Final Summary & Next Steps */}
-              <section className="space-y-8 pt-16 border-t border-gray-800">
-                <h2 className="text-3xl font-display font-bold text-brand-primary">Final Summary / Next-Phase Improvement Plan</h2>
-                <RatingTable title="Strategic Ratings" ratings={report.finalSummary.ratings} />
-                
-                <div className="space-y-4">
-                  <h3 className="text-xl font-display font-bold text-gray-200">Coaching-Oriented Next Steps</h3>
-                  <div className="grid grid-cols-1 gap-4">
-                    {report.finalSummary.nextSteps.map((step, i) => (
-                      <div key={i} className="flex gap-4 p-4 bg-brand-surface border border-gray-800 rounded-xl items-start">
-                        <div className="w-6 h-6 rounded-full bg-brand-primary/10 flex items-center justify-center text-brand-primary font-bold text-xs shrink-0">{i + 1}</div>
-                        <p className="text-sm text-gray-300">{step}</p>
-                      </div>
-                    ))}
+              {(path !== 'meal' && path !== 'workout') && (
+                <section className="space-y-8 pt-16 border-t border-gray-800">
+                  <h2 className="text-3xl font-display font-bold text-brand-primary">Final Summary / Next-Phase Improvement Plan</h2>
+                  <RatingTable title="Strategic Ratings" ratings={report.finalSummary?.ratings} />
+                  
+                  <div className="space-y-4">
+                    <h3 className="text-xl font-display font-bold text-gray-200">Coaching-Oriented Next Steps</h3>
+                    <div className="grid grid-cols-1 gap-4">
+                      {report.finalSummary?.nextSteps?.map((step, i) => (
+                        <div key={i} className="flex gap-4 p-4 bg-brand-surface border border-gray-800 rounded-xl items-start">
+                          <div className="w-6 h-6 rounded-full bg-brand-primary/10 flex items-center justify-center text-brand-primary font-bold text-xs shrink-0">{i + 1}</div>
+                          <p className="text-sm text-gray-300">{step}</p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-                <LogoBranding />
-              </section>
+
+                  {path === 'progress' && report.recommendedWorkout && (
+                    <div className="space-y-6 pt-8 border-t border-gray-800">
+                      <div className="flex items-center gap-3">
+                        <Dumbbell className="w-8 h-8 text-brand-primary" />
+                        <h2 className="text-3xl font-display font-bold text-brand-primary">Recommended Targeted Workout</h2>
+                      </div>
+                      <div className="p-6 bg-brand-primary/5 border border-brand-primary/20 rounded-2xl">
+                        <h3 className="text-xl font-bold text-gray-200 mb-2">{report.recommendedWorkout.title}</h3>
+                        <p className="text-sm text-gray-400 mb-6 leading-relaxed">{report.recommendedWorkout.description}</p>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {report.recommendedWorkout.exercises?.map((ex, i) => (
+                            <div key={i} className="p-4 bg-brand-surface border border-gray-800 rounded-xl space-y-2">
+                              <div className="flex justify-between items-start">
+                                {ex.videoUrl ? (
+                                  <a 
+                                    href={ex.videoUrl} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer" 
+                                    className="font-bold text-brand-primary hover:underline flex items-center gap-1"
+                                  >
+                                    {ex.name} <ExternalLink className="w-3 h-3" />
+                                  </a>
+                                ) : (
+                                  <h4 className="font-bold text-brand-primary">{ex.name}</h4>
+                                )}
+                                <Badge className="text-[10px] border-gray-700">{ex.sets} x {ex.reps}</Badge>
+                              </div>
+                              <p className="text-xs text-gray-500 italic"><span className="text-gray-400 font-medium not-italic">Focus:</span> {ex.focus}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {path === 'progress' && report.additionalActivities && (
+                    <div className="space-y-6 pt-8 border-t border-gray-800">
+                      <div className="flex items-center gap-3">
+                        <Sparkles className="w-8 h-8 text-brand-primary" />
+                        <h2 className="text-3xl font-display font-bold text-brand-primary">Additional Health & Wellness Activities</h2>
+                      </div>
+                      <div className="p-6 bg-brand-surface border border-gray-800 rounded-2xl">
+                        <h3 className="text-xl font-bold text-gray-200 mb-2">{report.additionalActivities.title}</h3>
+                        <p className="text-sm text-gray-400 mb-6 leading-relaxed">{report.additionalActivities.description}</p>
+                        
+                        <div className="grid grid-cols-1 gap-4">
+                          {report.additionalActivities.activities?.map((act, i) => (
+                            <div key={i} className="p-4 bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl">
+                              <div className="flex justify-between items-center mb-2">
+                                <h4 className="font-bold text-brand-primary">{act.name}</h4>
+                                <Badge className="text-[10px] border-brand-primary/20">{act.frequency}</Badge>
+                              </div>
+                              <p className="text-sm text-gray-300"><span className="text-gray-500 font-bold uppercase text-[10px] mr-2">Benefit:</span>{act.benefit}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <LogoBranding />
+                </section>
+              )}
 
               {/* Workout Plan */}
-              <section className="space-y-8 pt-16 border-t border-gray-800">
-                <h2 className="text-3xl font-display font-bold text-brand-primary">7-Day Workout Plan</h2>
-                <div className="overflow-x-auto bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl">
-                  <table className="w-full text-sm text-left border-collapse">
-                    <thead className="bg-brand-secondary/20 text-gray-400 uppercase text-[10px] tracking-wider">
-                      <tr>
-                        <th className="px-4 py-3 font-semibold border-r border-gray-800">Day</th>
-                        <th className="px-4 py-3 font-semibold border-r border-gray-800">Focus</th>
-                        <th className="px-4 py-3 font-semibold border-r border-gray-800">Warm-Up</th>
-                        <th className="px-4 py-3 font-semibold border-r border-gray-800">Main Work</th>
-                        <th className="px-4 py-3 font-semibold">Notes</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-800">
-                      {report.workoutPlan.map((day, i) => (
-                        <tr key={i} className="hover:bg-white/5 transition-colors">
-                          <td className="px-4 py-4 font-bold text-brand-primary border-r border-gray-800">{day.day}</td>
-                          <td className="px-4 py-4 border-r border-gray-800 text-gray-200">{day.focus}</td>
-                          <td className="px-4 py-4 border-r border-gray-800 text-gray-400 text-xs">{day.warmUp}</td>
-                          <td className="px-4 py-4 border-r border-gray-800 text-gray-300 font-medium">{day.mainWork}</td>
-                          <td className="px-4 py-4 text-gray-400 text-xs italic">{day.notes}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <LogoBranding />
-              </section>
+              {(path === 'workout' || path === 'full') && (
+                <section className="space-y-8 pt-16 border-t border-gray-800">
+                  <div className="space-y-4">
+                    <h2 className="text-3xl font-display font-bold text-brand-primary">Deep Research & Goal Alignment</h2>
+                    <div className="p-6 bg-brand-primary/5 border border-brand-primary/20 rounded-2xl text-gray-300 leading-relaxed italic relative overflow-hidden">
+                      <div className="absolute top-0 left-0 w-1.5 h-full bg-brand-primary" />
+                      <div className="flex gap-4">
+                        <Search className="w-6 h-6 text-brand-primary shrink-0 mt-1" />
+                        <p className="text-sm md:text-base">
+                          {report.goalAlignmentSummary}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <h2 className="text-3xl font-display font-bold text-brand-primary">Workout Plan</h2>
+                  {report.workoutPlan?.map((week, weekIdx) => (
+                    <div key={weekIdx} className="space-y-4">
+                      <div className="flex items-center gap-4">
+                        <h3 className="text-xl font-display font-bold text-gray-200">Week {week.week}</h3>
+                        <Badge className="border-brand-primary/30 text-brand-primary">{week.phase}</Badge>
+                      </div>
+                      <div className="overflow-x-auto bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl print-bg-white print-border-gray">
+                        <table className="w-full text-sm text-left border-collapse">
+                          <thead className="bg-brand-secondary/20 text-gray-400 uppercase text-[10px] tracking-wider print-bg-gray-100 print-text-gray-600">
+                            <tr>
+                              <th className="px-4 py-3 font-semibold border-r border-gray-800 print-border-gray">Day</th>
+                              <th className="px-4 py-3 font-semibold border-r border-gray-800 print-border-gray">Focus</th>
+                              <th className="px-4 py-3 font-semibold border-r border-gray-800 print-border-gray">Warm-Up</th>
+                              <th className="px-4 py-3 font-semibold border-r border-gray-800 print-border-gray">Main Work</th>
+                              <th className="px-4 py-3 font-semibold">Notes</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-800 print-divide-gray">
+                            {week.days?.map((day, i) => (
+                              <tr key={i} className="hover:bg-white/5 transition-colors print:text-black">
+                                <td className="px-4 py-4 font-bold text-brand-primary border-r border-gray-800 print-text-black print:border-gray-200">{day.day}</td>
+                                <td className="px-4 py-4 border-r border-gray-800 text-gray-200 print-text-black print:border-gray-200">{day.focus}</td>
+                                <td className="px-4 py-4 border-r border-gray-800 text-gray-400 text-xs print:text-gray-700 print:border-gray-200">
+                                  <ReactMarkdown components={{ a: ({node, ...props}) => <a {...props} className="text-brand-primary hover:underline" target="_blank" rel="noopener noreferrer" /> }}>
+                                    {day.warmUp}
+                                  </ReactMarkdown>
+                                </td>
+                                <td className="px-4 py-4 border-r border-gray-800 text-gray-300 font-medium print:text-black print:border-gray-200">
+                                  <ReactMarkdown components={{ a: ({node, ...props}) => <a {...props} className="text-brand-primary hover:underline" target="_blank" rel="noopener noreferrer" /> }}>
+                                    {day.mainWork}
+                                  </ReactMarkdown>
+                                </td>
+                                <td className="px-4 py-4 text-gray-400 text-xs italic print:text-gray-600">{day.notes}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+                  <LogoBranding />
+                </section>
+              )}
 
               {/* Nutrition & Meal Plan */}
-              <section className="space-y-8 pt-16 border-t border-gray-800">
-                <h2 className="text-3xl font-display font-bold text-brand-primary">Nutrition Strategy</h2>
-                <div className="p-6 bg-brand-surface border border-gray-800 rounded-xl text-gray-300 leading-relaxed">
-                  {report.nutritionStrategy}
-                </div>
+              {(path === 'meal' || path === 'full') && (
+                <section className="space-y-8 pt-16 border-t border-gray-800">
+                  <h2 className="text-3xl font-display font-bold text-brand-primary">Nutrition Strategy</h2>
+                  <div className="p-6 bg-brand-surface border border-gray-800 rounded-xl text-gray-300 leading-relaxed">
+                    {report.nutritionStrategy}
+                  </div>
 
-                <div className="overflow-x-auto bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl">
-                  <table className="w-full text-sm text-left border-collapse">
-                    <thead className="bg-brand-secondary/20 text-gray-400 uppercase text-[10px] tracking-wider">
-                      <tr>
-                        <th className="px-4 py-3 font-semibold border-r border-gray-800">Day</th>
-                        <th className="px-4 py-3 font-semibold border-r border-gray-800">Breakfast</th>
-                        <th className="px-4 py-3 font-semibold border-r border-gray-800">Lunch</th>
-                        <th className="px-4 py-3 font-semibold border-r border-gray-800">Dinner</th>
-                        <th className="px-4 py-3 font-semibold">Snack</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-800">
-                      {report.mealPlan.map((day, i) => (
-                        <tr key={i} className="hover:bg-white/5 transition-colors">
-                          <td className="px-4 py-4 font-bold text-brand-primary border-r border-gray-800">{day.day}</td>
-                          <td className="px-4 py-4 border-r border-gray-800 text-gray-300">{day.breakfast}</td>
-                          <td className="px-4 py-4 border-r border-gray-800 text-gray-300">{day.lunch}</td>
-                          <td className="px-4 py-4 border-r border-gray-800 text-gray-300">{day.dinner}</td>
-                          <td className="px-4 py-4 text-gray-300">{day.snack}</td>
+                  <div className="overflow-x-auto bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl print-bg-white print-border-gray">
+                    <table className="w-full text-sm text-left border-collapse">
+                      <thead className="bg-brand-secondary/20 text-gray-400 uppercase text-[10px] tracking-wider print-bg-gray-100 print-text-gray-600">
+                        <tr>
+                          <th className="px-4 py-3 font-semibold border-r border-gray-800 print-border-gray">Week</th>
+                          <th className="px-4 py-3 font-semibold border-r border-gray-800 print-border-gray">Day</th>
+                          <th className="px-4 py-3 font-semibold border-r border-gray-800 print-border-gray">Breakfast</th>
+                          <th className="px-4 py-3 font-semibold border-r border-gray-800 print-border-gray">Lunch</th>
+                          <th className="px-4 py-3 font-semibold border-r border-gray-800 print-border-gray">Dinner</th>
+                          <th className="px-4 py-3 font-semibold">Snack</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <LogoBranding />
-              </section>
+                      </thead>
+                      <tbody className="divide-y divide-gray-800 print-divide-gray">
+                        {report.mealPlan?.map((week, weekIdx) => (
+                          <React.Fragment key={weekIdx}>
+                            {week.days?.map((day, i) => (
+                              <tr key={`${weekIdx}-${i}`} className="hover:bg-white/5 transition-colors print:text-black">
+                                {i === 0 && (
+                                  <td className="px-4 py-4 font-bold text-gray-400 border-r border-gray-800 print:border-gray-200" rowSpan={week.days.length}>
+                                    W{week.week}
+                                  </td>
+                                )}
+                                <td className="px-4 py-4 font-bold text-brand-primary border-r border-gray-800 print-text-black print:border-gray-200">{day.day}</td>
+                                <td className="px-4 py-4 border-r border-gray-800 text-gray-300 print-text-black print:border-gray-200">
+                                  <div className="flex flex-col gap-1">
+                                    <span>{day.breakfast}</span>
+                                    {day.breakfastUrl && (
+                                      <a href={day.breakfastUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-primary hover:underline flex items-center gap-1 no-print">
+                                        Recipe <ExternalLink className="w-2 h-2" />
+                                      </a>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-4 border-r border-gray-800 text-gray-300 print-text-black print:border-gray-200">
+                                  <div className="flex flex-col gap-1">
+                                    <span>{day.lunch}</span>
+                                    {day.lunchUrl && (
+                                      <a href={day.lunchUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-primary hover:underline flex items-center gap-1 no-print">
+                                        Recipe <ExternalLink className="w-2 h-2" />
+                                      </a>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-4 border-r border-gray-800 text-gray-300 print-text-black print:border-gray-200">
+                                  <div className="flex flex-col gap-1">
+                                    <span>{day.dinner}</span>
+                                    {day.dinnerUrl && (
+                                      <a href={day.dinnerUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-primary hover:underline flex items-center gap-1 no-print">
+                                        Recipe <ExternalLink className="w-2 h-2" />
+                                      </a>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-4 text-gray-300 print-text-black">
+                                  <div className="flex flex-col gap-1">
+                                    <span>{day.snack}</span>
+                                    {day.snackUrl && (
+                                      <a href={day.snackUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-primary hover:underline flex items-center gap-1 no-print">
+                                        Recipe <ExternalLink className="w-2 h-2" />
+                                      </a>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </React.Fragment>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <LogoBranding />
+                </section>
+              )}
 
               {/* Grocery List */}
-              <section className="space-y-8 pt-16 border-t border-gray-800">
-                <h2 className="text-3xl font-display font-bold text-brand-primary">Grocery List</h2>
-                <div className="bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl overflow-hidden">
-                  <table className="w-full text-sm text-left border-collapse">
-                    <thead className="bg-brand-secondary/20 text-gray-400 uppercase text-[10px] tracking-wider">
-                      <tr>
-                        <th className="px-6 py-3 font-semibold border-r border-gray-800 w-1/3">Category</th>
-                        <th className="px-6 py-3 font-semibold">Items</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-800">
-                      {report.groceryList.map((row, i) => (
-                        <tr key={i}>
-                          <td className="px-6 py-4 bg-brand-secondary/20 font-bold text-gray-200 border-r border-gray-800">{row.category}</td>
-                          <td className="px-6 py-4 text-gray-300">{row.items}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <LogoBranding />
-              </section>
-
-              {/* Recovery & Tracking */}
-              <section className="space-y-8 pt-16 border-t border-gray-800">
-                <h2 className="text-3xl font-display font-bold text-brand-primary">Recovery, Steps, Water, and Progress Tracking</h2>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <Card className="p-6 space-y-4">
-                    <div className="flex items-center gap-3">
-                      <Footprints className="w-5 h-5 text-brand-primary" />
-                      <h3 className="font-bold">Daily Step Target</h3>
-                    </div>
-                    <p className="text-sm text-gray-400">{report.stepGoals}</p>
-                  </Card>
-                  <Card className="p-6 space-y-4">
-                    <div className="flex items-center gap-3">
-                      <Droplets className="w-5 h-5 text-brand-primary" />
-                      <h3 className="font-bold">Daily Water Target</h3>
-                    </div>
-                    <p className="text-sm text-gray-400">{report.hydrationTargets}</p>
-                  </Card>
-                  <Card className="p-6 space-y-4">
-                    <div className="flex items-center gap-3">
-                      <Camera className="w-5 h-5 text-brand-primary" />
-                      <h3 className="font-bold">Weekly Photo Reminder</h3>
-                    </div>
-                    <p className="text-sm text-gray-400">Take progress photos once per week in the same lighting and time of day.</p>
-                  </Card>
-                </div>
-
-                <div className="space-y-4">
-                  <h3 className="text-xl font-display font-bold text-gray-200">Suggested Recovery Schedule</h3>
+              {(path !== 'workout' && path !== 'progress') && (
+                <section className="space-y-8 pt-16 border-t border-gray-800">
+                  <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                    <h2 className="text-3xl font-display font-bold text-brand-primary">Grocery List</h2>
+                    {report.recommendedGroceryStore && (
+                      <div className="flex items-center gap-2 px-4 py-2 bg-brand-primary/10 border border-brand-primary/30 rounded-lg">
+                        <MapPin className="w-4 h-4 text-brand-primary" />
+                        <span className="text-sm font-medium text-gray-200">Recommended Store: <span className="text-brand-primary">{report.recommendedGroceryStore}</span></span>
+                      </div>
+                    )}
+                  </div>
                   <div className="bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl overflow-hidden">
                     <table className="w-full text-sm text-left border-collapse">
                       <thead className="bg-brand-secondary/20 text-gray-400 uppercase text-[10px] tracking-wider">
                         <tr>
-                          <th className="px-6 py-3 font-semibold border-r border-gray-800 w-1/3">Day</th>
-                          <th className="px-6 py-3 font-semibold">Recovery Focus</th>
+                          <th className="px-6 py-3 font-semibold border-r border-gray-800 w-1/3">Category</th>
+                          <th className="px-6 py-3 font-semibold">Items</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-800">
-                        {report.recoverySchedule.map((row, i) => (
+                        {report.groceryList?.map((row, i) => (
                           <tr key={i}>
-                            <td className="px-6 py-4 bg-brand-secondary/20 font-bold text-gray-200 border-r border-gray-800">{row.day}</td>
-                            <td className="px-6 py-4 text-gray-300">{row.focus}</td>
+                            <td className="px-6 py-4 bg-brand-secondary/20 font-bold text-gray-200 border-r border-gray-800">{row.category}</td>
+                            <td className="px-6 py-4 text-gray-300">{row.items}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
-                </div>
+                  <LogoBranding />
+                </section>
+              )}
 
-                <div className="space-y-4">
-                  <h3 className="text-xl font-display font-bold text-gray-200">Practical Water Schedule</h3>
-                  <div className="grid grid-cols-1 gap-2">
-                    {report.waterSchedule.map((item, i) => (
-                      <div key={i} className="flex gap-3 items-center text-sm text-gray-400">
-                        <div className="w-1.5 h-1.5 rounded-full bg-brand-primary shrink-0" />
-                        {item}
+              {/* Recovery & Tracking */}
+              {(path !== 'meal' && path !== 'progress') && (
+                <section className="space-y-8 pt-16 border-t border-gray-800">
+                  <h2 className="text-3xl font-display font-bold text-brand-primary">Recovery, Steps, Water, and Progress Tracking</h2>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <Card className="p-6 space-y-4">
+                      <div className="flex items-center gap-3">
+                        <Footprints className="w-5 h-5 text-brand-primary" />
+                        <h3 className="font-bold">Daily Step Target</h3>
                       </div>
-                    ))}
+                      <p className="text-sm text-gray-400">{report.stepGoals}</p>
+                    </Card>
+                    <Card className="p-6 space-y-4">
+                      <div className="flex items-center gap-3">
+                        <Droplets className="w-5 h-5 text-brand-primary" />
+                        <h3 className="font-bold">Daily Water Target</h3>
+                      </div>
+                      <p className="text-sm text-gray-400">{report.hydrationTargets}</p>
+                    </Card>
+                    <Card className="p-6 space-y-4">
+                      <div className="flex items-center gap-3">
+                        <Camera className="w-5 h-5 text-brand-primary" />
+                        <h3 className="font-bold">Weekly Photo Reminder</h3>
+                      </div>
+                      <p className="text-sm text-gray-400">Take progress photos once per week in the same lighting and time of day.</p>
+                    </Card>
                   </div>
-                </div>
-                <LogoBranding />
-              </section>
+
+                  <div className="space-y-4">
+                    <h3 className="text-xl font-display font-bold text-gray-200">Suggested Recovery Schedule</h3>
+                    <div className="bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl overflow-hidden">
+                      <table className="w-full text-sm text-left border-collapse">
+                        <thead className="bg-brand-secondary/20 text-gray-400 uppercase text-[10px] tracking-wider">
+                          <tr>
+                            <th className="px-6 py-3 font-semibold border-r border-gray-800 w-1/3">Day</th>
+                            <th className="px-6 py-3 font-semibold">Recovery Focus</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-800">
+                          {report.recoverySchedule?.map((row, i) => (
+                            <tr key={i}>
+                              <td className="px-6 py-4 bg-brand-secondary/20 font-bold text-gray-200 border-r border-gray-800">{row.day}</td>
+                              <td className="px-6 py-4 text-gray-300">{row.focus}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="text-xl font-display font-bold text-gray-200">Practical Water Schedule</h3>
+                    <div className="grid grid-cols-1 gap-2">
+                      {report.waterSchedule?.map((item, i) => (
+                        <div key={i} className="flex gap-3 items-center text-sm text-gray-400">
+                          <div className="w-1.5 h-1.5 rounded-full bg-brand-primary shrink-0" />
+                          {item}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <LogoBranding />
+                </section>
+              )}
 
               {/* Trainer Summary */}
-              <section className="pt-16 border-t border-gray-800">
-                <h2 className="text-3xl font-display font-bold text-brand-primary mb-8">Trainer Follow-Up Summary</h2>
-                <div className="bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl overflow-hidden">
-                  <table className="w-full text-sm text-left border-collapse">
-                    <tbody className="divide-y divide-gray-800">
-                      {[
-                        { label: 'Name', value: userData.name },
-                        { label: 'Weight', value: `${userData.weight} ${userData.weightUnit}` },
-                        { label: 'Height', value: `${userData.height} ${userData.heightUnit}` },
-                        { label: 'Meal Plan', value: report.trainerSummary.split('\n')[0] },
-                        { label: 'Workout Plan', value: report.trainerSummary.split('\n')[1] || '7-day tailored split' },
-                        { label: 'Steps', value: report.stepGoals },
-                        { label: 'Water Intake', value: report.hydrationTargets },
-                      ].map((row, i) => (
-                        <tr key={i}>
-                          <td className="px-6 py-3 bg-brand-secondary/20 font-bold text-gray-200 w-1/3">{row.label}</td>
-                          <td className="px-6 py-3 text-gray-300">{row.value}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <LogoBranding />
-                <div className="mt-12 text-center">
-                  <Button size="lg" onClick={() => setStep('landing')}>Start New Assessment</Button>
-                </div>
-              </section>
+              {(path !== 'meal' && path !== 'progress') && (
+                <section className="pt-16 border-t border-gray-800">
+                  <h2 className="text-3xl font-display font-bold text-brand-primary mb-8">Trainer Follow-Up Summary</h2>
+                  <div className="bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl overflow-hidden">
+                    <table className="w-full text-sm text-left border-collapse">
+                      <tbody className="divide-y divide-gray-800">
+                        {[
+                          { label: 'Name', value: userData.name },
+                          { label: 'Weight', value: `${userData.weight} ${userData.weightUnit}` },
+                          { label: 'Height', value: `${userData.height} ${userData.heightUnit}` },
+                          ...(path !== 'workout' ? [{ label: 'Meal Plan', value: report.trainerSummary.split('\n')[0] }] : []),
+                          { label: 'Workout Plan', value: report.trainerSummary.split('\n')[1] || '7-day tailored split' },
+                          { label: 'Steps', value: report.stepGoals },
+                          { label: 'Water Intake', value: report.hydrationTargets },
+                        ].map((row, i) => (
+                          <tr key={i}>
+                            <td className="px-6 py-3 bg-brand-secondary/20 font-bold text-gray-200 w-1/3">{row.label}</td>
+                            <td className="px-6 py-3 text-gray-300">{row.value}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <LogoBranding />
+                  <div className="mt-12 text-center">
+                    <Button size="lg" onClick={() => setStep('landing')}>Start New Assessment</Button>
+                  </div>
+                </section>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
