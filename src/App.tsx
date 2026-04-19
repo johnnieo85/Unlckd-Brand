@@ -27,7 +27,10 @@ import {
   Trash2,
   LogIn,
   LogOut,
-  ChevronLeft
+  ChevronLeft,
+  Shield,
+  CreditCard,
+  Lock
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Button } from './components/ui/Button';
@@ -39,6 +42,7 @@ import { generateTransformationReport } from './services/gemini';
 import { auth } from './lib/firebase';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { historyService } from './services/historyService';
+import { ensureUserProfile, checkUserAccess } from './services/accessService';
 
 const LogoBranding = () => (
   <div className="hidden print:flex items-center justify-between border-t border-gray-200 pt-4 mt-8">
@@ -205,7 +209,7 @@ const ProgressComparison = ({ title, ratings = [], summary, beforePhoto, afterPh
 );
 
 export default function App() {
-  const [step, setStep] = useState<'landing' | 'intake' | 'photos' | 'progress-photos' | 'processing' | 'report' | 'history'>('landing');
+  const [step, setStep] = useState<'landing' | 'intake' | 'photos' | 'progress-photos' | 'processing' | 'report' | 'history' | 'no-access'>('landing');
   const [path, setPath] = useState<Path>('full');
   const [userData, setUserData] = useState<UserData>({
     name: '',
@@ -245,18 +249,27 @@ export default function App() {
   const [report, setReport] = useState<AssessmentResult | null>(null);
   const [loadingMessage, setLoadingMessage] = useState('Analyzing your physique...');
   const [user, setUser] = useState(auth.currentUser);
+  const [hasAccess, setHasAccess] = useState<boolean | null>(null);
   const [savedReports, setSavedReports] = useState<SavedReport[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
       if (user) {
-        loadHistory();
+        try {
+          const profile = await ensureUserProfile(user);
+          setHasAccess(profile.hasAccess);
+          loadHistory();
+        } catch (error) {
+          console.error("Error ensuring user profile:", error);
+          setHasAccess(false);
+        }
       } else {
         setSavedReports([]);
+        setHasAccess(null);
       }
     });
     historyService.testConnection();
@@ -301,6 +314,8 @@ export default function App() {
   const handleSignOut = async () => {
     try {
       await signOut(auth);
+      setSavedReports([]);
+      setHasAccess(null);
       setStep('landing');
     } catch (error) {
       console.error("Sign out failed:", error);
@@ -331,6 +346,12 @@ export default function App() {
       handleSignIn();
       return;
     }
+    
+    if (hasAccess === false) {
+      setStep('no-access');
+      return;
+    }
+
     setPath(selectedPath);
     setStep('intake');
   };
@@ -466,7 +487,14 @@ export default function App() {
                 </Button>
                 <div className="flex items-center gap-3 pl-4 border-l border-white/10">
                   <div className="text-right hidden sm:block">
-                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Signed In As</p>
+                    <div className="flex items-center gap-2 justify-end mb-0.5">
+                      {hasAccess ? (
+                        <Badge className="text-[8px] h-3.5 px-1 py-0 border-brand-primary/20 bg-brand-primary/10 text-brand-primary uppercase font-black leading-none">Pro</Badge>
+                      ) : (
+                        <Badge className="text-[8px] h-3.5 px-1 py-0 border-red-500/20 bg-red-500/10 text-red-500 uppercase font-black leading-none">Restricted</Badge>
+                      )}
+                      <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Signed In As</p>
+                    </div>
                     <p className="text-xs text-gray-300 font-medium truncate max-w-[120px]">{user.displayName || user.email}</p>
                   </div>
                   <Button variant="ghost" size="icon" onClick={handleSignOut} className="hover:bg-white/5 text-gray-400 hover:text-white">
@@ -589,6 +617,70 @@ export default function App() {
                   ))}
                 </div>
               )}
+            </motion.div>
+          )}
+
+          {step === 'no-access' && (
+            <motion.div
+              key="no-access"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="max-w-2xl mx-auto py-20 text-center space-y-12"
+            >
+              <div className="relative inline-block">
+                <div className="w-24 h-24 rounded-3xl bg-brand-primary/10 flex items-center justify-center mx-auto border border-brand-primary/20">
+                  <Lock className="w-10 h-10 text-brand-primary" />
+                </div>
+                <div className="absolute -top-2 -right-2 bg-brand-primary p-2 rounded-full shadow-lg">
+                  <Shield className="w-4 h-4 text-brand-dark" />
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h2 className="text-4xl font-display font-bold tracking-tight">Access Restricted</h2>
+                <p className="text-gray-400 text-lg font-light leading-relaxed">
+                  Your UNLCKD Pro membership is currently inactive. Complete your registration to unlock the full power of elite AI-driven transformation analysis.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-6 pt-4">
+                <a 
+                  href="https://unlckdbrand.com/unlckd-pro-trainer" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="p-8 bg-brand-primary text-brand-dark rounded-3xl group relative overflow-hidden transition-all hover:scale-[1.02] shadow-2xl shadow-brand-primary/20"
+                >
+                  <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <Sparkles className="w-20 h-20" />
+                  </div>
+                  <div className="space-y-2 relative z-10">
+                    <h3 className="text-2xl font-display font-bold uppercase italic">Purchase Pro Access</h3>
+                    <p className="font-medium opacity-80">One-time payment for lifetime coaching & analysis</p>
+                  </div>
+                </a>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <Button 
+                    variant="outline" 
+                    className="h-20 rounded-3xl border-white/5 hover:bg-white/5 gap-2"
+                    onClick={() => setStep('landing')}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    Back to Dashboard
+                  </Button>
+                  <div className="p-4 rounded-3xl bg-white/[0.02] border border-white/5 flex flex-col items-center justify-center text-center">
+                    <p className="text-[10px] text-gray-500 uppercase font-black tracking-[0.2em] mb-1">Status</p>
+                    <Badge className="text-red-500 border-red-500/20 bg-red-500/10">Pending Grant</Badge>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-8 border-t border-white/5">
+                <p className="text-xs text-gray-500 italic">
+                  Note: After purchase, access is typically granted within 24 hours. Once your status is updated in the UNLCKD cloud, premium tools will automatically unlock.
+                </p>
+              </div>
             </motion.div>
           )}
 

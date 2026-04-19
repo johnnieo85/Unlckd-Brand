@@ -14,12 +14,28 @@
         "progressPhotos": { "type": "object" }
       },
       "required": ["id", "timestamp", "path", "userData", "report", "photos"]
+    },
+    "User": {
+      "title": "User Profile",
+      "description": "User account information and access status",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "email": { "type": "string" },
+        "hasAccess": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "email", "hasAccess"]
     }
   },
   "firestore": {
     "/reports/{reportId}": {
       "schema": "Report",
       "description": "Collection of transformation reports"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles and access grants"
     }
   }
 }
