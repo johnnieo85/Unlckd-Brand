@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Dumbbell, 
@@ -22,15 +22,23 @@ import {
   Info,
   ExternalLink,
   Download,
-  Sparkles
+  Sparkles,
+  History,
+  Trash2,
+  LogIn,
+  LogOut,
+  ChevronLeft
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Button } from './components/ui/Button';
 import { Input, Select } from './components/ui/Input';
 import { Card, Badge } from './components/ui/Card';
 import { cn } from './lib/utils';
-import { Path, UserData, Photos, ProgressPhotos, AssessmentResult, Rating } from './types';
+import { Path, UserData, Photos, ProgressPhotos, AssessmentResult, Rating, SavedReport } from './types';
 import { generateTransformationReport } from './services/gemini';
+import { auth } from './lib/firebase';
+import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
+import { historyService } from './services/historyService';
 
 const LogoBranding = () => (
   <div className="hidden print:flex items-center justify-between border-t border-gray-200 pt-4 mt-8">
@@ -197,7 +205,7 @@ const ProgressComparison = ({ title, ratings = [], summary, beforePhoto, afterPh
 );
 
 export default function App() {
-  const [step, setStep] = useState<'landing' | 'intake' | 'photos' | 'progress-photos' | 'processing' | 'report'>('landing');
+  const [step, setStep] = useState<'landing' | 'intake' | 'photos' | 'progress-photos' | 'processing' | 'report' | 'history'>('landing');
   const [path, setPath] = useState<Path>('full');
   const [userData, setUserData] = useState<UserData>({
     name: '',
@@ -236,8 +244,77 @@ export default function App() {
   });
   const [report, setReport] = useState<AssessmentResult | null>(null);
   const [loadingMessage, setLoadingMessage] = useState('Analyzing your physique...');
+  const [user, setUser] = useState(auth.currentUser);
+  const [savedReports, setSavedReports] = useState<SavedReport[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
+      if (user) {
+        loadHistory();
+      } else {
+        setSavedReports([]);
+      }
+    });
+    historyService.testConnection();
+    return () => unsubscribe();
+  }, []);
+
+  const loadHistory = async () => {
+    setIsLoadingHistory(true);
+    try {
+      const reports = await historyService.getReports();
+      setSavedReports(reports);
+    } catch (error) {
+      console.error("Failed to load history:", error);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  const handleSignIn = async () => {
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (error) {
+      console.error("Sign in failed:", error);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+      setStep('landing');
+    } catch (error) {
+      console.error("Sign out failed:", error);
+    }
+  };
+
+  const handleDeleteReport = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await historyService.deleteReport(id);
+      setSavedReports(prev => prev.filter(r => r.id !== id));
+    } catch (error) {
+      console.error("Delete failed:", error);
+    }
+  };
+
+  const handleViewSavedReport = (saved: SavedReport) => {
+    setPath(saved.path);
+    setUserData(saved.userData);
+    setPhotos(saved.photos);
+    if (saved.progressPhotos) setProgressPhotos(saved.progressPhotos);
+    setReport(saved.report);
+    setStep('report');
+  };
 
   const handleStart = (selectedPath: Path) => {
+    if (!user) {
+      handleSignIn();
+      return;
+    }
     setPath(selectedPath);
     setStep('intake');
   };
@@ -276,6 +353,16 @@ export default function App() {
         path
       );
       setReport(result);
+      
+      if (user) {
+        try {
+          await historyService.saveReport(path, userData, result, photos, path === 'progress' ? progressPhotos : undefined);
+          await loadHistory();
+        } catch (saveError) {
+          console.error("Failed to save report to history:", saveError);
+        }
+      }
+      
       setStep('report');
     } catch (error) {
       console.error('Error generating report:', error);
@@ -333,16 +420,142 @@ export default function App() {
             </div>
             <span className="font-display font-bold text-2xl tracking-tight uppercase">UNLCKD <span className="text-brand-primary">Pro</span></span>
           </div>
-          {step !== 'landing' && (
-            <Button variant="ghost" size="sm" onClick={() => setStep('landing')} className="hover:bg-white/5">
-              Exit
-            </Button>
-          )}
+          
+          <div className="flex items-center gap-4 no-print">
+            {user ? (
+              <>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setStep('history')}
+                  className={cn("gap-2 hover:bg-white/5", step === 'history' && "text-brand-primary bg-white/5")}
+                >
+                  <History className="w-4 h-4" />
+                  My Reports
+                </Button>
+                <div className="flex items-center gap-3 pl-4 border-l border-white/10">
+                  <div className="text-right hidden sm:block">
+                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Signed In As</p>
+                    <p className="text-xs text-gray-300 font-medium truncate max-w-[120px]">{user.displayName || user.email}</p>
+                  </div>
+                  <Button variant="ghost" size="icon" onClick={handleSignOut} className="hover:bg-white/5 text-gray-400 hover:text-white">
+                    <LogOut className="w-4 h-4" />
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <Button size="sm" onClick={handleSignIn} className="gap-2 bg-brand-primary text-brand-dark font-bold hover:bg-brand-primary/90">
+                <LogIn className="w-4 h-4" />
+                Sign In
+              </Button>
+            )}
+            
+            {step !== 'landing' && (
+              <Button variant="ghost" size="sm" onClick={() => setStep('landing')} className="hover:bg-white/5 ml-2">
+                Exit
+              </Button>
+            )}
+          </div>
         </div>
       </header>
 
       <main className="relative pt-32 pb-20 px-6 max-w-6xl mx-auto">
         <AnimatePresence mode="wait">
+          {step === 'history' && (
+            <motion.div
+              key="history"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="space-y-8"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-4xl font-display font-bold tracking-tight">Your Transformation History</h2>
+                  <p className="text-gray-400 mt-2 text-lg font-light">Your professional assessments, preserved and tracked.</p>
+                </div>
+                <Button variant="outline" onClick={() => setStep('landing')} className="gap-2 border-white/10 hover:bg-white/5 rounded-xl">
+                  <ChevronLeft className="w-4 h-4" />
+                  Back to Dashboard
+                </Button>
+              </div>
+
+              {isLoadingHistory ? (
+                <div className="h-[400px] flex items-center justify-center">
+                  <Loader2 className="w-12 h-12 text-brand-primary animate-spin" />
+                </div>
+              ) : savedReports.length === 0 ? (
+                <Card className="p-16 text-center bg-white/[0.02] border-dashed border-white/10 rounded-3xl">
+                  <div className="max-w-sm mx-auto space-y-6">
+                    <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto">
+                      <History className="w-10 h-10 text-gray-500" />
+                    </div>
+                    <div className="space-y-2">
+                      <h3 className="text-xl font-bold">No reports found</h3>
+                      <p className="text-gray-400 font-light">Start your first assessment to begin building your transformation history.</p>
+                    </div>
+                    <Button onClick={() => setStep('landing')} className="bg-brand-primary text-brand-dark font-bold hover:bg-brand-primary/90 rounded-full px-8">
+                      Start New Assessment
+                    </Button>
+                  </div>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {savedReports.map((saved) => (
+                    <Card 
+                      key={saved.id} 
+                      className="group cursor-pointer bg-white/[0.02] border-white/5 hover:border-brand-primary/50 transition-all overflow-hidden relative rounded-3xl"
+                      onClick={() => handleViewSavedReport(saved)}
+                    >
+                      <div className="aspect-video relative overflow-hidden">
+                        <img 
+                          src={saved.photos.front || 'https://picsum.photos/seed/physique/800/600'} 
+                          alt="Report thumbnail"
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 blur-sm brightness-50"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-brand-dark via-transparent to-transparent" />
+                        <div className="absolute top-4 right-4 z-20">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-full"
+                            onClick={(e) => handleDeleteReport(saved.id, e)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button className="bg-brand-primary text-brand-dark font-bold rounded-full gap-2">
+                            View Report
+                            <ArrowRight className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="p-6 space-y-4">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <Badge className="bg-brand-primary/10 text-brand-primary border-none mb-2">
+                              {saved.path.toUpperCase()}
+                            </Badge>
+                            <h3 className="font-display font-bold text-xl tracking-tight leading-tight uppercase group-hover:text-brand-primary transition-colors">
+                              {saved.userData.name}
+                            </h3>
+                          </div>
+                          <p className="text-[10px] text-gray-500 font-mono">
+                            {saved.timestamp?.toDate ? saved.timestamp.toDate().toLocaleDateString() : 'Recent'}
+                          </p>
+                        </div>
+                        <p className="text-sm text-gray-400 line-clamp-2 font-light italic">
+                          "{saved.report.toplineSummary}"
+                        </p>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          )}
+
           {step === 'landing' && (
             <motion.div
               key="landing"

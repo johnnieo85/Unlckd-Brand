@@ -137,3 +137,13 @@ export interface AssessmentResult {
     }[];
   };
 }
+
+export interface SavedReport {
+  id: string;
+  timestamp: any;
+  path: Path;
+  userData: UserData;
+  report: AssessmentResult;
+  photos: Photos;
+  progressPhotos?: ProgressPhotos;
+}
