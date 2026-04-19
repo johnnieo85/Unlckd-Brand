@@ -1,4 +1,5 @@
 export type Path = 'assessment' | 'workout' | 'meal' | 'full' | 'progress';
+export type PlanDuration = '7-day' | '2-week' | '4-week' | '12-week';
 
 export interface UserData {
   name: string;
@@ -18,6 +19,8 @@ export interface UserData {
   allergies: string;
   currentWorkout: string;
   caloriePreference: 'deficit' | 'maintain' | 'surplus';
+  physicalActivity: string;
+  planDuration?: PlanDuration;
 }
 
 export interface Photos {
@@ -32,6 +35,8 @@ export interface ProgressPhotos {
   after: Photos;
   beforeDate: string;
   afterDate: string;
+  beforeWeight: string;
+  afterWeight: string;
 }
 
 export interface Rating {
@@ -64,24 +69,37 @@ export interface AssessmentResult {
     nextSteps: string[];
   };
   workoutPlan: {
-    day: string;
-    focus: string;
-    warmUp: string;
-    mainWork: string;
-    notes: string;
+    week: number;
+    phase: string;
+    days: {
+      day: string;
+      focus: string;
+      warmUp: string;
+      mainWork: string;
+      videoUrl?: string;
+      notes: string;
+    }[];
   }[];
   nutritionStrategy: string;
   mealPlan: {
-    day: string;
-    breakfast: string;
-    lunch: string;
-    dinner: string;
-    snack: string;
+    week: number;
+    days: {
+      day: string;
+      breakfast: string;
+      breakfastUrl?: string;
+      lunch: string;
+      lunchUrl?: string;
+      dinner: string;
+      dinnerUrl?: string;
+      snack: string;
+      snackUrl?: string;
+    }[];
   }[];
   groceryList: {
     category: string;
     items: string;
   }[];
+  recommendedGroceryStore?: string;
   recoverySchedule: {
     day: string;
     focus: string;
@@ -89,5 +107,33 @@ export interface AssessmentResult {
   waterSchedule: string[];
   stepGoals: string;
   hydrationTargets: string;
+  goalAlignmentSummary: string;
   trainerSummary: string;
+  healthMetrics?: {
+    bmi: number;
+    bmiCategory: string;
+    estimatedBodyFat: string;
+    healthStatus: string;
+    focus: string;
+  };
+  recommendedWorkout?: {
+    title: string;
+    description: string;
+    exercises: {
+      name: string;
+      sets: string;
+      reps: string;
+      focus: string;
+      videoUrl?: string;
+    }[];
+  };
+  additionalActivities?: {
+    title: string;
+    description: string;
+    activities: {
+      name: string;
+      benefit: string;
+      frequency: string;
+    }[];
+  };
 }
