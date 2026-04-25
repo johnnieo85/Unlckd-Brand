@@ -104,44 +104,51 @@ export async function generateTransformationReport(
           4. PATH-SPECIFIC GENERATION:
              - If path is "workout" or "meal": You MUST return empty objects/arrays for "toplineRatings", "frontViewAnalysis", "leftViewAnalysis", "backViewAnalysis", "rightViewAnalysis", and "finalSummary".
              - If path is "assessment": You MUST return empty arrays for "workoutPlan", "mealPlan", and "groceryList", and an empty string for "nutritionStrategy".
-             - If path is "progress": You MUST return empty arrays for "workoutPlan", "mealPlan", "groceryList", "recoverySchedule", "waterSchedule", and empty strings for "nutritionStrategy", "stepGoals", "hydrationTargets", "trainerSummary". You MUST provide "healthMetrics", "recommendedWorkout", and "additionalActivities".
+             - If path is "progress": You MUST return empty arrays for "workoutPlan", "mealPlan", "groceryList", "recoverySchedule", "waterSchedule", and empty strings for "nutritionStrategy", "stepGoals", "hydrationTargets", "trainerSummary".
+             - For ALL paths, you MUST provide "healthMetrics", "motivationalQuote", and "sleepRecommendation".
              - If path is "workout", "meal", or "full": You MUST provide a plan for the duration requested by the user (${userData.planDuration || '12-week'}).
              - Structure the response into weeks for relevant paths. If "7-day" is requested, return a single week with 7 days. If "2-week", "4-week", or "12-week" is requested, return the corresponding number of weeks.
              - Each week should have a specific focus or phase.
              - Ensure progressive overload in the workout plan.
              - AVOID REPETITION: If certain days or meals are similar across weeks, keep the descriptions extremely short to save tokens.
              - PRIORITY: Completing the entire requested duration is more important than detailed prose.
-          5. DIET STRATEGY (CALORIE PREFERENCE): Strictly adhere to the user's calorie preference (${userData.caloriePreference}).
+          5. MOTIVATIONAL QUOTE: Generate a unique, powerful motivational quote specifically for this user's situation. The quote MUST be followed by the text "Unlock your greatness."
+          6. SLEEP RECOMMENDATION: Provide deep research on sleep requirements tailored to support this user's specific workout routine, occupation, and goals. Explain why this specific amount and quality of sleep is necessary for their recovery and performance.
+          7. DIET STRATEGY (CALORIE PREFERENCE): Strictly adhere to the user's calorie preference (${userData.preference}). Calculate the estimated number of calories they should be eating daily based on their TDEE.
              - If "deficit": prioritize a sustainable energy deficit for fat loss (Lose Weight).
              - If "maintain": prioritize body recomposition and maintenance calories (Maintain Weight).
              - If "surplus": prioritize muscle gain and a energy surplus (Gain Weight).
-          5. FAT LOSS: If in deficit, prioritize high protein (1.6-2.2g/kg), and resistance training 2-4x/week.
-          6. VISCERAL FAT: Emphasize HIIT and moderate-to-vigorous aerobic work.
-          7. MOBILITY: Integrate dynamic mobility in warm-ups and static stretching for recovery.
-          8. TRAINING MODALITIES: Utilize Kettlebells, Resistance Bands, and Bodyweight where appropriate.
-          9. If NO photos are provided, provide a text-only assessment based on the user's data (age, weight, height, goals, calorie preference).
-          10. WORKOUT VIDEOS: For each exercise in the "mainWork" and "warmUp" fields, you MUST provide a direct YouTube video URL (e.g., https://www.youtube.com/watch?v=...) that shows how to perform the exercise. CRITICAL: The links MUST point to a single video player page, never to a search results page (e.g., /results?search_query=) or a channel page. Use markdown format: [Exercise Name](Direct YouTube URL). Ensure the link is for the specific exercise mentioned.
-          11. MEAL RECIPES: For each meal in the meal plan, provide a direct Pinterest recipe link in the corresponding "Url" field (e.g., breakfastUrl).
-          12. GROCERY STORE: Recommend a specific grocery store (e.g., Whole Foods, Trader Joe's, Tesco, etc.) where the user can find the majority of their grocery list items based on their location (${userData.location}) and the generated list.
-          13. HYDRATION UNITS: If the user's weight unit is "lbs" (${userData.weightUnit}), provide all hydration targets and water schedules in imperial units (ounces/oz). If "kg", use metric (liters/L).
-          14. GOAL ALIGNMENT SUMMARY: Provide a "goalAlignmentSummary" (under 500 characters) that conducts a short overview of what will help the person reach their desired goal. This must convey that deep research was conducted on their specific goals (${userData.goals}) and their occupation (${userData.occupation}), explaining why the generated workout plan is the optimal fit for them.
-          15. HYDRATION RESEARCH: Conduct deep research on water consumption specifically for this user. The "hydrationTargets" and "waterSchedule" MUST be tailored to:
+          8. FAT LOSS: If in deficit, prioritize high protein (1.6-2.2g/kg), and resistance training 2-4x/week.
+          9. VISCERAL FAT: Emphasize HIIT and moderate-to-vigorous aerobic work.
+          10. MOBILITY: Integrate dynamic mobility in warm-ups and static stretching for recovery.
+          11. TRAINING MODALITIES: Utilize Kettlebells, Resistance Bands, and Bodyweight where appropriate.
+          12. If NO photos are provided, provide a text-only assessment based on the user's data (age, weight, height, goals, calorie preference).
+          13. WORKOUT VIDEOS: For each exercise in the "mainWork" and "warmUp" fields, you MUST provide a direct YouTube video URL (e.g., https://www.youtube.com/watch?v=...) that shows how to perform the exercise. CRITICAL: The links MUST point to a single video player page, never to a search results page (e.g., /results?search_query=) or a channel page. Use markdown format: [Exercise Name](Direct YouTube URL). Ensure the link is for the specific exercise mentioned.
+          14. MEAL RECIPES: For each meal in the meal plan, provide a direct Pinterest recipe link in the corresponding "Url" field (e.g., breakfastUrl).
+          15. GROCERY STORE: Recommend a specific grocery store (e.g., Whole Foods, Trader Joe's, Tesco, etc.) where the user can find the majority of their grocery list items based on their location (${userData.location}) and the generated list.
+          16. HYDRATION UNITS: If the user's weight unit is "lbs" (${userData.weightUnit}), provide all hydration targets and water schedules in imperial units (ounces/oz). If "kg", use metric (liters/L).
+          17. GOAL ALIGNMENT SUMMARY: Provide a "goalAlignmentSummary" (under 500 characters) that conducts a short overview of what will help the person reach their desired goal. This must convey that deep research was conducted on their specific goals (${userData.goals}) and their occupation (${userData.occupation}), explaining why the generated workout plan is the optimal fit for them.
+          18. HYDRATION RESEARCH: Conduct deep research on water consumption specifically for this user. The "hydrationTargets" and "waterSchedule" MUST be tailored to:
               - Their workout desire and intensity.
               - Recommended daily intake based on weight (${userData.weight} ${userData.weightUnit}) and activity level (${userData.physicalActivity}).
               - Any reported health conditions or injuries (${userData.injuries || 'None'}).
               Explain the logic behind these targets in the "hydrationTargets" field.
-          16. OCCUPATION-CENTERED TRAINING: The workout plan MUST be centered around deep research on their occupation (${userData.occupation}). For example, if they have a sedentary desk job, prioritize posture, hip mobility, and metabolic conditioning. If they have a physically demanding job, prioritize recovery, structural balance, and injury prevention.
-          17. EXTREME CONCISENESS: To prevent JSON truncation, you MUST keep all descriptions, evaluations, and notes extremely brief (under 150 characters per field).
-          18. HEALTH METRICS & RECOMMENDED WORKOUT (PROGRESS PATH ONLY):
-              - If path is "progress", you MUST calculate:
+          19. OCCUPATION-CENTERED TRAINING: The workout plan MUST be centered around deep research on their occupation (${userData.occupation}). For example, if they have a sedentary desk job, prioritize posture, hip mobility, and metabolic conditioning. If they have a physically demanding job, prioritize recovery, structural balance, and injury prevention.
+          20. EXTREME CONCISENESS: To prevent JSON truncation, you MUST keep all descriptions, evaluations, and notes extremely brief (under 150 characters per field).
+          21. HEALTH METRICS:
+              - You MUST calculate:
                 - BMI: (weight in kg) / (height in m)^2.
-                - BMI Category: (Underweight, Healthy, Overweight, Obese).
+                - BMI Category: (Underweight, Fit, Overweight, Obese).
                 - Estimated Body Fat %: Based on visual analysis of photos and user data.
                 - Health Status: A summary of their current physical health based on BMI and body fat.
                 - Focus: What they should prioritize (e.g., "Focus on a slight calorie deficit to reach a healthy BMI range").
-              - Recommended Workout: Provide a single, deeply researched workout routine (title, description, and 4-6 specific exercises) tailored to address the "concerning areas" identified in the physique comparison. For each exercise, include a direct YouTube video URL (not a search link or channel link) in the "videoUrl" field. Ensure the link points specifically to a single video showing that exercise.
-              - Additional Activities: Conduct deep research and provide a section about additional activities to help reach goals, such as sauna, massages, swimming, or any other activity that may assist with becoming healthy. Include a title, description, and a list of 3-4 specific activities with their benefits and recommended frequency.
-          19. Return ONLY valid JSON matching the provided schema.
+                - Recommended Calorie Level: (maintain, deficit, surplus).
+                - Estimated Daily Calories: An exact number or narrow range (e.g., "2,200 - 2,400 kcal").
+          22. RECOMMENDED WORKOUT & ADDITIONAL ACTIVITIES (PROGRESS & ASSESSMENT ONLY):
+              - If path is "progress" or "assessment":
+                - Recommended Workout: Provide a single, deeply researched workout routine (title, description, and 4-6 specific exercises) tailored to address the "concerning areas" identified in the physique comparison. For each exercise, include a direct YouTube video URL (not a search link or channel link) in the "videoUrl" field. Ensure the link points specifically to a single video showing that exercise.
+                - Additional Activities: Conduct deep research and provide a section about additional activities to help reach goals, such as sauna, massages, swimming, or any other activity that may assist with becoming healthy. Include a title, description, and a list of 3-4 specific activities with their benefits and recommended frequency.
+          23. Return ONLY valid JSON matching the provided schema.
         `,
         responseMimeType: "application/json",
         maxOutputTokens: 65536,
@@ -272,6 +279,24 @@ export async function generateTransformationReport(
                 },
               },
             },
+            motivationalQuote: {
+              type: Type.OBJECT,
+              properties: {
+                text: { type: Type.STRING },
+                author: { type: Type.STRING },
+              },
+            },
+            sleepRecommendation: {
+              type: Type.OBJECT,
+              properties: {
+                duration: { type: Type.STRING },
+                rationale: { type: Type.STRING },
+                tips: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING },
+                },
+              },
+            },
             nutritionStrategy: { type: Type.STRING },
             mealPlan: {
               type: Type.ARRAY,
@@ -336,6 +361,8 @@ export async function generateTransformationReport(
                 estimatedBodyFat: { type: Type.STRING },
                 healthStatus: { type: Type.STRING },
                 focus: { type: Type.STRING },
+                recommendedCalorieLevel: { type: Type.STRING },
+                dailyCalorieTarget: { type: Type.STRING },
               },
             },
             recommendedWorkout: {

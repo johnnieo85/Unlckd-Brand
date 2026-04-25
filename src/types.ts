@@ -80,6 +80,15 @@ export interface AssessmentResult {
       notes: string;
     }[];
   }[];
+  motivationalQuote?: {
+    text: string;
+    author?: string;
+  };
+  sleepRecommendation?: {
+    duration: string;
+    rationale: string;
+    tips: string[];
+  };
   nutritionStrategy: string;
   mealPlan: {
     week: number;
@@ -115,6 +124,8 @@ export interface AssessmentResult {
     estimatedBodyFat: string;
     healthStatus: string;
     focus: string;
+    recommendedCalorieLevel: 'maintain' | 'deficit' | 'surplus';
+    dailyCalorieTarget: string;
   };
   recommendedWorkout?: {
     title: string;
