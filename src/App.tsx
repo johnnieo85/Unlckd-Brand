@@ -30,7 +30,10 @@ import {
   ChevronLeft,
   Shield,
   CreditCard,
-  Lock
+  Lock,
+  Quote,
+  Moon,
+  Instagram
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Button } from './components/ui/Button';
@@ -52,7 +55,13 @@ const LogoBranding = () => (
       </div>
       <span className="font-display font-bold text-sm tracking-tight uppercase text-black">UNLCKD <span className="text-gray-600">Pro</span></span>
     </div>
-    <span className="text-[10px] text-gray-400 uppercase tracking-widest">Official Transformation Report</span>
+    <div className="flex items-center gap-4">
+      <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+        <Instagram className="w-3 h-3 text-brand-primary" />
+        unlckd_brand
+      </div>
+      <span className="text-[10px] text-gray-400 uppercase tracking-widest">Official Transformation Report</span>
+    </div>
   </div>
 );
 
@@ -1401,6 +1410,24 @@ export default function App() {
                 </Button>
               </div>
 
+              {/* Motivational Quote */}
+              {report.motivationalQuote && (
+                <div className="text-center py-16 px-8 border border-brand-primary/20 bg-brand-primary/5 rounded-[2rem] relative overflow-hidden group">
+                  <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.1),transparent)] opacity-50" />
+                  <Quote className="w-10 h-10 text-brand-primary/20 mx-auto mb-6" />
+                  <h2 className="text-2xl md:text-3xl font-serif italic text-gray-100 leading-relaxed max-w-3xl mx-auto relative z-10">
+                    "{report.motivationalQuote.text}"
+                  </h2>
+                  {report.motivationalQuote.author && (
+                    <p className="mt-6 text-brand-primary font-bold tracking-widest text-sm uppercase relative z-10">— {report.motivationalQuote.author}</p>
+                  )}
+                  <div className="mt-10 flex flex-col items-center gap-2 relative z-10">
+                    <p className="text-gray-500 text-[10px] font-black uppercase tracking-[0.4em]">Unlock your greatness.</p>
+                    <div className="w-12 h-0.5 bg-brand-primary/30 rounded-full" />
+                  </div>
+                </div>
+              )}
+
               {/* Page 1: Header & Baseline Info */}
               <section className="space-y-8">
                 <div className="text-center space-y-2">
@@ -1531,9 +1558,9 @@ export default function App() {
 
                   <RatingTable title={path === 'progress' ? "Progress Ratings" : "Topline Ratings"} ratings={report.toplineRatings} />
 
-                  {path === 'progress' && report.healthMetrics && (
+                  {report.healthMetrics && (
                     <div className="space-y-6 pt-8 border-t border-gray-800">
-                      <h2 className="text-3xl font-display font-bold text-brand-primary">Health Metrics & Status</h2>
+                      <h2 className="text-3xl font-display font-bold text-brand-primary">Physique Assessment & Calorie Level</h2>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <Card className="p-6 bg-brand-surface border-gray-800">
                           <div className="flex items-center gap-3 mb-4">
@@ -1542,11 +1569,11 @@ export default function App() {
                           </div>
                           <div className="space-y-4">
                             <div className="flex justify-between items-center">
-                              <span className="text-sm text-gray-400">Estimated BMI</span>
+                              <span className="text-sm text-gray-400">BMI</span>
                               <span className="text-lg font-mono font-bold text-brand-primary">{report.healthMetrics.bmi}</span>
                             </div>
                             <div className="flex justify-between items-center">
-                              <span className="text-sm text-gray-400">BMI Category</span>
+                              <span className="text-sm text-gray-400">Category</span>
                               <Badge className="border-brand-primary/30 text-brand-primary">{report.healthMetrics.bmiCategory}</Badge>
                             </div>
                             <div className="flex justify-between items-center">
@@ -1557,10 +1584,34 @@ export default function App() {
                         </Card>
                         <Card className="p-6 bg-brand-surface border-gray-800">
                           <div className="flex items-center gap-3 mb-4">
+                            <Utensils className="w-5 h-5 text-brand-primary" />
+                            <h3 className="font-bold text-gray-200">Calorie Recommendation</h3>
+                          </div>
+                          <div className="space-y-4">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-gray-400">Strategy</span>
+                              <Badge className={cn(
+                                "capitalize",
+                                report.healthMetrics.recommendedCalorieLevel === 'deficit' ? "bg-red-500/10 text-red-500 border-red-500/20" :
+                                report.healthMetrics.recommendedCalorieLevel === 'surplus' ? "bg-blue-500/10 text-blue-500 border-blue-500/20" :
+                                "bg-green-500/10 text-green-500 border-green-500/20"
+                              )}>
+                                {report.healthMetrics.recommendedCalorieLevel}
+                              </Badge>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-gray-400">Daily Target</span>
+                              <span className="text-lg font-mono font-bold text-brand-primary">{report.healthMetrics.dailyCalorieTarget}</span>
+                            </div>
+                          </div>
+                        </Card>
+                        
+                        <Card className="p-6 bg-brand-surface border-gray-800 md:col-span-2">
+                          <div className="flex items-center gap-3 mb-4">
                             <Target className="w-5 h-5 text-brand-primary" />
                             <h3 className="font-bold text-gray-200">Health Status & Focus</h3>
                           </div>
-                          <div className="space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
                               <span className="text-xs font-bold text-gray-500 uppercase block mb-1">Current Status</span>
                               <p className="text-sm text-gray-300 leading-relaxed">{report.healthMetrics.healthStatus}</p>
@@ -1893,31 +1944,72 @@ export default function App() {
 
               {/* Recovery & Tracking */}
               {(path !== 'meal' && path !== 'progress') && (
-                <section className="space-y-8 pt-16 border-t border-gray-800">
-                  <h2 className="text-3xl font-display font-bold text-brand-primary">Recovery, Steps, Water, and Progress Tracking</h2>
+                <section className="space-y-12 pt-16 border-t border-gray-800 print-break-before">
+                  <h2 className="text-3xl font-display font-bold text-brand-primary">Recovery, Sleep & Optimization</h2>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <Card className="p-6 space-y-4">
-                      <div className="flex items-center gap-3">
-                        <Footprints className="w-5 h-5 text-brand-primary" />
-                        <h3 className="font-bold">Daily Step Target</h3>
-                      </div>
-                      <p className="text-sm text-gray-400">{report.stepGoals}</p>
-                    </Card>
-                    <Card className="p-6 space-y-4">
-                      <div className="flex items-center gap-3">
-                        <Droplets className="w-5 h-5 text-brand-primary" />
-                        <h3 className="font-bold">Daily Water Target</h3>
-                      </div>
-                      <p className="text-sm text-gray-400">{report.hydrationTargets}</p>
-                    </Card>
-                    <Card className="p-6 space-y-4">
-                      <div className="flex items-center gap-3">
-                        <Camera className="w-5 h-5 text-brand-primary" />
-                        <h3 className="font-bold">Weekly Photo Reminder</h3>
-                      </div>
-                      <p className="text-sm text-gray-400">Take progress photos once per week in the same lighting and time of day.</p>
-                    </Card>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {/* Sleep Recommendation */}
+                    {report.sleepRecommendation && (
+                      <Card className="p-8 bg-brand-surface border-brand-primary/20 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
+                          <Moon className="w-24 h-24 text-brand-primary" />
+                        </div>
+                        <div className="relative z-10 space-y-6">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-brand-primary/10 rounded-lg">
+                              <Moon className="w-6 h-6 text-brand-primary" />
+                            </div>
+                            <h3 className="text-xl font-bold text-gray-100">Sleep Architecture</h3>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Recommended Duration</span>
+                            <p className="text-3xl font-display font-black text-brand-primary">{report.sleepRecommendation.duration}</p>
+                          </div>
+
+                          <div className="space-y-2">
+                            <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Performance Rationale</span>
+                            <p className="text-sm text-gray-300 leading-relaxed italic">"{report.sleepRecommendation.rationale}"</p>
+                          </div>
+
+                          <div className="space-y-3">
+                            <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Optimization Tips</span>
+                            <ul className="space-y-2">
+                              {report.sleepRecommendation.tips.map((tip, i) => (
+                                <li key={i} className="flex gap-3 text-sm text-gray-400">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-brand-primary/40 mt-1.5 shrink-0" />
+                                  {tip}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      </Card>
+                    )}
+
+                    <div className="space-y-6">
+                      <Card className="p-6 space-y-4 bg-brand-surface border-gray-800">
+                        <div className="flex items-center gap-3">
+                          <Footprints className="w-5 h-5 text-brand-primary" />
+                          <h3 className="font-bold">Daily Step Goal (NEAT)</h3>
+                        </div>
+                        <p className="text-2xl font-mono font-bold text-brand-primary">{report.stepGoals}</p>
+                      </Card>
+                      <Card className="p-6 space-y-4 bg-brand-surface border-gray-800">
+                        <div className="flex items-center gap-3">
+                          <Droplets className="w-5 h-5 text-brand-primary" />
+                          <h3 className="font-bold">Hydration Target</h3>
+                        </div>
+                        <p className="text-2xl font-mono font-bold text-brand-primary">{report.hydrationTargets}</p>
+                      </Card>
+                      <Card className="p-6 space-y-4 bg-brand-surface border-gray-800">
+                        <div className="flex items-center gap-3">
+                          <Camera className="w-5 h-5 text-brand-primary" />
+                          <h3 className="font-bold">Weekly Documentation</h3>
+                        </div>
+                        <p className="text-sm text-gray-400 italic">"Ensure photos are taken in consistent lighting for accurate visual tracking."</p>
+                      </Card>
+                    </div>
                   </div>
 
                   <div className="space-y-4">
