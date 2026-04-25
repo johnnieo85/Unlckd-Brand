@@ -121,7 +121,9 @@ export async function generateTransformationReport(
           8. FAT LOSS: If in deficit, prioritize high protein (1.6-2.2g/kg), and resistance training 2-4x/week.
           9. VISCERAL FAT: Emphasize HIIT and moderate-to-vigorous aerobic work.
           10. MOBILITY: Integrate dynamic mobility in warm-ups and static stretching for recovery.
-          11. TRAINING MODALITIES: Utilize Kettlebells, Resistance Bands, and Bodyweight where appropriate.
+          11. TRAINING MODALITIES & EXERCISE POOL:
+              - Utilize Kettlebells, Resistance Bands, and Bodyweight where appropriate.
+              - KNOWLEDGE BASE: You have deep knowledge of exercises specifically for Dumbbells (e.g., Goblet Squats, Renegade Rows), Weighted Vests (e.g., Vest Pushups, Vest Lunges), and advanced Bodyweight movements (e.g., Hollow Body Holds, Bulgarian Split Squats).
           12. If NO photos are provided, provide a text-only assessment based on the user's data (age, weight, height, goals, calorie preference).
           13. WORKOUT VIDEOS: For each exercise in the "mainWork" and "warmUp" fields, you MUST provide a direct YouTube video URL (e.g., https://www.youtube.com/watch?v=...) that shows how to perform the exercise. CRITICAL: The links MUST point to a single video player page, never to a search results page (e.g., /results?search_query=) or a channel page. Use markdown format: [Exercise Name](Direct YouTube URL). Ensure the link is for the specific exercise mentioned. 
               - EQUIPMENT SPECIFICITY: If the user has specified specialized at-home smart equipment (e.g., Tonal, Mirror, Tempo), you MUST provide video links that specifically demonstrate the exercise on that exact system. If a YouTube video for the specific equipment cannot be found, provide a direct link to a vendor-specific instructional video from their official website or support library.
