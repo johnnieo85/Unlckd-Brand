@@ -114,7 +114,7 @@ export async function generateTransformationReport(
              - PRIORITY: Completing the entire requested duration is more important than detailed prose.
           5. MOTIVATIONAL QUOTE: Generate a unique, powerful motivational quote specifically for this user's situation. The quote MUST be followed by the text "Unlock your greatness."
           6. SLEEP RECOMMENDATION: Provide deep research on sleep requirements tailored to support this user's specific workout routine, occupation, and goals. Explain why this specific amount and quality of sleep is necessary for their recovery and performance.
-          7. DIET STRATEGY (CALORIE PREFERENCE): Strictly adhere to the user's calorie preference (${userData.preference}). Calculate the estimated number of calories they should be eating daily based on their TDEE.
+          7. DIET STRATEGY (CALORIE PREFERENCE): Strictly adhere to the user's calorie preference (${userData.caloriePreference}). Calculate the estimated number of calories they should be eating daily based on their TDEE.
              - If "deficit": prioritize a sustainable energy deficit for fat loss (Lose Weight).
              - If "maintain": prioritize body recomposition and maintenance calories (Maintain Weight).
              - If "surplus": prioritize muscle gain and a energy surplus (Gain Weight).

@@ -48,19 +48,19 @@ import { historyService } from './services/historyService';
 import { ensureUserProfile, checkUserAccess } from './services/accessService';
 
 const LogoBranding = () => (
-  <div className="hidden print:flex items-center justify-between border-t border-gray-200 pt-4 mt-8">
+  <div className="flex items-center justify-between border-t border-white/10 pt-6 mt-12 print:border-gray-200 print:pt-4 print:mt-8">
     <div className="flex items-center gap-2">
-      <div className="w-6 h-6 bg-black rounded flex items-center justify-center">
-        <Activity className="w-4 h-4 text-white" />
+      <div className="w-8 h-8 bg-brand-primary/10 rounded-lg flex items-center justify-center print:bg-black print:w-6 print:h-6">
+        <Activity className="w-5 h-5 text-brand-primary print:w-4 print:h-4 print:text-white" />
       </div>
-      <span className="font-display font-bold text-sm tracking-tight uppercase text-black">UNLCKD <span className="text-gray-600">Pro</span></span>
+      <span className="font-display font-bold text-base tracking-tight uppercase text-gray-200 print:text-black print:text-sm">UNLCKD <span className="text-gray-500 print:text-gray-600">Pro</span></span>
     </div>
-    <div className="flex items-center gap-4">
-      <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-        <Instagram className="w-3 h-3 text-brand-primary" />
+    <div className="flex items-center gap-6">
+      <div className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-widest print:text-[10px] print:gap-1.5">
+        <Instagram className="w-4 h-4 text-brand-primary print:w-3 print:h-3" />
         unlckd_brand
       </div>
-      <span className="text-[10px] text-gray-400 uppercase tracking-widest">Official Transformation Report</span>
+      <span className="text-xs text-gray-500 uppercase tracking-widest print:text-[10px] print:text-gray-400">Official Transformation Report</span>
     </div>
   </div>
 );
