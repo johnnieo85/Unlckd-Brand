@@ -580,6 +580,32 @@ export default function App() {
     reader.readAsDataURL(file);
   };
 
+  const handleDownload = () => {
+    const originalTitle = document.title;
+    
+    // Extract last name
+    const nameParts = userData.name.trim().split(' ');
+    const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : nameParts[0];
+    
+    // Format date: 26APR2026
+    const now = new Date();
+    const day = now.getDate().toString().padStart(2, '0');
+    const monthNames = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+    const month = monthNames[now.getMonth()];
+    const year = now.getFullYear();
+    
+    const formattedDate = `${day}${month}${year}`;
+    const fileName = `UNLCKDProTrainer_${lastName}_${formattedDate}`;
+    
+    document.title = fileName;
+    window.print();
+    
+    // Restore title after a short delay
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 500);
+  };
+
   return (
     <div className="min-h-screen bg-brand-dark text-gray-100 selection:bg-brand-primary selection:text-white relative overflow-x-hidden">
       {/* Background decorative elements */}
@@ -1544,7 +1570,7 @@ export default function App() {
                   variant="primary" 
                   size="md" 
                   className="gap-2 bg-brand-primary text-brand-dark font-bold hover:bg-brand-primary/90 shadow-xl shadow-brand-primary/20"
-                  onClick={() => window.print()}
+                  onClick={handleDownload}
                 >
                   <Download className="w-5 h-5" />
                   Download PDF Report
