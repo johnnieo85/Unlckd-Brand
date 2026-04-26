@@ -113,7 +113,10 @@ export async function generateTransformationReport(
              - If path is "assessment": Provide ONLY physique assessment and topline ratings.
              - If path is "progress": Provide ONLY physique comparison analysis between the provided before/after sets.
           5. COMPLETE 12-WEEK PLANS: If "full", "workout", or "meal" is requested, you MUST provide exactly 12 weekly blocks. Each week must have a specific phase/focus.
-          6. EXERCISE COUNT: For each training day, the "mainWork" field MUST contain between 5 to 10 specific, effective exercises.
+          6. EXERCISE FORMATTING (CRITICAL):
+             - For every exercise in "mainWork" and "warmUp" (in workoutPlan), you MUST include specific sets and reps in the format: "Exercise Name (Sets x Reps)".
+             - Example: "Barbell Bench Press (4x10-12) [Video](URL)".
+             - For each training day, the "mainWork" field MUST contain between 7 to 10 specific, effective exercises.
           7. MOTIVATIONAL QUOTE: Generate a unique, powerful motivational quote specifically for this user's situation. The quote MUST be followed by the text "Unlock your greatness."
           8. SLEEP RECOMMENDATION: Provide deep research on sleep requirements tailored to support this user's specific workout routine, occupation, and goals. 
           9. DIET STRATEGY: Strictly adhere to the user's calorie preference (${userData.caloriePreference}). Calculate estimated TDEE and provide an exact daily calorie target.
