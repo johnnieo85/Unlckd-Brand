@@ -34,7 +34,8 @@ import {
   Quote,
   Moon,
   Instagram,
-  RotateCcw
+  RotateCcw,
+  RefreshCw
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Button } from './components/ui/Button';
@@ -47,24 +48,6 @@ import { auth } from './lib/firebase';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { historyService } from './services/historyService';
 import { ensureUserProfile, checkUserAccess, unlockPremium } from './services/accessService';
-
-const LogoBranding = () => (
-  <div className="flex items-center justify-between border-t border-white/10 pt-6 mt-12 print:border-gray-200 print:pt-4 print:mt-8">
-    <div className="flex items-center gap-2">
-      <div className="w-8 h-8 bg-brand-primary/10 rounded-lg flex items-center justify-center print:bg-black print:w-6 print:h-6">
-        <Activity className="w-5 h-5 text-brand-primary print:w-4 print:h-4 print:text-white" />
-      </div>
-      <span className="font-display font-bold text-base tracking-tight uppercase text-gray-200 print:text-black print:text-sm">UNLCKD <span className="text-gray-500 print:text-gray-600">Pro</span></span>
-    </div>
-    <div className="flex items-center gap-6">
-      <div className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-widest print:text-[10px] print:gap-1.5">
-        <Instagram className="w-4 h-4 text-brand-primary print:w-3 print:h-3" />
-        unlckd_brand
-      </div>
-      <span className="text-xs text-gray-500 uppercase tracking-widest print:text-[10px] print:text-gray-400">Official Transformation Report</span>
-    </div>
-  </div>
-);
 
 const RatingTable = ({ title, ratings = [], summary, photo }: { title: string; ratings?: Rating[]; summary?: string; photo?: string | null }) => (
   <div className="space-y-6">
@@ -225,6 +208,30 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'reports' | 'gym'>('reports');
   const [latestReport, setLatestReport] = useState<SavedReport | null>(null);
   const [step, setStep] = useState<'landing' | 'intake' | 'photos' | 'progress-photos' | 'processing' | 'report' | 'history' | 'no-access'>('landing');
+
+  const LogoBranding = () => (
+    <div className="flex items-center justify-between border-t border-white/10 pt-6 mt-12 print:border-gray-200 print:pt-4 print:mt-8">
+      <div 
+        className="flex items-center gap-2 cursor-pointer group"
+        onClick={() => {
+          setStep('landing');
+          setActiveTab('reports');
+        }}
+      >
+        <div className="w-8 h-8 bg-brand-primary/10 rounded-lg flex items-center justify-center print:bg-black print:w-6 print:h-6 group-hover:scale-105 transition-transform">
+          <Activity className="w-5 h-5 text-brand-primary print:w-4 print:h-4 print:text-white" />
+        </div>
+        <span className="font-display font-bold text-base tracking-tight uppercase text-gray-200 print:text-black print:text-sm group-hover:text-brand-primary transition-colors">UNLCKD <span className="text-gray-500 print:text-gray-600">Pro</span></span>
+      </div>
+      <div className="flex items-center gap-6">
+        <div className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-widest print:text-[10px] print:gap-1.5">
+          <Instagram className="w-4 h-4 text-brand-primary print:w-3 print:h-3" />
+          unlckd_brand
+        </div>
+        <span className="text-xs text-gray-500 uppercase tracking-widest print:text-[10px] print:text-gray-400">Official Transformation Report</span>
+      </div>
+    </div>
+  );
   const [path, setPath] = useState<Path>('full');
   const [userData, setUserData] = useState<UserData>({
     name: '',
@@ -547,7 +554,10 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div 
             className="flex items-center gap-3 cursor-pointer group"
-            onClick={() => setStep('landing')}
+            onClick={() => {
+              setStep('landing');
+              setActiveTab('reports');
+            }}
           >
             <div className="w-10 h-10 bg-brand-primary rounded-lg flex items-center justify-center shadow-lg shadow-brand-primary/20 group-hover:scale-105 transition-transform">
               <Activity className="w-6 h-6 text-brand-dark" />
@@ -571,9 +581,10 @@ export default function App() {
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  onClick={() => {
+                  onClick={async () => {
                     setActiveTab('reports');
                     setStep('history');
+                    await loadHistory();
                   }}
                   className={cn("gap-2 hover:bg-white/5", activeTab === 'reports' && step === 'history' && "text-brand-primary bg-white/5")}
                 >
@@ -645,7 +656,14 @@ export default function App() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
             >
-              <ProGym latestReport={latestReport} userProfile={userProfile} />
+              <ProGym 
+                latestReport={latestReport} 
+                userProfile={userProfile} 
+                onHomeClick={() => {
+                  setStep('landing');
+                  setActiveTab('reports');
+                }}
+              />
             </motion.div>
           ) : (
             <>
@@ -663,6 +681,15 @@ export default function App() {
                   <p className="text-gray-400 mt-2 text-lg font-light">Your professional assessments, preserved and tracked.</p>
                 </div>
                 <div className="flex gap-3">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => loadHistory()} 
+                    disabled={isLoadingHistory}
+                    className="gap-2 border-white/10 hover:bg-white/5 rounded-xl"
+                  >
+                    <RefreshCw className={cn("w-4 h-4", isLoadingHistory && "animate-spin")} />
+                    Refresh
+                  </Button>
                   <Button variant="outline" onClick={() => setStep('landing')} className="gap-2 border-white/10 hover:bg-white/5 rounded-xl">
                     <ChevronLeft className="w-4 h-4" />
                     Back to Dashboard
@@ -697,12 +724,25 @@ export default function App() {
                       className="group cursor-pointer bg-white/[0.02] border-white/5 hover:border-brand-primary/50 transition-all overflow-hidden relative rounded-3xl"
                       onClick={() => handleViewSavedReport(saved)}
                     >
-                      <div className="aspect-video relative overflow-hidden">
-                        <img 
-                          src={saved.photos.front || 'https://picsum.photos/seed/physique/800/600'} 
-                          alt="Report thumbnail"
-                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 blur-sm brightness-50"
-                        />
+                      <div className="aspect-video relative overflow-hidden bg-brand-surface">
+                        {saved.photos.front ? (
+                          <img 
+                            src={saved.photos.front} 
+                            alt="Report thumbnail"
+                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 blur-sm brightness-50"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-brand-primary/5">
+                            {saved.path === 'meal' ? (
+                              <Utensils className="w-12 h-12 text-brand-primary/40" />
+                            ) : saved.path === 'workout' ? (
+                              <Dumbbell className="w-12 h-12 text-brand-primary/40" />
+                            ) : (
+                              <Activity className="w-12 h-12 text-brand-primary/40" />
+                            )}
+                            <span className="text-[10px] font-black uppercase tracking-widest text-brand-primary/40">Report Data Only</span>
+                          </div>
+                        )}
                         <div className="absolute inset-0 bg-gradient-to-t from-brand-dark via-transparent to-transparent" />
                         <div className="absolute top-4 right-4 z-20 flex gap-2">
                           <Button 
@@ -1439,7 +1479,10 @@ export default function App() {
                 </div>
               </div>
               <div className="text-center space-y-2">
-                <h2 className="text-2xl font-display font-bold">UNLCKD AI is working</h2>
+                <h2 
+                  className="text-2xl font-display font-bold cursor-pointer hover:text-brand-primary transition-colors"
+                  onClick={() => setStep('landing')}
+                >UNLCKD AI is working</h2>
                 <p className="text-gray-400 animate-pulse">{loadingMessage}</p>
               </div>
             </motion.div>
@@ -1490,7 +1533,10 @@ export default function App() {
               {/* Page 1: Header & Baseline Info */}
               <section className="space-y-8">
                 <div className="text-center space-y-2">
-                  <h1 className="text-4xl font-display font-bold text-brand-primary">
+                  <h1 
+                    className="text-4xl font-display font-bold text-brand-primary cursor-pointer hover:brightness-110 transition-all"
+                    onClick={() => setStep('landing')}
+                  >
                     {path === 'meal' ? 'UNLCKD Meal Plan' : 
                      path === 'workout' ? 'UNLCKD Workout Plan' : 
                      path === 'progress' ? 'UNLCKD Weekly Comparison Report' :
@@ -2224,9 +2270,15 @@ export default function App() {
 
       <footer className="py-12 border-t border-gray-800 bg-brand-dark">
         <div className="max-w-7xl mx-auto px-4 text-center space-y-4">
-          <div className="flex items-center justify-center gap-2 opacity-50">
-            <Dumbbell className="w-4 h-4" />
-            <span className="font-display font-bold text-sm tracking-tight">UNLCKD Pro Trainer</span>
+          <div 
+            className="flex items-center justify-center gap-2 opacity-50 cursor-pointer hover:opacity-100 transition-opacity group"
+            onClick={() => {
+              setStep('landing');
+              setActiveTab('reports');
+            }}
+          >
+            <Dumbbell className="w-4 h-4 group-hover:scale-110 transition-transform" />
+            <span className="font-display font-bold text-sm tracking-tight group-hover:text-brand-primary transition-colors">UNLCKD Pro Trainer</span>
           </div>
           <p className="text-xs text-gray-600">
             © 2026 UNLCKD Pro Trainer. AI-generated assessments are for informational purposes only. Consult a professional before starting any new fitness or nutrition program.
