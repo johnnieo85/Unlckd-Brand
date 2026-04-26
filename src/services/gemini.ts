@@ -120,8 +120,13 @@ export async function generateTransformationReport(
           7. MOTIVATIONAL QUOTE: Generate a unique, powerful motivational quote specifically for this user's situation. The quote MUST be followed by the text "Unlock your greatness."
           8. SLEEP RECOMMENDATION: Provide deep research on sleep requirements tailored to support this user's specific workout routine, occupation, and goals. 
           9. DIET STRATEGY: Strictly adhere to the user's calorie preference (${userData.caloriePreference}). Calculate estimated TDEE and provide an exact daily calorie target.
+             - UNIT CONSISTENCY: If the user's weight unit is "lbs" (${userData.weightUnit}), you MUST use the term "calories" or "cal" for all energy measurements throughout the entire report (e.g., daily target, meal macros). If "kg", you MAY use "kcal" or "calories".
           10. VISUAL ANALYSIS: For each photo provided, conduct a thorough assessment of muscle definition, symmetry, and areas for improvement.
-          11. WORKOUT VIDEOS: For each exercise, you MUST provide a direct YouTube video URL.
+          11. WORKOUT VIDEOS (QUALITY VERIFICATION): 
+              - For each exercise, you MUST provide a direct YouTube video URL (e.g., https://www.youtube.com/watch?v=...).
+              - CRITICAL: You MUST conduct a mental verification that the video actually exists and shows the correct exercise.
+              - NO BROKEN LINKS: Avoid private or deleted videos. Prefer well-known fitness channels (e.g., ScottHermanFitness, RenaissancePeriodization, BuffDudes, or specialized equipment channels like Tonal) to ensure stability.
+              - EQUIPMENT SPECIFICITY: If smart equipment is used, the video MUST demonstrate on that equipment.
           12. QUALITY CONTROL & COMPLETENESS PROTOCOL: Before finalizing the JSON, you MUST verify:
               - CHECK 1: Are there exactly 12 weeks of plans?
               - CHECK 2: Do all views (Front, Back, Left, Right) have summaries and ratings?
