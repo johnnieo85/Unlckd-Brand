@@ -162,9 +162,7 @@ export const ProGym = ({
   const [isMeasurementsExpanded, setIsMeasurementsExpanded] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [unlockedDates, setUnlockedDates] = useState<Set<string>>(new Set([new Date().toISOString().split('T')[0]]));
-  const [isHubUnlocked, setIsHubUnlocked] = useState(() => {
-    return sessionStorage.getItem(`gym_hub_unlocked_${userProfile?.userId}`) === 'true';
-  });
+  const [isHubUnlocked, setIsHubUnlocked] = useState(false);
   const [pinEntry, setPinEntry] = useState('');
   const [pinSetup, setPinSetup] = useState({ pin: '', confirm: '' });
   const [error, setError] = useState('');
@@ -172,6 +170,13 @@ export const ProGym = ({
   const [calendarDates, setCalendarDates] = useState<string[]>([]);
   const [activeView, setActiveView] = useState<'hub' | 'report'>('hub');
   const [trackerOrder, setTrackerOrder] = useState<string[]>(['hydration', 'movement']);
+
+  useEffect(() => {
+    if (userProfile?.userId) {
+      const unlocked = sessionStorage.getItem(`gym_hub_unlocked_${userProfile.userId}`) === 'true';
+      if (unlocked) setIsHubUnlocked(true);
+    }
+  }, [userProfile?.userId]);
   
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -838,7 +843,7 @@ export const ProGym = ({
 
   const handlePinSubmit = () => {
     if (!userProfile) return;
-    if (pinEntry === userProfile.gymPin) {
+    if (pinEntry.trim() === userProfile.gymPin?.toString().trim()) {
       setIsHubUnlocked(true);
       sessionStorage.setItem(`gym_hub_unlocked_${userProfile.userId}`, 'true');
       setError('');
@@ -860,7 +865,7 @@ export const ProGym = ({
     }
     
     try {
-      await updateGymPin(userProfile.userId, pinSetup.pin);
+      await updateGymPin(userProfile.userId, pinSetup.pin.trim());
       setIsHubUnlocked(true);
       setIsSettingPin(false);
       sessionStorage.setItem(`gym_hub_unlocked_${userProfile.userId}`, 'true');
@@ -945,9 +950,11 @@ export const ProGym = ({
                     <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 ml-1">New 4-6 Digit PIN</label>
                     <Input
                       type="password"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       placeholder="••••"
                       value={pinSetup.pin}
-                      onChange={(e) => setPinSetup(prev => ({ ...prev, pin: e.target.value }))}
+                      onChange={(e) => setPinSetup(prev => ({ ...prev, pin: e.target.value.replace(/\D/g, '') }))}
                       className="text-center text-2xl tracking-[1em] font-mono bg-white/5 border-white/10"
                       maxLength={6}
                     />
@@ -956,9 +963,11 @@ export const ProGym = ({
                     <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 ml-1">Confirm PIN</label>
                     <Input
                       type="password"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       placeholder="••••"
                       value={pinSetup.confirm}
-                      onChange={(e) => setPinSetup(prev => ({ ...prev, confirm: e.target.value }))}
+                      onChange={(e) => setPinSetup(prev => ({ ...prev, confirm: e.target.value.replace(/\D/g, '') }))}
                       className="text-center text-2xl tracking-[1em] font-mono bg-white/5 border-white/10"
                       maxLength={6}
                     />
@@ -985,9 +994,11 @@ export const ProGym = ({
                 <div className="space-y-4">
                   <Input
                     type="password"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     placeholder="••••"
                     value={pinEntry}
-                    onChange={(e) => setPinEntry(e.target.value)}
+                    onChange={(e) => setPinEntry(e.target.value.replace(/\D/g, ''))}
                     onKeyDown={(e) => e.key === 'Enter' && handlePinSubmit()}
                     className="text-center text-3xl tracking-[1em] font-mono bg-white/5 border-white/10 h-16"
                     maxLength={6}
