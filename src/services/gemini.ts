@@ -6,7 +6,8 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 export async function generateTransformationReport(
   userData: UserData,
   photos: Photos | ProgressPhotos,
-  path: string
+  path: string,
+  isResubmit: boolean = false
 ): Promise<AssessmentResult> {
   const model = "gemini-3-flash-preview";
 
@@ -51,6 +52,13 @@ export async function generateTransformationReport(
     User Data:
     ${JSON.stringify(userData, null, 2)}
     
+    ${isResubmit ? `
+    RESUBMIT / RE-EVALUATION MODE ENABLED:
+    - The previous version of this report had output issues (e.g., missing 12 weeks, broken links, or incomplete analysis).
+    - You MUST be extra diligent in following ALL instructions, especially for the 12-week completeness and video link accuracy.
+    - Ensure EVERY exercise has a valid YouTube link in markdown format.
+    ` : ''}
+
     Requested Path: ${path}
     
     ${path === 'progress' ? `
@@ -112,13 +120,15 @@ export async function generateTransformationReport(
              - If path is "progress": Provide ONLY physique comparison analysis between the provided before/after sets.
           5. COMPLETE 12-WEEK PLANS: If "full", "workout", or "meal" is requested, you MUST provide exactly 12 weekly blocks. Each week must have a specific phase/focus.
           6. EXERCISE FORMATTING (CRITICAL):
-             - For every exercise in "mainWork" and "warmUp" (in workoutPlan), you MUST include specific sets and reps in the format: "Exercise Name (Sets x Reps)".
-             - Example: "Barbell Bench Press (4x10-12) [Video](URL)".
+             - For every exercise in "mainWork" and "warmUp" (in workoutPlan), you MUST use markdown links for exercises.
+             - Format: "[Exercise Name (Sets x Reps)](YouTube URL)".
+             - The URL must be a valid direct YouTube video link.
+             - Example: "- [Dumbbell Bench Press (4x10-12)](https://www.youtube.com/watch?v=...)".
              - For each training day, the "mainWork" field MUST contain between 7 to 10 specific, effective exercises.
           7. MOTIVATIONAL QUOTE: Generate a unique, powerful motivational quote specifically for this user's situation. The quote MUST be followed by the text "Unlock your greatness."
           8. SLEEP RECOMMENDATION: Provide deep research on sleep requirements tailored to support this user's specific workout routine, occupation, and goals. 
           9. DIET STRATEGY: Strictly adhere to the user's calorie preference (${userData.caloriePreference}). Calculate estimated TDEE and provide an exact daily calorie target.
-             - UNIT CONSISTENCY: If the user's weight unit is "lbs" (${userData.weightUnit}), you MUST use the term "calories" or "cal" for all energy measurements throughout the entire report (e.g., daily target, meal macros). If "kg", you MAY use "kcal" or "calories".
+             - UNIT CONSISTENCY: If the user's weight unit is "lbs" (${userData.weightUnit}), you MUST use the term "calories" or "cal" for all energy measurements (e.g., daily target, meal macros) and "ounces (fl oz)" or "gallons" for water intake. If "kg", you MAY use "kcal" for energy and "liters (L)" for water.
           10. VISUAL ANALYSIS: For each photo provided, conduct a thorough assessment of muscle definition, symmetry, and areas for improvement.
           11. WORKOUT VIDEOS (QUALITY VERIFICATION): 
               - For each exercise, you MUST provide a direct YouTube video URL (e.g., https://www.youtube.com/watch?v=...).

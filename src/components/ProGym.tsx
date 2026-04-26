@@ -24,7 +24,8 @@ import {
   Lock,
   LockOpen,
   Info,
-  Sparkles
+  Sparkles,
+  Settings
 } from 'lucide-react';
 import { Card, Badge } from './ui/Card';
 import { Button } from './ui/Button';
@@ -32,6 +33,7 @@ import { Input } from './ui/Input';
 import { gymService } from '../services/gymService';
 import { DailyLog, SavedReport, Measurement, UserProfile, Badge as UserBadge } from '../types';
 import { cn } from '../lib/utils';
+import { updateGymPin } from '../services/accessService';
 
 const Ring = ({ 
   progress, 
@@ -98,6 +100,13 @@ export const ProGym = ({ latestReport, userProfile }: { latestReport: SavedRepor
   const [isMeasurementsExpanded, setIsMeasurementsExpanded] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [unlockedDates, setUnlockedDates] = useState<Set<string>>(new Set([new Date().toISOString().split('T')[0]]));
+  const [isHubUnlocked, setIsHubUnlocked] = useState(() => {
+    return sessionStorage.getItem(`gym_hub_unlocked_${userProfile?.userId}`) === 'true';
+  });
+  const [pinEntry, setPinEntry] = useState('');
+  const [pinSetup, setPinSetup] = useState({ pin: '', confirm: '' });
+  const [error, setError] = useState('');
+  const [isSettingPin, setIsSettingPin] = useState(false);
   const [measurementUnits, setMeasurementUnits] = useState({
     weight: 'kg' as 'kg' | 'lbs',
     length: 'cm' as 'cm' | 'in'
@@ -513,6 +522,42 @@ export const ProGym = ({ latestReport, userProfile }: { latestReport: SavedRepor
     await gymService.updateDailyLog(today, { habits: newHabits });
   };
 
+  const handlePinSubmit = () => {
+    if (!userProfile) return;
+    if (pinEntry === userProfile.gymPin) {
+      setIsHubUnlocked(true);
+      sessionStorage.setItem(`gym_hub_unlocked_${userProfile.userId}`, 'true');
+      setError('');
+    } else {
+      setError('Incorrect PIN. Please try again.');
+      setPinEntry('');
+    }
+  };
+
+  const handlePinSetup = async () => {
+    if (!userProfile) return;
+    if (pinSetup.pin.length < 4) {
+      setError('PIN must be at least 4 digits.');
+      return;
+    }
+    if (pinSetup.pin !== pinSetup.confirm) {
+      setError('PINs do not match.');
+      return;
+    }
+    
+    try {
+      await updateGymPin(userProfile.userId, pinSetup.pin);
+      setIsHubUnlocked(true);
+      setIsSettingPin(false);
+      sessionStorage.setItem(`gym_hub_unlocked_${userProfile.userId}`, 'true');
+      setError('');
+      // In a real app, you might want to refresh the profile state here
+      // But for now, we set the unlock state directly
+    } catch (e) {
+      setError('Failed to save PIN. Please try again.');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-20">
@@ -523,18 +568,167 @@ export const ProGym = ({ latestReport, userProfile }: { latestReport: SavedRepor
 
   if (!log) return null;
 
+  if (!isHubUnlocked) {
+    const isFirstTime = !userProfile?.gymPin || isSettingPin;
+
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center p-6">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="w-full max-w-md"
+        >
+          <Card className="p-8 space-y-8 bg-brand-surface border-white/5 shadow-2xl relative overflow-hidden">
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand-primary/0 via-brand-primary to-brand-primary/0" />
+            
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="p-4 bg-brand-primary/10 rounded-3xl">
+                {isFirstTime ? <Sparkles className="w-8 h-8 text-brand-primary" /> : <Lock className="w-8 h-8 text-brand-primary" />}
+              </div>
+              <div className="space-y-1">
+                <h2 className="text-2xl font-display font-black text-white">
+                  {isFirstTime ? (isSettingPin ? "Update Your PIN" : "Secure Your Data") : "Gym Hub Locked"}
+                </h2>
+                <p className="text-gray-500 text-sm">
+                  {isFirstTime 
+                    ? (isSettingPin ? "Enter your new personal PIN below." : "Set your personal PIN to protect your workout and meal plans.")
+                    : "Enter your secure PIN to access your optimization hub."}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {isFirstTime ? (
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 ml-1">New 4-6 Digit PIN</label>
+                    <Input
+                      type="password"
+                      placeholder="••••"
+                      value={pinSetup.pin}
+                      onChange={(e) => setPinSetup(prev => ({ ...prev, pin: e.target.value }))}
+                      className="text-center text-2xl tracking-[1em] font-mono bg-white/5 border-white/10"
+                      maxLength={6}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 ml-1">Confirm PIN</label>
+                    <Input
+                      type="password"
+                      placeholder="••••"
+                      value={pinSetup.confirm}
+                      onChange={(e) => setPinSetup(prev => ({ ...prev, confirm: e.target.value }))}
+                      className="text-center text-2xl tracking-[1em] font-mono bg-white/5 border-white/10"
+                      maxLength={6}
+                    />
+                  </div>
+                  <Button 
+                    className="w-full h-12 rounded-xl text-brand-dark" 
+                    onClick={handlePinSetup}
+                  >
+                    {isSettingPin ? "Update PIN" : "Set PIN & Continue"}
+                  </Button>
+                  {isSettingPin && (
+                    <Button 
+                      variant="ghost"
+                      className="w-full text-gray-500 text-xs hover:text-white" 
+                      onClick={() => {
+                        setIsSettingPin(false);
+                        setIsHubUnlocked(true);
+                        setError('');
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <Input
+                    type="password"
+                    placeholder="••••"
+                    value={pinEntry}
+                    onChange={(e) => setPinEntry(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handlePinSubmit()}
+                    className="text-center text-3xl tracking-[1em] font-mono bg-white/5 border-white/10 h-16"
+                    maxLength={6}
+                    autoFocus
+                  />
+                  <Button 
+                    className="w-full h-14 rounded-2xl text-brand-dark font-black text-lg" 
+                    onClick={handlePinSubmit}
+                  >
+                    Unlock Hub
+                  </Button>
+                </div>
+              )}
+
+              {error && (
+                <motion.p 
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-red-500 text-xs font-bold text-center"
+                >
+                  {error}
+                </motion.p>
+              )}
+            </div>
+
+            <div className="pt-4 border-t border-white/5 flex flex-col items-center gap-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-gray-600">Privacy & Security Focus</span>
+              <p className="text-[10px] text-center text-gray-600 px-4">
+                Your data is encrypted and only accessible via your personal device and account.
+              </p>
+            </div>
+          </Card>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 pb-20">
       {/* Hero Header */}
       <div className="relative h-48 rounded-[2.5rem] overflow-hidden group">
         <div className="absolute inset-0 bg-brand-primary opacity-10" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.2),transparent)]" />
-        <div className="relative h-full flex flex-col justify-center px-10">
-          <Badge className="w-fit mb-4 bg-brand-primary/20 text-brand-primary border-brand-primary/20">PREMIUM EXPERIENCE</Badge>
-          <h1 className="text-4xl md:text-5xl font-display font-black text-white tracking-tighter">
-            UNLCKD <span className="text-brand-primary">PRO GYM</span>
-          </h1>
-          <p className="text-gray-400 mt-2 font-medium tracking-wide uppercase text-xs">Optimization Hub • Precision Training</p>
+        <div className="relative h-full flex flex-row items-center justify-between px-10">
+          <div className="flex flex-col justify-center">
+            <Badge className="w-fit mb-4 bg-brand-primary/20 text-brand-primary border-brand-primary/20">PREMIUM EXPERIENCE</Badge>
+            <h1 className="text-4xl md:text-5xl font-display font-black text-white tracking-tighter">
+              UNLCKD <span className="text-brand-primary">PRO GYM</span>
+            </h1>
+            <p className="text-gray-400 mt-2 font-medium tracking-wide uppercase text-xs">Optimization Hub • Precision Training</p>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <Button 
+              variant="outline" 
+              size="icon" 
+              className="bg-white/5 border-white/10 hover:bg-white/10 rounded-xl"
+              onClick={() => {
+                setIsHubUnlocked(false);
+                sessionStorage.removeItem(`gym_hub_unlocked_${userProfile?.userId}`);
+              }}
+              title="Lock Hub"
+            >
+              <Lock className="w-4 h-4 text-gray-400" />
+            </Button>
+            <Button 
+              variant="outline" 
+              size="icon" 
+              className="bg-white/5 border-white/10 hover:bg-white/10 rounded-xl"
+              onClick={() => {
+                setIsSettingPin(true);
+                setIsHubUnlocked(false);
+                setPinSetup({ pin: '', confirm: '' });
+                setError('');
+              }}
+              title="Change PIN"
+            >
+              <Settings className="w-4 h-4 text-gray-400" />
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -547,16 +741,36 @@ export const ProGym = ({ latestReport, userProfile }: { latestReport: SavedRepor
               {latestReport ? `Report Schedule • Week ${Math.floor((new Date(selectedDate).getTime() - (latestReport.timestamp?.toDate ? latestReport.timestamp.toDate() : new Date(latestReport.timestamp)).setHours(0,0,0,0)) / (7 * 24 * 60 * 60 * 1000)) + 1}` : 'Weekly Activity'}
             </span>
           </div>
-          {selectedDate !== today && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => setSelectedDate(today)}
-              className="h-7 px-3 text-[10px] font-black uppercase bg-white/5 hover:bg-white/10 rounded-lg text-brand-primary"
-            >
-              Back to Today
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            <div className="relative group/date">
+              <input 
+                type="date"
+                value={selectedDate}
+                onChange={(e) => {
+                  setSelectedDate(e.target.value);
+                  setUnlockedDates(prev => new Set([...prev, e.target.value]));
+                }}
+                className="absolute inset-0 opacity-0 cursor-pointer z-10 w-full"
+              />
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-7 px-3 text-[10px] font-black uppercase bg-white/5 hover:bg-white/10 rounded-lg text-gray-400 group-hover/date:text-brand-primary border border-white/5"
+              >
+                Go to Date
+              </Button>
+            </div>
+            {selectedDate !== today && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setSelectedDate(today)}
+                className="h-7 px-3 text-[10px] font-black uppercase bg-white/5 hover:bg-white/10 rounded-lg text-brand-primary"
+              >
+                Back to Today
+              </Button>
+            )}
+          </div>
         </div>
         
         <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide px-1">

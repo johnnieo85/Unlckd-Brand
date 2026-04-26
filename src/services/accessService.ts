@@ -46,3 +46,8 @@ export async function unlockPremium(userId: string): Promise<void> {
   const userRef = doc(db, 'users', userId);
   await setDoc(userRef, { isPremium: true }, { merge: true });
 }
+
+export async function updateGymPin(userId: string, pin: string): Promise<void> {
+  const userRef = doc(db, 'users', userId);
+  await setDoc(userRef, { gymPin: pin }, { merge: true });
+}
