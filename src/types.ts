@@ -180,6 +180,7 @@ export interface UserProfile {
   createdAt: any;
   badges: Badge[];
   gymPin?: string;
+  habitList?: string[];
   monthlyGoal?: {
     title: string;
     description: string;

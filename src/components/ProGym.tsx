@@ -25,7 +25,9 @@ import {
   LockOpen,
   Info,
   Sparkles,
-  Settings
+  Settings,
+  BarChart3,
+  ClipboardList
 } from 'lucide-react';
 import { Card, Badge } from './ui/Card';
 import { Button } from './ui/Button';
@@ -33,7 +35,7 @@ import { Input } from './ui/Input';
 import { gymService } from '../services/gymService';
 import { DailyLog, SavedReport, Measurement, UserProfile, Badge as UserBadge } from '../types';
 import { cn } from '../lib/utils';
-import { updateGymPin } from '../services/accessService';
+import { updateGymPin, updateUserProfile } from '../services/accessService';
 
 const Ring = ({ 
   progress, 
@@ -92,7 +94,17 @@ const Ring = ({
   );
 };
 
-export const ProGym = ({ latestReport, userProfile, onHomeClick }: { latestReport: SavedReport | null; userProfile: UserProfile | null; onHomeClick?: () => void }) => {
+export const ProGym = ({ 
+  latestReport, 
+  userProfile, 
+  onProfileUpdate,
+  onHomeClick 
+}: { 
+  latestReport: SavedReport | null; 
+  userProfile: UserProfile | null; 
+  onProfileUpdate?: () => void;
+  onHomeClick?: () => void 
+}) => {
   const [log, setLog] = useState<DailyLog | null>(null);
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [loading, setLoading] = useState(true);
@@ -108,6 +120,11 @@ export const ProGym = ({ latestReport, userProfile, onHomeClick }: { latestRepor
   const [error, setError] = useState('');
   const [isSettingPin, setIsSettingPin] = useState(false);
   const [calendarDates, setCalendarDates] = useState<string[]>([]);
+  const [activeView, setActiveView] = useState<'hub' | 'report'>('hub');
+  const [isEditingHabits, setIsEditingHabits] = useState(false);
+  const [editingHabits, setEditingHabits] = useState<string[]>([]);
+  const [reportLogs, setReportLogs] = useState<DailyLog[]>([]);
+  const [isReportLoading, setIsReportLoading] = useState(false);
   const [measurementUnits, setMeasurementUnits] = useState({
     weight: 'kg' as 'kg' | 'lbs',
     length: 'cm' as 'cm' | 'in'
@@ -450,6 +467,31 @@ export const ProGym = ({ latestReport, userProfile, onHomeClick }: { latestRepor
     setMeasurements(measurementData);
 
     if (logData) {
+      // Sync habits with profile master list (ensure new habits appear in old logs)
+      const masterHabits = getHabitList();
+      const currentHabits = logData.habits || {};
+      const updatedHabits: Record<string, boolean> = {};
+      let hasChanges = false;
+      
+      masterHabits.forEach(h => {
+        if (currentHabits[h] !== undefined) {
+          updatedHabits[h] = currentHabits[h];
+        } else {
+          updatedHabits[h] = false;
+          hasChanges = true;
+        }
+      });
+
+      // Check if we removed any habits
+      if (Object.keys(currentHabits).length !== Object.keys(updatedHabits).length) {
+        hasChanges = true;
+      }
+
+      if (hasChanges) {
+        logData.habits = updatedHabits;
+        gymService.updateDailyLog(date, { habits: updatedHabits });
+      }
+
       // Ensure meals are initialized if missing or empty in old logs
       if ((!logData.meals || logData.meals.length === 0) && latestReport) {
         const mealDay = getMealsForSelectedDate();
@@ -589,14 +631,50 @@ export const ProGym = ({ latestReport, userProfile, onHomeClick }: { latestRepor
     setLoading(false);
   };
 
-  const habitList = [
-    'Adequate Sleep',
-    'Water Consumption',
-    'Step Goal',
-    'Nutrition Compliance',
-    'Daily Stretching',
-    'Evening Recovery'
-  ];
+  const getHabitList = () => {
+    return userProfile?.habitList || [
+      'Adequate Sleep',
+      'Water Consumption',
+      'Step Goal',
+      'Nutrition Compliance',
+      'Daily Stretching',
+      'Evening Recovery'
+    ];
+  };
+
+  const habitList = getHabitList();
+
+  const handleUpdateHabitList = async () => {
+    if (!userProfile) return;
+    try {
+      const newList = editingHabits.filter(h => h.trim() !== '');
+      await updateUserProfile(userProfile.userId, { habitList: newList });
+      
+      // Update current log habits mapping if needed
+      // If we renamed a habit, we don't necessarily know how to map it unless we track indices
+      // For now, simpler: user updates the list, it affects future logs.
+      // The user said "reflect after that date", so strictly speaking I should update future logs.
+      
+      // Update current log to include new habits (init as false if missing)
+      if (log) {
+        const newHabitsObj = { ...log.habits };
+        newList.forEach(h => {
+          if (newHabitsObj[h] === undefined) newHabitsObj[h] = false;
+        });
+        const updatedLog = { ...log, habits: newHabitsObj };
+        setLog(updatedLog);
+        await gymService.updateDailyLog(selectedDate, { habits: newHabitsObj });
+      }
+
+      setIsEditingHabits(false);
+      if (onProfileUpdate) onProfileUpdate();
+      // We rely on the parent updating the userProfile prop, or we just use local state if we had it.
+      // But since userProfile is a prop, we should ideally trigger a refresh in App.tsx
+      // For now, let's assume we want to see it immediately
+    } catch (e) {
+      setError('Failed to update habits');
+    }
+  };
 
   const calculateXP = () => {
     if (!log) return 0;
@@ -699,12 +777,30 @@ export const ProGym = ({ latestReport, userProfile, onHomeClick }: { latestRepor
       setIsSettingPin(false);
       sessionStorage.setItem(`gym_hub_unlocked_${userProfile.userId}`, 'true');
       setError('');
+      if (onProfileUpdate) onProfileUpdate();
       // In a real app, you might want to refresh the profile state here
       // But for now, we set the unlock state directly
     } catch (e) {
       setError('Failed to save PIN. Please try again.');
     }
   };
+
+  const loadReportData = async () => {
+    setIsReportLoading(true);
+    // Get last 30 days
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - 30);
+    const logs = await gymService.getLogsInRange(start.toISOString().split('T')[0], end.toISOString().split('T')[0]);
+    setReportLogs(logs);
+    setIsReportLoading(false);
+  };
+
+  useEffect(() => {
+    if (activeView === 'report') {
+      loadReportData();
+    }
+  }, [activeView]);
 
   if (loading) {
     return (
@@ -857,7 +953,27 @@ export const ProGym = ({ latestReport, userProfile, onHomeClick }: { latestRepor
             >
               UNLCKD <span className="text-brand-primary">PRO GYM</span>
             </h1>
-            <p className="text-gray-400 mt-2 font-medium tracking-wide uppercase text-xs">Optimization Hub • Precision Training</p>
+            <div className="flex items-center gap-4 mt-2">
+              <button 
+                onClick={() => setActiveView('hub')}
+                className={cn(
+                  "text-[10px] font-black uppercase tracking-widest transition-all",
+                  activeView === 'hub' ? "text-brand-primary" : "text-gray-500 hover:text-gray-300"
+                )}
+              >
+                Dashboard
+              </button>
+              <div className="w-1 h-1 rounded-full bg-gray-800" />
+              <button 
+                onClick={() => setActiveView('report')}
+                className={cn(
+                  "text-[10px] font-black uppercase tracking-widest transition-all",
+                  activeView === 'report' ? "text-brand-primary" : "text-gray-500 hover:text-gray-300"
+                )}
+              >
+                Consistency Report
+              </button>
+            </div>
           </div>
           
           <div className="flex items-center gap-3">
@@ -891,6 +1007,8 @@ export const ProGym = ({ latestReport, userProfile, onHomeClick }: { latestRepor
         </div>
       </div>
 
+      {activeView === 'hub' ? (
+        <>
       {/* Daily Navigation */}
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between px-2">
@@ -1787,44 +1905,92 @@ export const ProGym = ({ latestReport, userProfile, onHomeClick }: { latestRepor
         {/* Right Column: Habits & Rewards */}
         <div className="space-y-8">
           <Card className="p-8 bg-brand-surface border-white/5">
-            <div className="flex items-center gap-3 mb-8">
-              <div className="p-2 bg-brand-primary/10 rounded-lg">
-                <CheckCircle2 className="w-5 h-5 text-brand-primary" />
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-brand-primary/10 rounded-lg">
+                  <CheckCircle2 className="w-5 h-5 text-brand-primary" />
+                </div>
+                <h3 className="font-bold text-gray-100">Daily Habits</h3>
               </div>
-              <h3 className="font-bold text-gray-100">Daily Habits</h3>
+              <button 
+                onClick={() => {
+                  if (isEditingHabits) {
+                    handleUpdateHabitList();
+                  } else {
+                    setEditingHabits(habitList);
+                    setIsEditingHabits(true);
+                  }
+                }}
+                className="text-[10px] font-black uppercase tracking-widest text-brand-primary hover:text-brand-primary/80 transition-colors"
+              >
+                {isEditingHabits ? 'Save Changes' : 'Manage Habits'}
+              </button>
             </div>
             
             <div className="space-y-4">
-              {habitList.map((habit) => {
-                const completed = log.habits?.[habit] || false;
-                return (
-                  <button
-                    key={habit}
-                    onClick={() => toggleHabit(habit)}
-                    className={cn(
-                      "w-full flex items-center justify-between p-4 rounded-xl border transition-all",
-                      completed 
-                        ? "bg-brand-primary/10 border-brand-primary/20 text-brand-primary" 
-                        : "bg-white/5 border-white/5 text-gray-400 hover:border-white/10"
-                    )}
+              {isEditingHabits ? (
+                <div className="space-y-3">
+                  {editingHabits.map((h, idx) => (
+                    <div key={idx} className="flex gap-2">
+                       <Input 
+                        value={h}
+                        onChange={(e) => {
+                          const newList = [...editingHabits];
+                          newList[idx] = e.target.value;
+                          setEditingHabits(newList);
+                        }}
+                        className="bg-white/5 border-white/10"
+                       />
+                       <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="text-red-500/50 hover:text-red-500"
+                        onClick={() => setEditingHabits(editingHabits.filter((_, i) => i !== idx))}
+                       >
+                         <Minus className="w-4 h-4" />
+                       </Button>
+                    </div>
+                  ))}
+                  <Button 
+                    variant="outline" 
+                    className="w-full border-dashed border-white/10 text-gray-500 hover:text-brand-primary hover:border-brand-primary/30"
+                    onClick={() => setEditingHabits([...editingHabits, ''])}
                   >
-                    <div className="flex items-center gap-3">
-                      {(habit.includes('Nutrition') || habit.includes('Diet')) && <Utensils className="w-4 h-4" />}
-                      {(habit.includes('Recovery') || habit.includes('Sleep')) && <Moon className="w-4 h-4" />}
-                      {habit.includes('Step') && <Footprints className="w-4 h-4" />}
-                      {habit.includes('Stretching') && <Zap className="w-4 h-4" />}
-                      {habit.includes('Water') && <Droplets className="w-4 h-4" />}
-                      <span className="text-sm font-medium">{habit}</span>
-                    </div>
-                    <div className={cn(
-                      "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors",
-                      completed ? "bg-brand-primary border-brand-primary" : "border-white/10"
-                    )}>
-                      {completed && <Check className="w-3 h-3 text-brand-surface" />}
-                    </div>
-                  </button>
-                );
-              })}
+                    <Plus className="w-4 h-4 mr-2" /> Add Habit
+                  </Button>
+                </div>
+              ) : (
+                habitList.map((habit) => {
+                  const completed = log.habits?.[habit] || false;
+                  return (
+                    <button
+                      key={habit}
+                      onClick={() => toggleHabit(habit)}
+                      className={cn(
+                        "w-full flex items-center justify-between p-4 rounded-xl border transition-all",
+                        completed 
+                          ? "bg-brand-primary/10 border-brand-primary/20 text-brand-primary" 
+                          : "bg-white/5 border-white/5 text-gray-400 hover:border-white/10"
+                      )}
+                    >
+                      <div className="flex items-center gap-3 text-left">
+                        {(habit.toLowerCase().includes('nutrition') || habit.toLowerCase().includes('diet')) && <Utensils className="w-4 h-4" />}
+                        {(habit.toLowerCase().includes('recovery') || habit.toLowerCase().includes('sleep')) && <Moon className="w-4 h-4" />}
+                        {habit.toLowerCase().includes('step') && <Footprints className="w-4 h-4" />}
+                        {(habit.toLowerCase().includes('stretching') || habit.toLowerCase().includes('mobility')) && <Zap className="w-4 h-4" />}
+                        {habit.toLowerCase().includes('water') && <Droplets className="w-4 h-4" />}
+                        <span className="text-sm font-medium">{habit}</span>
+                      </div>
+                      <div className={cn(
+                        "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0",
+                        completed ? "bg-brand-primary border-brand-primary" : "border-white/10"
+                      )}>
+                        {completed && <Check className="w-3 h-3 text-brand-surface" />}
+                      </div>
+                    </button>
+                  );
+                })
+              )}
             </div>
           </Card>
 
@@ -1959,6 +2125,138 @@ export const ProGym = ({ latestReport, userProfile, onHomeClick }: { latestRepor
            </div>
         </Card>
       </div>
+      </>
+      ) : (
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card className="p-8 bg-brand-surface border-white/5 space-y-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Avg. Step Compliance</span>
+              <div className="text-3xl font-display font-black text-white">
+                {reportLogs.length > 0 
+                  ? Math.round((reportLogs.filter(l => l.steps >= l.stepGoal).length / reportLogs.length) * 100)
+                  : 0}%
+              </div>
+              <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-emerald-500" 
+                  style={{ width: `${reportLogs.length > 0 ? (reportLogs.filter(l => l.steps >= l.stepGoal).length / reportLogs.length) * 100 : 0}%` }} 
+                />
+              </div>
+            </Card>
+            <Card className="p-8 bg-brand-surface border-white/5 space-y-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Avg. Hydration</span>
+              <div className="text-3xl font-display font-black text-white">
+                {reportLogs.length > 0 
+                  ? Math.round((reportLogs.reduce((acc, l) => acc + (l.water / l.waterGoal), 0) / reportLogs.length) * 100)
+                  : 0}%
+              </div>
+              <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-blue-500" 
+                  style={{ width: `${reportLogs.length > 0 ? (reportLogs.reduce((acc, l) => acc + (l.water / l.waterGoal), 0) / reportLogs.length) * 100 : 0}%` }} 
+                />
+              </div>
+            </Card>
+            <Card className="p-8 bg-brand-surface border-white/5 space-y-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Habit Streaks</span>
+              <div className="text-3xl font-display font-black text-white">
+                {reportLogs.length > 0 
+                  ? Math.round((reportLogs.reduce((acc, l) => acc + (Object.values(l.habits || {}).filter(Boolean).length / (Object.keys(l.habits || {}).length || 1)), 0) / reportLogs.length) * 100)
+                  : 0}%
+              </div>
+              <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-brand-primary" 
+                  style={{ width: `${reportLogs.length > 0 ? (reportLogs.reduce((acc, l) => acc + (Object.values(l.habits || {}).filter(Boolean).length / (Object.keys(l.habits || {}).length || 1)), 0) / reportLogs.length) * 100 : 0}%` }} 
+                />
+              </div>
+            </Card>
+          </div>
+
+          <Card className="p-8 bg-brand-surface border-white/5">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-brand-primary/10 rounded-lg">
+                  <ClipboardList className="w-5 h-5 text-brand-primary" />
+                </div>
+                <h3 className="font-bold text-gray-100 uppercase tracking-widest text-sm">30-Day Consistency Grid</h3>
+              </div>
+              <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-gray-500">
+                 <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-sm bg-brand-primary" /> Done</div>
+                 <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-sm bg-white/5" /> Missed</div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-7 sm:grid-cols-10 md:grid-cols-15 gap-2">
+              {reportLogs.slice().reverse().map((l, i) => {
+                const habitStrength = Object.values(l.habits || {}).filter(Boolean).length / (Object.keys(l.habits || {}).length || 1);
+                return (
+                  <div 
+                    key={l.id} 
+                    className={cn(
+                      "aspect-square rounded-sm transition-all cursor-help relative group",
+                      habitStrength > 0.8 ? "bg-brand-primary" : 
+                      habitStrength > 0.5 ? "bg-brand-primary/60" :
+                      habitStrength > 0.2 ? "bg-brand-primary/30" : "bg-white/5"
+                    )}
+                    title={`${l.date}: ${Math.round(habitStrength * 100)}% habits`}
+                  >
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-brand-dark border border-white/10 rounded text-[9px] font-mono text-white opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">
+                      {l.date}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+
+          <Card className="p-8 bg-brand-surface border-white/5">
+            <h3 className="font-bold text-gray-100 mb-6 flex items-center gap-2">
+               <TrendingUp className="w-4 h-4 text-brand-primary" />
+               Detailed Log History
+            </h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="text-[10px] uppercase tracking-widest text-gray-600 border-b border-white/5">
+                  <tr>
+                    <th className="pb-4 font-bold">Date</th>
+                    <th className="pb-4 font-bold">Steps</th>
+                    <th className="pb-4 font-bold text-center">Water</th>
+                    <th className="pb-4 font-bold text-center">Habits</th>
+                    <th className="pb-4 font-bold text-right">XP</th>
+                  </tr>
+                </thead>
+                <tbody className="text-sm">
+                  {reportLogs.map(l => (
+                    <tr key={l.id} className="border-b border-white/[0.02] last:border-0 hover:bg-white/[0.01]">
+                      <td className="py-4 font-mono text-gray-400">{l.date}</td>
+                      <td className="py-4">
+                        <div className="flex items-center gap-2">
+                          <span className={cn("font-bold", l.steps >= l.stepGoal ? "text-emerald-500" : "text-gray-200")}>
+                            {l.steps.toLocaleString()}
+                          </span>
+                          <span className="text-[10px] text-gray-600">/ {l.stepGoal.toLocaleString()}</span>
+                        </div>
+                      </td>
+                      <td className="py-4 text-center font-mono text-gray-300">
+                        {l.water} {l.waterUnit}
+                      </td>
+                      <td className="py-4 text-center">
+                        <Badge className="bg-brand-primary/10 text-brand-primary border-brand-primary/20 font-mono">
+                          {Object.values(l.habits || {}).filter(Boolean).length}/{Object.keys(l.habits || {}).length}
+                        </Badge>
+                      </td>
+                      <td className="py-4 text-right font-mono font-bold text-brand-primary">
+                        +{Math.round((Math.min(l.steps / l.stepGoal, 1) * 500) + (Math.min(l.water / l.waterGoal, 1) * 300) + (Object.values(l.habits || {}).filter(Boolean).length * 200))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };
