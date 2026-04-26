@@ -2389,81 +2389,115 @@ export const ProGym = ({
 
             <div className="overflow-x-auto pb-4 custom-scrollbar">
               <div className="min-w-[800px]">
-                <div className="grid grid-cols-[180px_repeat(31,minmax(24px,1fr))] gap-y-4 items-center">
+                <div className="grid grid-cols-[220px_repeat(31,minmax(24px,1fr))] gap-y-4 items-center">
                   {/* Calendar Days Header */}
-                  <div className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Habit</div>
+                  <div className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Habit & Consistency</div>
                   {Array.from({ length: new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0).getDate() }).map((_, i) => (
                     <div key={i} className="text-[10px] font-mono text-gray-600 text-center">{i + 1}</div>
                   ))}
 
                   {/* Habit Rows */}
-                  {habitList.map((habit) => (
-                    <React.Fragment key={habit}>
-                      <div className="text-xs font-bold text-gray-300 pr-4 truncate">{habit}</div>
-                      {Array.from({ length: new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0).getDate() }).map((_, i) => {
-                        const day = i + 1;
-                        const dateStr = `${reportDate.getFullYear()}-${String(reportDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                        const logAtDate = reportLogs.find(l => l.date === dateStr);
-                        const isDone = logAtDate?.habits?.[habit] || false;
-                        const isFuture = new Date(dateStr) > new Date();
+                  {habitList.map((habit) => {
+                    const daysInMonth = new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0).getDate();
+                    const isCurrentMonth = reportDate.getMonth() === new Date().getMonth() && reportDate.getFullYear() === new Date().getFullYear();
+                    const daysToConsider = isCurrentMonth ? new Date().getDate() : daysInMonth;
+                    
+                    const completions = reportLogs.filter(l => l.habits?.[habit]).length;
+                    const percentage = Math.round((completions / Math.max(1, daysToConsider)) * 100);
 
-                        return (
-                          <div key={i} className="flex justify-center">
-                            {isFuture ? (
-                              <div className="w-2.5 h-2.5 rounded-full bg-white/[0.02]" />
-                            ) : isDone ? (
-                              <motion.div 
-                                initial={{ scale: 0 }}
-                                animate={{ scale: 1 }}
-                                className="w-2.5 h-2.5 rounded-full bg-brand-primary shadow-[0_0_8px_rgba(16,185,129,0.4)]" 
-                              />
-                            ) : (
-                              <div className="w-2.5 h-2.5 rounded-full border border-white/10" />
-                            )}
-                          </div>
-                        );
-                      })}
-                    </React.Fragment>
-                  ))}
+                    return (
+                      <React.Fragment key={habit}>
+                        <div className="flex items-center gap-2 pr-4 min-w-0">
+                          <span className="text-xs font-bold text-gray-300 truncate">{habit}</span>
+                          <span className="text-[10px] font-mono font-black text-brand-primary shrink-0">{percentage}%</span>
+                        </div>
+                        {Array.from({ length: daysInMonth }).map((_, i) => {
+                          const day = i + 1;
+                          const dateStr = `${reportDate.getFullYear()}-${String(reportDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                          const logAtDate = reportLogs.find(l => l.date === dateStr);
+                          const isDone = logAtDate?.habits?.[habit] || false;
+                          const isFuture = new Date(dateStr) > new Date();
+
+                          return (
+                            <div key={i} className="flex justify-center">
+                              {isFuture ? (
+                                <div className="w-2.5 h-2.5 rounded-full bg-white/[0.02]" />
+                              ) : isDone ? (
+                                <motion.div 
+                                  initial={{ scale: 0 }}
+                                  animate={{ scale: 1 }}
+                                  className="w-2.5 h-2.5 rounded-full bg-brand-primary shadow-[0_0_8px_rgba(16,185,129,0.4)]" 
+                                />
+                              ) : (
+                                <div className="w-2.5 h-2.5 rounded-full border border-white/10" />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </React.Fragment>
+                    );
+                  })}
 
                   {/* Built-in Metrics Rows */}
                   <div className="col-span-full border-t border-white/5 my-4" />
                   
-                  <div className="text-xs font-bold text-gray-300 pr-4">10K Step Goal</div>
-                  {Array.from({ length: new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0).getDate() }).map((_, i) => {
-                    const day = i + 1;
-                    const dateStr = `${reportDate.getFullYear()}-${String(reportDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                    const logAtDate = reportLogs.find(l => l.date === dateStr);
-                    const isDone = logAtDate && logAtDate.steps >= logAtDate.stepGoal;
-                    const isFuture = new Date(dateStr) > new Date();
+                  {(() => {
+                    const daysInMonth = new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0).getDate();
+                    const isCurrentMonth = reportDate.getMonth() === new Date().getMonth() && reportDate.getFullYear() === new Date().getFullYear();
+                    const daysToConsider = isCurrentMonth ? new Date().getDate() : daysInMonth;
+                    
+                    const stepCompletions = reportLogs.filter(l => l.steps >= l.stepGoal).length;
+                    const stepPercentage = Math.round((stepCompletions / Math.max(1, daysToConsider)) * 100);
+                    
+                    const waterCompletions = reportLogs.filter(l => l.water >= l.waterGoal).length;
+                    const waterPercentage = Math.round((waterCompletions / Math.max(1, daysToConsider)) * 100);
 
                     return (
-                      <div key={i} className="flex justify-center">
-                        {isFuture ? <div className="w-2.5 h-2.5 rounded-full bg-white/[0.02]" /> :
-                         isDone ? <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" /> :
-                         <div className="w-2.5 h-2.5 rounded-full border border-white/10" />
-                        }
-                      </div>
-                    );
-                  })}
+                      <>
+                        <div className="flex items-center gap-2 pr-4 min-w-0">
+                          <span className="text-xs font-bold text-gray-300 truncate">10K Step Goal</span>
+                          <span className="text-[10px] font-mono font-black text-emerald-500 shrink-0">{stepPercentage}%</span>
+                        </div>
+                        {Array.from({ length: daysInMonth }).map((_, i) => {
+                          const day = i + 1;
+                          const dateStr = `${reportDate.getFullYear()}-${String(reportDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                          const logAtDate = reportLogs.find(l => l.date === dateStr);
+                          const isDone = logAtDate && logAtDate.steps >= logAtDate.stepGoal;
+                          const isFuture = new Date(dateStr) > new Date();
 
-                  <div className="text-xs font-bold text-gray-300 pr-4">Hydration Target</div>
-                  {Array.from({ length: new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0).getDate() }).map((_, i) => {
-                    const day = i + 1;
-                    const dateStr = `${reportDate.getFullYear()}-${String(reportDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                    const logAtDate = reportLogs.find(l => l.date === dateStr);
-                    const isDone = logAtDate && logAtDate.water >= logAtDate.waterGoal;
-                    const isFuture = new Date(dateStr) > new Date();
+                          return (
+                            <div key={i} className="flex justify-center">
+                              {isFuture ? <div className="w-2.5 h-2.5 rounded-full bg-white/[0.02]" /> :
+                               isDone ? <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" /> :
+                               <div className="w-2.5 h-2.5 rounded-full border border-white/10" />
+                              }
+                            </div>
+                          );
+                        })}
 
-                    return (
-                      <div key={i} className="flex justify-center">
-                        {isFuture ? <div className="w-2.5 h-2.5 rounded-full bg-white/[0.02]" /> :
-                         isDone ? <div className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.4)]" /> :
-                         <div className="w-2.5 h-2.5 rounded-full border border-white/10" />
-                        }
-                      </div>
+                        <div className="flex items-center gap-2 pr-4 min-w-0">
+                          <span className="text-xs font-bold text-gray-300 truncate">Hydration Target</span>
+                          <span className="text-[10px] font-mono font-black text-blue-500 shrink-0">{waterPercentage}%</span>
+                        </div>
+                        {Array.from({ length: daysInMonth }).map((_, i) => {
+                          const day = i + 1;
+                          const dateStr = `${reportDate.getFullYear()}-${String(reportDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                          const logAtDate = reportLogs.find(l => l.date === dateStr);
+                          const isDone = logAtDate && logAtDate.water >= logAtDate.waterGoal;
+                          const isFuture = new Date(dateStr) > new Date();
+
+                          return (
+                            <div key={i} className="flex justify-center">
+                              {isFuture ? <div className="w-2.5 h-2.5 rounded-full bg-white/[0.02]" /> :
+                               isDone ? <div className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.4)]" /> :
+                               <div className="w-2.5 h-2.5 rounded-full border border-white/10" />
+                              }
+                            </div>
+                          );
+                        })}
+                      </>
                     );
-                  })}
+                  })()}
                 </div>
               </div>
             </div>
