@@ -158,6 +158,59 @@ export const ProGym = ({ latestReport, userProfile, onHomeClick }: { latestRepor
     6: "Strength does not come from winning. Your struggles develop your strengths.",
   };
 
+  const importMealsFromPlan = async () => {
+    if (!latestReport || !log) return;
+    const mealDay = getMealsForSelectedDate();
+    if (!mealDay) return;
+
+    const importedMeals: DailyLog['meals'] = [
+      { 
+        name: mealDay.breakfast, 
+        type: 'breakfast', 
+        completed: false, 
+        url: mealDay.breakfastUrl, 
+        calories: mealDay.breakfastMacros?.calories,
+        protein: mealDay.breakfastMacros?.protein,
+        fat: mealDay.breakfastMacros?.fat,
+        carbs: mealDay.breakfastMacros?.carbs
+      },
+      { 
+        name: mealDay.lunch, 
+        type: 'lunch', 
+        completed: false, 
+        url: mealDay.lunchUrl, 
+        calories: mealDay.lunchMacros?.calories,
+        protein: mealDay.lunchMacros?.protein,
+        fat: mealDay.lunchMacros?.fat,
+        carbs: mealDay.lunchMacros?.carbs
+      },
+      { 
+        name: mealDay.dinner, 
+        type: 'dinner', 
+        completed: false, 
+        url: mealDay.dinnerUrl, 
+        calories: mealDay.dinnerMacros?.calories,
+        protein: mealDay.dinnerMacros?.protein,
+        fat: mealDay.dinnerMacros?.fat,
+        carbs: mealDay.dinnerMacros?.carbs
+      },
+      { 
+        name: mealDay.snack, 
+        type: 'snack', 
+        completed: false, 
+        url: mealDay.snackUrl, 
+        calories: mealDay.snackMacros?.calories,
+        protein: mealDay.snackMacros?.protein,
+        fat: mealDay.snackMacros?.fat,
+        carbs: mealDay.snackMacros?.carbs
+      }
+    ];
+
+    const updatedLog = { ...log, meals: importedMeals };
+    setLog(updatedLog);
+    await gymService.updateDailyLog(selectedDate, { meals: importedMeals });
+  };
+
   const dayOfWeek = new Date(selectedDate).getDay();
   const dailyMessage = motivationalMessages[dayOfWeek] || "Consistency is the key to transformation.";
 
@@ -397,15 +450,51 @@ export const ProGym = ({ latestReport, userProfile, onHomeClick }: { latestRepor
     setMeasurements(measurementData);
 
     if (logData) {
-      // Ensure meals are initialized if missing in old logs
-      if (!logData.meals && latestReport) {
+      // Ensure meals are initialized if missing or empty in old logs
+      if ((!logData.meals || logData.meals.length === 0) && latestReport) {
         const mealDay = getMealsForSelectedDate();
         if (mealDay) {
           logData.meals = [
-            { name: mealDay.breakfast, type: 'breakfast', completed: false, url: mealDay.breakfastUrl, ...mealDay.breakfastMacros },
-            { name: mealDay.lunch, type: 'lunch', completed: false, url: mealDay.lunchUrl, ...mealDay.lunchMacros },
-            { name: mealDay.dinner, type: 'dinner', completed: false, url: mealDay.dinnerUrl, ...mealDay.dinnerMacros },
-            { name: mealDay.snack, type: 'snack', completed: false, url: mealDay.snackUrl, ...mealDay.snackMacros }
+            { 
+              name: mealDay.breakfast, 
+              type: 'breakfast', 
+              completed: false, 
+              url: mealDay.breakfastUrl, 
+              calories: mealDay.breakfastMacros?.calories,
+              protein: mealDay.breakfastMacros?.protein,
+              fat: mealDay.breakfastMacros?.fat,
+              carbs: mealDay.breakfastMacros?.carbs
+            },
+            { 
+              name: mealDay.lunch, 
+              type: 'lunch', 
+              completed: false, 
+              url: mealDay.lunchUrl, 
+              calories: mealDay.lunchMacros?.calories,
+              protein: mealDay.lunchMacros?.protein,
+              fat: mealDay.lunchMacros?.fat,
+              carbs: mealDay.lunchMacros?.carbs
+            },
+            { 
+              name: mealDay.dinner, 
+              type: 'dinner', 
+              completed: false, 
+              url: mealDay.dinnerUrl, 
+              calories: mealDay.dinnerMacros?.calories,
+              protein: mealDay.dinnerMacros?.protein,
+              fat: mealDay.dinnerMacros?.fat,
+              carbs: mealDay.dinnerMacros?.carbs
+            },
+            { 
+              name: mealDay.snack, 
+              type: 'snack', 
+              completed: false, 
+              url: mealDay.snackUrl, 
+              calories: mealDay.snackMacros?.calories,
+              protein: mealDay.snackMacros?.protein,
+              fat: mealDay.snackMacros?.fat,
+              carbs: mealDay.snackMacros?.carbs
+            }
           ];
         }
       }
@@ -427,10 +516,46 @@ export const ProGym = ({ latestReport, userProfile, onHomeClick }: { latestRepor
 
       const mealDay = getMealsForSelectedDate();
       const initialMeals: DailyLog['meals'] = mealDay ? [
-        { name: mealDay.breakfast, type: 'breakfast', completed: false, url: mealDay.breakfastUrl, ...mealDay.breakfastMacros },
-        { name: mealDay.lunch, type: 'lunch', completed: false, url: mealDay.lunchUrl, ...mealDay.lunchMacros },
-        { name: mealDay.dinner, type: 'dinner', completed: false, url: mealDay.dinnerUrl, ...mealDay.dinnerMacros },
-        { name: mealDay.snack, type: 'snack', completed: false, url: mealDay.snackUrl, ...mealDay.snackMacros }
+        { 
+          name: mealDay.breakfast, 
+          type: 'breakfast', 
+          completed: false, 
+          url: mealDay.breakfastUrl, 
+          calories: mealDay.breakfastMacros?.calories,
+          protein: mealDay.breakfastMacros?.protein,
+          fat: mealDay.breakfastMacros?.fat,
+          carbs: mealDay.breakfastMacros?.carbs
+        },
+        { 
+          name: mealDay.lunch, 
+          type: 'lunch', 
+          completed: false, 
+          url: mealDay.lunchUrl, 
+          calories: mealDay.lunchMacros?.calories,
+          protein: mealDay.lunchMacros?.protein,
+          fat: mealDay.lunchMacros?.fat,
+          carbs: mealDay.lunchMacros?.carbs
+        },
+        { 
+          name: mealDay.dinner, 
+          type: 'dinner', 
+          completed: false, 
+          url: mealDay.dinnerUrl, 
+          calories: mealDay.dinnerMacros?.calories,
+          protein: mealDay.dinnerMacros?.protein,
+          fat: mealDay.dinnerMacros?.fat,
+          carbs: mealDay.dinnerMacros?.carbs
+        },
+        { 
+          name: mealDay.snack, 
+          type: 'snack', 
+          completed: false, 
+          url: mealDay.snackUrl, 
+          calories: mealDay.snackMacros?.calories,
+          protein: mealDay.snackMacros?.protein,
+          fat: mealDay.snackMacros?.fat,
+          carbs: mealDay.snackMacros?.carbs
+        }
       ] : [
         { name: 'Breakfast', type: 'breakfast', completed: false },
         { name: 'Lunch', type: 'lunch', completed: false },
@@ -1363,6 +1488,16 @@ export const ProGym = ({ latestReport, userProfile, onHomeClick }: { latestRepor
                 <h3 className="font-bold text-gray-100">Daily Nutrition Log</h3>
               </div>
               <div className="flex items-center gap-2">
+                {latestReport && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={importMealsFromPlan}
+                    className="border-brand-primary/20 hover:bg-brand-primary/10 text-brand-primary h-7 px-2 text-[10px] font-black uppercase tracking-widest"
+                  >
+                    Sync from Plan
+                  </Button>
+                )}
                 <Badge className="bg-brand-primary/10 text-brand-primary border-brand-primary/20 font-black text-[10px]">
                   {log?.useManualWorkout ? 'MANUAL EDITS ENABLED' : 'GUIDED PLAN'}
                 </Badge>
