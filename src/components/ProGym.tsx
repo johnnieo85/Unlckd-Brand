@@ -569,7 +569,8 @@ export const ProGym = ({ latestReport, userProfile }: { latestReport: SavedRepor
   if (!log) return null;
 
   if (!isHubUnlocked) {
-    const isFirstTime = !userProfile?.gymPin || isSettingPin;
+    const hasPin = !!userProfile?.gymPin;
+    const isFirstTime = !hasPin && !isSettingPin;
 
     return (
       <div className="min-h-[60vh] flex items-center justify-center p-6">
@@ -583,22 +584,28 @@ export const ProGym = ({ latestReport, userProfile }: { latestReport: SavedRepor
             
             <div className="flex flex-col items-center text-center space-y-4">
               <div className="p-4 bg-brand-primary/10 rounded-3xl">
-                {isFirstTime ? <Sparkles className="w-8 h-8 text-brand-primary" /> : <Lock className="w-8 h-8 text-brand-primary" />}
+                {isFirstTime ? <Lock className="w-8 h-8 text-red-500" /> : (isSettingPin ? <Sparkles className="w-8 h-8 text-brand-primary" /> : <Lock className="w-8 h-8 text-brand-primary" />)}
               </div>
               <div className="space-y-1">
                 <h2 className="text-2xl font-display font-black text-white">
-                  {isFirstTime ? (isSettingPin ? "Update Your PIN" : "Secure Your Data") : "Gym Hub Locked"}
+                  {isFirstTime ? "Access Restricted" : (isSettingPin ? "Update Your PIN" : "Gym Hub Locked")}
                 </h2>
                 <p className="text-gray-500 text-sm">
                   {isFirstTime 
-                    ? (isSettingPin ? "Enter your new personal PIN below." : "Set your personal PIN to protect your workout and meal plans.")
-                    : "Enter your secure PIN to access your optimization hub."}
+                    ? "Your Hub access has not been granted. Please contact your UNLCKD instructor for your personal PIN." 
+                    : (isSettingPin ? "Enter your new personal PIN below." : "Enter your secure PIN to access your optimization hub.")}
                 </p>
               </div>
             </div>
 
             <div className="space-y-4">
               {isFirstTime ? (
+                <div className="pt-4 flex flex-col items-center">
+                   <div className="p-4 bg-white/5 rounded-2xl text-center">
+                     <p className="text-xs text-gray-400 font-medium">Once your instructor provides your PIN, you will be able to unlock your personalized training environment.</p>
+                   </div>
+                </div>
+              ) : isSettingPin ? (
                 <div className="space-y-4">
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 ml-1">New 4-6 Digit PIN</label>
@@ -626,21 +633,19 @@ export const ProGym = ({ latestReport, userProfile }: { latestReport: SavedRepor
                     className="w-full h-12 rounded-xl text-brand-dark" 
                     onClick={handlePinSetup}
                   >
-                    {isSettingPin ? "Update PIN" : "Set PIN & Continue"}
+                    Update PIN
                   </Button>
-                  {isSettingPin && (
-                    <Button 
-                      variant="ghost"
-                      className="w-full text-gray-500 text-xs hover:text-white" 
-                      onClick={() => {
-                        setIsSettingPin(false);
-                        setIsHubUnlocked(true);
-                        setError('');
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                  )}
+                  <Button 
+                    variant="ghost"
+                    className="w-full text-gray-500 text-xs hover:text-white" 
+                    onClick={() => {
+                      setIsSettingPin(false);
+                      setIsHubUnlocked(true);
+                      setError('');
+                    }}
+                  >
+                    Cancel
+                  </Button>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -742,6 +747,34 @@ export const ProGym = ({ latestReport, userProfile }: { latestReport: SavedRepor
             </span>
           </div>
           <div className="flex items-center gap-2">
+            {latestReport && (
+              <div className="relative group/week">
+                <select 
+                  onChange={(e) => {
+                    const week = parseInt(e.target.value);
+                    const startDate = latestReport.timestamp?.toDate ? latestReport.timestamp.toDate() : new Date(latestReport.timestamp);
+                    startDate.setHours(0,0,0,0);
+                    const targetDate = new Date(startDate);
+                    targetDate.setDate(targetDate.getDate() + (week - 1) * 7);
+                    setSelectedDate(targetDate.toISOString().split('T')[0]);
+                    setUnlockedDates(prev => new Set([...prev, targetDate.toISOString().split('T')[0]]));
+                  }}
+                  className="absolute inset-0 opacity-0 cursor-pointer z-10 w-full"
+                  value={Math.floor((new Date(selectedDate).getTime() - (latestReport.timestamp?.toDate ? latestReport.timestamp.toDate() : new Date(latestReport.timestamp)).setHours(0,0,0,0)) / (7 * 24 * 60 * 60 * 1000)) + 1}
+                >
+                  {Array.from({ length: 12 }).map((_, i) => (
+                    <option key={i} value={i + 1}>Week {i + 1}</option>
+                  ))}
+                </select>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-7 px-3 text-[10px] font-black uppercase bg-white/5 hover:bg-white/10 rounded-lg text-gray-400 group-hover/week:text-brand-primary border border-white/5"
+                >
+                  Jump to Week
+                </Button>
+              </div>
+            )}
             <div className="relative group/date">
               <input 
                 type="date"
