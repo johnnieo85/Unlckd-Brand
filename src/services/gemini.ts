@@ -8,7 +8,7 @@ export async function generateTransformationReport(
   photos: Photos | ProgressPhotos,
   path: string
 ): Promise<AssessmentResult> {
-  const model = "gemini-1.5-pro";
+  const model = "gemini-3-flash-preview";
 
   const photoParts: any[] = [];
   const processPhoto = (data: string | null) => {
@@ -84,14 +84,12 @@ export async function generateTransformationReport(
   try {
     const response = await ai.models.generateContent({
       model,
-      contents: [
-        {
-          parts: [
-            { text: prompt },
-            ...photoParts,
-          ],
-        },
-      ],
+      contents: {
+        parts: [
+          { text: prompt },
+          ...photoParts,
+        ],
+      },
       config: {
         systemInstruction: `
           You are a world-class premium fitness coach and physique assessor for "UNLCKD Pro Trainer".
