@@ -22,6 +22,14 @@ service cloud.firestore {
       allow update: if isSignedIn() && 
                       isOwner(userId) && 
                       request.resource.data.hasAccess == resource.data.hasAccess; // Users cannot grant themselves access
+
+      match /dailyLogs/{date} {
+        allow read, write: if isSignedIn() && isOwner(userId) && hasAccess();
+      }
+
+      match /measurements/{measurementId} {
+        allow read, write: if isSignedIn() && isOwner(userId) && hasAccess();
+      }
     }
 
     match /reports/{reportId} {

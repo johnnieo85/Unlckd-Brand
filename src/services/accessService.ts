@@ -2,12 +2,7 @@ import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { User as FirebaseUser } from 'firebase/auth';
 
-export interface UserProfile {
-  userId: string;
-  email: string;
-  hasAccess: boolean;
-  createdAt: any;
-}
+import { UserProfile, Badge } from '../types';
 
 export async function ensureUserProfile(user: FirebaseUser): Promise<UserProfile> {
   const userRef = doc(db, 'users', user.uid);
@@ -18,7 +13,16 @@ export async function ensureUserProfile(user: FirebaseUser): Promise<UserProfile
       userId: user.uid,
       email: user.email || '',
       hasAccess: false, // Default to no access
-      createdAt: serverTimestamp()
+      isPremium: false,
+      createdAt: serverTimestamp(),
+      badges: [],
+      monthlyGoal: {
+        title: "The Stepper Elite",
+        description: "Achieve 10,000 steps daily for at least 75% of the month to unlock the elite status.",
+        deadline: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString(),
+        completed: false,
+        badgeId: "stepper"
+      }
     };
     await setDoc(userRef, newProfile);
     return newProfile;
@@ -36,4 +40,9 @@ export async function checkUserAccess(userId: string): Promise<boolean> {
   }
   
   return false;
+}
+
+export async function unlockPremium(userId: string): Promise<void> {
+  const userRef = doc(db, 'users', userId);
+  await setDoc(userRef, { isPremium: true }, { merge: true });
 }

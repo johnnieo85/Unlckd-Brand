@@ -106,9 +106,9 @@ export async function generateTransformationReport(
              - If path is "assessment": You MUST return empty arrays for "workoutPlan", "mealPlan", and "groceryList", and an empty string for "nutritionStrategy".
              - If path is "progress": You MUST return empty arrays for "workoutPlan", "mealPlan", "groceryList", "recoverySchedule", "waterSchedule", and empty strings for "nutritionStrategy", "stepGoals", "hydrationTargets", "trainerSummary".
              - For ALL paths, you MUST provide "healthMetrics", "motivationalQuote", and "sleepRecommendation".
-             - If path is "workout", "meal", or "full": You MUST provide a plan for the duration requested by the user (${userData.planDuration || '12-week'}).
-             - Structure the response into weeks for relevant paths. If "7-day" is requested, return a single week with 7 days. If "2-week", "4-week", or "12-week" is requested, return the corresponding number of weeks.
-             - Each week should have a specific focus or phase.
+             - If path is "workout", "meal", or "full": You MUST provide a comprehensive 12-week plan.
+             - Structure the response into exactly 12 weeks. Each week MUST have a specific focus or phase.
+             - Every week should contain a unique focus (e.g., Week 1: Foundational Strength, Week 2: Hypertrophy, etc.).
              - Ensure progressive overload in the workout plan.
              - EXERCISE COUNT: For each training day, the "mainWork" field MUST contain between 7 to 10 specific, effective exercises.
              - AVOID REPETITION: If certain days or meals are similar across weeks, keep the descriptions extremely short to save tokens.

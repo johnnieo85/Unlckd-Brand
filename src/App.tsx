@@ -40,12 +40,12 @@ import { Button } from './components/ui/Button';
 import { Input, Select } from './components/ui/Input';
 import { Card, Badge } from './components/ui/Card';
 import { cn } from './lib/utils';
-import { Path, UserData, Photos, ProgressPhotos, AssessmentResult, Rating, SavedReport } from './types';
+import { Path, UserData, Photos, ProgressPhotos, AssessmentResult, Rating, SavedReport, UserProfile } from './types';
 import { generateTransformationReport } from './services/gemini';
 import { auth } from './lib/firebase';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { historyService } from './services/historyService';
-import { ensureUserProfile, checkUserAccess } from './services/accessService';
+import { ensureUserProfile, checkUserAccess, unlockPremium } from './services/accessService';
 
 const LogoBranding = () => (
   <div className="flex items-center justify-between border-t border-white/10 pt-6 mt-12 print:border-gray-200 print:pt-4 print:mt-8">
@@ -217,7 +217,12 @@ const ProgressComparison = ({ title, ratings = [], summary, beforePhoto, afterPh
   </div>
 );
 
+import { ProGym } from './components/ProGym';
+import { gymService } from './services/gymService';
+
 export default function App() {
+  const [activeTab, setActiveTab] = useState<'reports' | 'gym'>('reports');
+  const [latestReport, setLatestReport] = useState<SavedReport | null>(null);
   const [step, setStep] = useState<'landing' | 'intake' | 'photos' | 'progress-photos' | 'processing' | 'report' | 'history' | 'no-access'>('landing');
   const [path, setPath] = useState<Path>('full');
   const [userData, setUserData] = useState<UserData>({
@@ -258,7 +263,11 @@ export default function App() {
   const [report, setReport] = useState<AssessmentResult | null>(null);
   const [loadingMessage, setLoadingMessage] = useState('Analyzing your physique...');
   const [user, setUser] = useState(auth.currentUser);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
+  const [isPremium, setIsPremium] = useState<boolean>(false);
+  const [showGymAuth, setShowGymAuth] = useState(false);
+  const [gymAuthPin, setGymAuthPin] = useState('');
   const [savedReports, setSavedReports] = useState<SavedReport[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
@@ -269,12 +278,26 @@ export default function App() {
   const [authPassword, setAuthPassword] = useState('');
 
   useEffect(() => {
+    if (user && savedReports.length > 0) {
+      // Only import data from the user's last "Full Transformation Report"
+      const report = savedReports.find(r => r.path === 'full');
+      if (report) {
+        setLatestReport(report);
+      } else {
+        setLatestReport(null);
+      }
+    }
+  }, [user, savedReports]);
+
+  useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
       if (user) {
         try {
           const profile = await ensureUserProfile(user);
+          setUserProfile(profile);
           setHasAccess(profile.hasAccess);
+          setIsPremium(profile.isPremium);
           loadHistory();
         } catch (error) {
           console.error("Error ensuring user profile:", error);
@@ -535,11 +558,30 @@ export default function App() {
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  onClick={() => setStep('history')}
-                  className={cn("gap-2 hover:bg-white/5", step === 'history' && "text-brand-primary bg-white/5")}
+                  onClick={() => {
+                    setActiveTab('reports');
+                    setStep('history');
+                  }}
+                  className={cn("gap-2 hover:bg-white/5", activeTab === 'reports' && step === 'history' && "text-brand-primary bg-white/5")}
                 >
                   <History className="w-4 h-4" />
                   My Reports
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => {
+                    if (!isPremium) {
+                      setShowGymAuth(true);
+                    } else {
+                      setActiveTab('gym');
+                    }
+                  }}
+                  className={cn("gap-2 hover:bg-white/5", activeTab === 'gym' && "text-brand-primary bg-white/5")}
+                >
+                  <Dumbbell className="w-4 h-4" />
+                  Gym Hub
+                  {!isPremium && <Lock className="w-3 h-3 text-gray-500" />}
                 </Button>
                 <div className="flex items-center gap-3 pl-4 border-l border-white/10">
                   <div className="text-right hidden sm:block">
@@ -551,7 +593,10 @@ export default function App() {
                       )}
                       <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Signed In As</p>
                     </div>
-                    <p className="text-xs text-gray-300 font-medium truncate max-w-[120px]">{user.displayName || user.email}</p>
+                    <p className="text-xs text-gray-300 font-medium truncate max-w-[120px]">
+                      {user.displayName || user.email}
+                      {isPremium && <span className="text-brand-primary ml-1 text-[10px] font-black">(premium)</span>}
+                    </p>
                   </div>
                   <Button variant="ghost" size="icon" onClick={handleSignOut} className="hover:bg-white/5 text-gray-400 hover:text-white">
                     <LogOut className="w-4 h-4" />
@@ -580,7 +625,18 @@ export default function App() {
 
       <main className="relative pt-32 pb-20 px-6 max-w-6xl mx-auto">
         <AnimatePresence mode="wait">
-          {step === 'history' && (
+          {activeTab === 'gym' ? (
+            <motion.div
+              key="gym"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+            >
+              <ProGym latestReport={latestReport} userProfile={userProfile} />
+            </motion.div>
+          ) : (
+            <>
+              {step === 'history' && (
             <motion.div
               key="history"
               initial={{ opacity: 0, scale: 0.95 }}
@@ -991,19 +1047,7 @@ export default function App() {
                     />
                   )}
 
-                  {(path === 'workout' || path === 'meal' || path === 'full') && (
-                    <Select 
-                      label="Plan Duration"
-                      options={[
-                        {label: '7-Day', value: '7-day'}, 
-                        {label: '2 Week', value: '2-week'},
-                        {label: '4 Week', value: '4-week'},
-                        {label: '12 Week', value: '12-week'}
-                      ]} 
-                      value={userData.planDuration}
-                      onChange={e => setUserData({...userData, planDuration: e.target.value as any})}
-                    />
-                  )}
+
                 </div>
 
                 {(path !== 'meal' && path !== 'assessment' && path !== 'progress') && (
@@ -1435,12 +1479,12 @@ export default function App() {
                     {path === 'meal' ? 'UNLCKD Meal Plan' : 
                      path === 'workout' ? 'UNLCKD Workout Plan' : 
                      path === 'progress' ? 'UNLCKD Weekly Comparison Report' :
-                     'UNLCKD Transformation Report'}
+                     'UNLCKD 12-Week Transformation Report'}
                   </h1>
                   <p className="text-gray-500">
                     {path === 'meal' ? 'Nutrition Strategy, Meal Plan, and Grocery List' :
                      path === 'workout' ? 'Training Plan, Recovery, and Hydration Strategy' :
-                     'Baseline Assessment, Training Plan, and Nutrition Strategy'}
+                     '12-Week Baseline Assessment, Training Plan, and Nutrition Strategy'}
                   </p>
                 </div>
 
@@ -2081,8 +2125,79 @@ export default function App() {
               )}
             </motion.div>
           )}
-        </AnimatePresence>
-      </main>
+        </>
+      )}
+    </AnimatePresence>
+  </main>
+      
+  {/* Gym Activation Modal */}
+  <AnimatePresence>
+    {showGymAuth && (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 sm:p-0">
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => setShowGymAuth(false)}
+          className="absolute inset-0 bg-brand-dark/80 backdrop-blur-md" 
+        />
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 20 }}
+          className="relative w-full max-w-md bg-brand-surface border border-white/10 rounded-3xl p-8 shadow-2xl"
+        >
+          <div className="flex flex-col items-center text-center">
+            <div className="w-16 h-16 bg-brand-primary/10 rounded-2xl flex items-center justify-center mb-6">
+              <Lock className="w-8 h-8 text-brand-primary" />
+            </div>
+            <h3 className="text-2xl font-display font-black text-white mb-2 uppercase tracking-tight">Access Pro Gym Hub</h3>
+            <p className="text-gray-400 text-sm mb-8">This section requires secondary authorization. Please enter your 4-digit activation PIN.</p>
+            
+            <div className="w-full space-y-4">
+              <div className="space-y-1.5 text-left">
+                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest pl-1">Activation PIN</label>
+                <Input 
+                  type="password"
+                  placeholder="••••"
+                  maxLength={4}
+                  value={gymAuthPin}
+                  onChange={(e) => setGymAuthPin(e.target.value)}
+                  className="text-center text-2xl tracking-[1em] font-mono"
+                />
+              </div>
+              
+              <Button 
+                className="w-full bg-brand-primary text-brand-dark font-black py-6 rounded-2xl text-lg hover:bg-brand-primary/90"
+                onClick={async () => {
+                  if (gymAuthPin === '1234') { // Mock PIN for demo
+                    if (user) {
+                      await unlockPremium(user.uid);
+                      setIsPremium(true);
+                      setShowGymAuth(false);
+                      setActiveTab('gym');
+                      setGymAuthPin('');
+                    }
+                  } else {
+                    alert('Invalid Activation PIN');
+                  }
+                }}
+              >
+                Authorize Entry
+              </Button>
+              
+              <button 
+                onClick={() => setShowGymAuth(false)}
+                className="text-xs font-bold text-gray-500 hover:text-white transition-colors"
+              >
+                Cancel Request
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    )}
+  </AnimatePresence>
 
       <footer className="py-12 border-t border-gray-800 bg-brand-dark">
         <div className="max-w-7xl mx-auto px-4 text-center space-y-4">
