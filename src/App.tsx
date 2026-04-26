@@ -437,33 +437,6 @@ export default function App() {
     linkElement.click();
   };
 
-  const handleImportReport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const content = event.target?.result as string;
-        const importedData = JSON.parse(content);
-        
-        // Basic validation
-        if (!importedData.report || !importedData.userData || !importedData.path) {
-          throw new Error("Invalid report format");
-        }
-
-        const { id, timestamp, userId, ...reportData } = importedData;
-        await historyService.importReport(reportData);
-        await loadHistory();
-        alert("Report imported successfully!");
-      } catch (error) {
-        console.error("Import failed:", error);
-        alert("Failed to import report. Please ensure the file is a valid UNLCKD report.");
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = ''; // Reset input
-  };
 
   const handleStart = (selectedPath: Path) => {
     if (!user) {
@@ -693,21 +666,6 @@ export default function App() {
                   <p className="text-gray-400 mt-2 text-lg font-light">Your professional assessments, preserved and tracked.</p>
                 </div>
                 <div className="flex gap-3">
-                  <input
-                    type="file"
-                    id="report-import"
-                    className="hidden"
-                    accept=".json"
-                    onChange={handleImportReport}
-                  />
-                  <Button 
-                    variant="outline" 
-                    onClick={() => document.getElementById('report-import')?.click()} 
-                    className="gap-2 border-white/10 hover:bg-white/5 rounded-xl"
-                  >
-                    <Download className="w-4 h-4" />
-                    Import JSON
-                  </Button>
                   <Button variant="outline" onClick={() => setStep('landing')} className="gap-2 border-white/10 hover:bg-white/5 rounded-xl">
                     <ChevronLeft className="w-4 h-4" />
                     Back to Dashboard

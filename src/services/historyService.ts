@@ -110,21 +110,6 @@ export const historyService = {
     }
   },
 
-  async importReport(data: Omit<SavedReport, 'id' | 'timestamp' | 'userId'>): Promise<string> {
-    if (!auth.currentUser) throw new Error("User must be signed in to import reports");
-
-    try {
-      const docRef = await addDoc(collection(db, 'reports'), {
-        ...data,
-        userId: auth.currentUser.uid,
-        id: crypto.randomUUID(),
-        timestamp: serverTimestamp(),
-      });
-      return docRef.id;
-    } catch (error) {
-      handleFirestoreError(error, 'create', 'reports');
-    }
-  },
 
   async testConnection() {
     try {

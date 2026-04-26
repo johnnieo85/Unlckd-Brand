@@ -160,10 +160,14 @@ export const ProGym = ({ latestReport, userProfile }: { latestReport: SavedRepor
     if (latestReport.timestamp) {
       try {
         const reportDate = latestReport.timestamp?.toDate ? latestReport.timestamp.toDate() : new Date(latestReport.timestamp);
-        const now = new Date();
-        const diffTime = Math.abs(now.getTime() - reportDate.getTime());
+        const startDate = new Date(reportDate);
+        startDate.setHours(0, 0, 0, 0);
+        const targetDate = new Date(selectedDate);
+        targetDate.setHours(0, 0, 0, 0);
+        
+        const diffTime = targetDate.getTime() - startDate.getTime();
         const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-        currentWeekIndex = Math.min(Math.floor(diffDays / 7), 11); // 0-11 for 12 weeks
+        currentWeekIndex = Math.max(0, Math.min(Math.floor(diffDays / 7), 11)); // 0-11 for 12 weeks
       } catch (e) {
         console.error("Error calculating week index", e);
       }
@@ -207,10 +211,14 @@ export const ProGym = ({ latestReport, userProfile }: { latestReport: SavedRepor
     if (latestReport.timestamp) {
       try {
         const reportDate = latestReport.timestamp?.toDate ? latestReport.timestamp.toDate() : new Date(latestReport.timestamp);
-        const now = new Date();
-        const diffTime = Math.abs(now.getTime() - reportDate.getTime());
+        const startDate = new Date(reportDate);
+        startDate.setHours(0, 0, 0, 0);
+        const targetDate = new Date(selectedDate);
+        targetDate.setHours(0, 0, 0, 0);
+        
+        const diffTime = targetDate.getTime() - startDate.getTime();
         const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-        currentWeekIndex = Math.min(Math.floor(diffDays / 7), 11);
+        currentWeekIndex = Math.max(0, Math.min(Math.floor(diffDays / 7), 11));
       } catch (e) {}
     }
 
@@ -531,48 +539,95 @@ export const ProGym = ({ latestReport, userProfile }: { latestReport: SavedRepor
       </div>
 
       {/* Daily Navigation */}
-      <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide">
-        {Array.from({ length: 7 }).map((_, i) => {
-          const d = new Date();
-          d.setDate(d.getDate() - (d.getDay() - i)); // Week start Sunday
-          const iso = d.toISOString().split('T')[0];
-          const isSelected = selectedDate === iso;
-          const isUnlocked = unlockedDates.has(iso);
-          const isToday = iso === new Date().toISOString().split('T')[0];
-
-          return (
-            <button
-              key={iso}
-              onClick={() => {
-                setSelectedDate(iso);
-                setUnlockedDates(prev => new Set([...prev, iso]));
-              }}
-              className={cn(
-                "flex flex-col items-center min-w-[80px] p-4 rounded-2xl border transition-all relative group",
-                isSelected 
-                  ? "bg-brand-primary border-brand-primary text-brand-dark" 
-                  : "bg-brand-surface border-white/5 text-gray-500 hover:border-white/10"
-              )}
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between px-2">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-brand-primary" />
+            <span className="text-xs font-black uppercase tracking-widest text-gray-400">
+              {latestReport ? `Report Schedule • Week ${Math.floor((new Date(selectedDate).getTime() - (latestReport.timestamp?.toDate ? latestReport.timestamp.toDate() : new Date(latestReport.timestamp)).setHours(0,0,0,0)) / (7 * 24 * 60 * 60 * 1000)) + 1}` : 'Weekly Activity'}
+            </span>
+          </div>
+          {selectedDate !== today && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setSelectedDate(today)}
+              className="h-7 px-3 text-[10px] font-black uppercase bg-white/5 hover:bg-white/10 rounded-lg text-brand-primary"
             >
-              <span className="text-[10px] font-black uppercase tracking-widest mb-1">
-                {d.toLocaleDateString('en-US', { weekday: 'short' })}
-              </span>
-              <span className="text-lg font-bold font-mono">{d.getDate()}</span>
-              
-              <div className="mt-2">
-                {isUnlocked || isSelected ? (
-                  <LockOpen className={cn("w-3 h-3", isSelected ? "text-brand-dark" : "text-brand-primary")} />
-                ) : (
-                  <Lock className="w-3 h-3 text-gray-600" />
-                )}
-              </div>
-              
-              {isToday && !isSelected && (
-                <div className="absolute -top-1 -right-1 w-2 h-2 bg-brand-primary rounded-full" />
-              )}
-            </button>
-          );
-        })}
+              Back to Today
+            </Button>
+          )}
+        </div>
+        
+        <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide px-1">
+          {(() => {
+            const numDays = latestReport ? 84 : 7;
+            const startDate = latestReport 
+              ? (latestReport.timestamp?.toDate ? latestReport.timestamp.toDate() : new Date(latestReport.timestamp))
+              : new Date();
+            
+            if (!latestReport) {
+              startDate.setDate(startDate.getDate() - startDate.getDay()); // Sunday
+            }
+            startDate.setHours(0, 0, 0, 0);
+
+            return Array.from({ length: numDays }).map((_, i) => {
+              const d = new Date(startDate);
+              d.setDate(d.getDate() + i);
+              const iso = d.toISOString().split('T')[0];
+              const isSelected = selectedDate === iso;
+              const isUnlocked = unlockedDates.has(iso);
+              const isToday = iso === today;
+              const weekNum = Math.floor(i / 7) + 1;
+              const isFirstDayOfWeek = i % 7 === 0;
+
+              return (
+                <React.Fragment key={iso}>
+                  {latestReport && isFirstDayOfWeek && i > 0 && (
+                    <div className="flex items-center px-4 self-stretch">
+                      <div className="h-full w-px bg-white/10" />
+                    </div>
+                  )}
+                  <button
+                    onClick={() => {
+                      setSelectedDate(iso);
+                      setUnlockedDates(prev => new Set([...prev, iso]));
+                    }}
+                    className={cn(
+                      "flex flex-col items-center min-w-[70px] p-4 rounded-2xl border transition-all relative group shadow-sm",
+                      isSelected 
+                        ? "bg-brand-primary border-brand-primary text-brand-dark" 
+                        : "bg-brand-surface border-white/5 text-gray-500 hover:border-white/10"
+                    )}
+                  >
+                    <span className="text-[9px] font-black uppercase tracking-widest mb-1 opacity-70">
+                      {d.toLocaleDateString('en-US', { weekday: 'short' })}
+                    </span>
+                    <span className="text-lg font-bold font-mono">{d.getDate()}</span>
+                    
+                    <div className="mt-2">
+                      {isUnlocked || isSelected ? (
+                        <LockOpen className={cn("w-3 h-3", isSelected ? "text-brand-dark" : "text-brand-primary")} />
+                      ) : (
+                        <Lock className="w-3 h-3 text-gray-600" />
+                      )}
+                    </div>
+                    
+                    {isToday && !isSelected && (
+                      <div className="absolute -top-1 -right-1 w-2 h-2 bg-brand-primary rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                    )}
+
+                    {latestReport && isFirstDayOfWeek && (
+                      <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 whitespace-nowrap">
+                        <span className="text-[7px] font-black text-brand-primary uppercase tracking-tighter">W{weekNum}</span>
+                      </div>
+                    )}
+                  </button>
+                </React.Fragment>
+              );
+            });
+          })()}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
