@@ -1,6 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { 
+  DndContext, 
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { 
   Activity, 
   Droplets, 
   Zap,
@@ -28,7 +45,8 @@ import {
   Sparkles,
   Settings,
   BarChart3,
-  ClipboardList
+  ClipboardList,
+  GripVertical
 } from 'lucide-react';
 import { Card, Badge } from './ui/Card';
 import { Button } from './ui/Button';
@@ -37,6 +55,37 @@ import { gymService } from '../services/gymService';
 import { DailyLog, SavedReport, Measurement, UserProfile, Badge as UserBadge } from '../types';
 import { cn } from '../lib/utils';
 import { updateGymPin, updateUserProfile } from '../services/accessService';
+
+const SortableTracker = ({ id, children }: { id: string; children: React.ReactNode }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : undefined,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="relative group">
+      <div 
+        {...attributes} 
+        {...listeners}
+        className="absolute top-4 right-4 p-2 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity z-10"
+      >
+        <GripVertical className="w-4 h-4 text-gray-500" />
+      </div>
+      {children}
+    </div>
+  );
+};
 
 const Ring = ({ 
   progress, 
@@ -122,6 +171,25 @@ export const ProGym = ({
   const [isSettingPin, setIsSettingPin] = useState(false);
   const [calendarDates, setCalendarDates] = useState<string[]>([]);
   const [activeView, setActiveView] = useState<'hub' | 'report'>('hub');
+  const [trackerOrder, setTrackerOrder] = useState<string[]>(['hydration', 'movement']);
+  
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setTrackerOrder((items) => {
+        const oldIndex = items.indexOf(active.id as string);
+        const newIndex = items.indexOf(over.id as string);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  };
   const [isEditingHabits, setIsEditingHabits] = useState(false);
   const [editingHabits, setEditingHabits] = useState<string[]>([]);
   const [reportLogs, setReportLogs] = useState<DailyLog[]>([]);
@@ -393,6 +461,24 @@ export const ProGym = ({
     const updatedLog = { ...log, meals: updatedMeals };
     setLog(updatedLog);
     gymService.updateDailyLog(selectedDate, { meals: updatedMeals });
+  };
+
+  const handleAddManualMeal = async () => {
+    if (!log) return;
+    const currentMeals = log.meals || [];
+    const newMeal = { name: 'New Meal', type: 'snack' as any, completed: false };
+    const updatedMeals = [...currentMeals, newMeal];
+    const updatedLog = { ...log, meals: updatedMeals, useManualWorkout: true };
+    setLog(updatedLog);
+    await gymService.updateDailyLog(selectedDate, { meals: updatedMeals, useManualWorkout: true });
+  };
+
+  const handleRemoveMeal = async (index: number) => {
+    if (!log || !log.meals) return;
+    const updatedMeals = log.meals.filter((_, i) => i !== index);
+    const updatedLog = { ...log, meals: updatedMeals };
+    setLog(updatedLog);
+    await gymService.updateDailyLog(selectedDate, { meals: updatedMeals });
   };
 
   const workoutDay = getWorkoutForSelectedDate();
@@ -1227,111 +1313,128 @@ export const ProGym = ({
 
           {/* Quick Logs */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card className="p-8 space-y-6 bg-brand-surface border-white/5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-500/10 rounded-lg">
-                    <Droplets className="w-5 h-5 text-blue-500" />
-                  </div>
-                  <h3 className="font-bold text-gray-200">Hydration</h3>
-                </div>
-                <div className="flex items-center gap-4">
-                  <button 
-                    onClick={toggleWaterUnit}
-                    className="text-[10px] font-black uppercase tracking-widest px-2 py-1 bg-white/5 rounded-md hover:bg-white/10 active:scale-95 transition-all text-gray-500 hover:text-blue-400"
-                  >
-                    {log.waterUnit}
-                  </button>
-                  <span className="font-mono text-sm text-gray-400">{log.water}/{log.waterGoal} {log.waterUnit}</span>
-                </div>
-              </div>
-              
-              <div className="space-y-3">
-                <div className="flex gap-2">
-                  {(() => {
-                    const increments = log.waterUnit === 'oz' ? [8, 16, 24] : [250, 500, 750];
-                    const baseMinus = log.waterUnit === 'oz' ? -8 : -250;
-                    return (
-                      <>
-                        <Button 
-                          variant="outline"
-                          className="flex-none w-10 border-white/5 hover:border-red-500/30 hover:bg-red-500/5 transition-all p-0"
-                          onClick={() => updateWater(baseMinus)}
-                        >
-                          <Minus className="w-3 h-3 text-red-400" />
-                        </Button>
-                        <div className="flex-1 flex gap-2">
-                          {increments.map((amount) => (
-                            <Button 
-                              key={amount}
-                              variant="outline"
-                              className="flex-1 border-white/5 hover:border-blue-500/30 hover:bg-blue-500/5 transition-all text-xs"
-                              onClick={() => updateWater(amount)}
+            <DndContext 
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext 
+                items={trackerOrder}
+                strategy={verticalListSortingStrategy}
+              >
+                {trackerOrder.map((id) => (
+                  <SortableTracker key={id} id={id}>
+                    {id === 'hydration' ? (
+                      <Card className="p-8 space-y-6 bg-brand-surface border-white/5 h-full">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-blue-500/10 rounded-lg">
+                              <Droplets className="w-5 h-5 text-blue-500" />
+                            </div>
+                            <h3 className="font-bold text-gray-200">Hydration</h3>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <button 
+                              onClick={toggleWaterUnit}
+                              className="text-[10px] font-black uppercase tracking-widest px-2 py-1 bg-white/5 rounded-md hover:bg-white/10 active:scale-95 transition-all text-gray-500 hover:text-blue-400"
                             >
-                              +{amount}
-                            </Button>
-                          ))}
+                              {log.waterUnit}
+                            </button>
+                            <span className="font-mono text-sm text-gray-400">{log.water}/{log.waterGoal} {log.waterUnit}</span>
+                          </div>
                         </div>
-                      </>
-                    );
-                  })()}
-                </div>
-              </div>
-              
-              <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-                <motion.div 
-                  className="h-full bg-blue-500"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${Math.min((log.water / log.waterGoal) * 100, 100)}%` }}
-                />
-              </div>
-            </Card>
+                        
+                        <div className="space-y-3">
+                          <div className="flex gap-2">
+                            {(() => {
+                              const increments = log.waterUnit === 'oz' ? [8, 16, 24] : [250, 500, 750];
+                              const baseMinus = log.waterUnit === 'oz' ? -8 : -250;
+                              return (
+                                <>
+                                  <Button 
+                                    variant="outline"
+                                    className="flex-none w-10 border-white/5 hover:border-red-500/30 hover:bg-red-500/5 transition-all p-0"
+                                    onClick={() => updateWater(baseMinus)}
+                                  >
+                                    <Minus className="w-3 h-3 text-red-400" />
+                                  </Button>
+                                  <div className="flex-1 flex gap-2">
+                                    {increments.map((amount) => (
+                                      <Button 
+                                        key={amount}
+                                        variant="outline"
+                                        className="flex-1 border-white/5 hover:border-blue-500/30 hover:bg-blue-500/5 transition-all text-xs"
+                                        onClick={() => updateWater(amount)}
+                                      >
+                                        +{amount}
+                                      </Button>
+                                    ))}
+                                  </div>
+                                </>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                        
+                        <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                          <motion.div 
+                            className="h-full bg-blue-500"
+                            initial={{ width: 0 }}
+                            animate={{ width: `${Math.min((log.water / log.waterGoal) * 100, 100)}%` }}
+                          />
+                        </div>
+                      </Card>
+                    ) : (
+                      <Card className="p-8 space-y-6 bg-brand-surface border-white/5 h-full">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-emerald-500/10 rounded-lg">
+                              <Footprints className="w-5 h-5 text-emerald-500" />
+                            </div>
+                            <h3 className="font-bold text-gray-200">Movement</h3>
+                          </div>
+                          <span className="font-mono text-sm text-gray-400">{log.steps}/{log.stepGoal}</span>
+                        </div>
+                        
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="outline" 
+                            className="flex-none w-10 border-white/5 hover:border-red-500/30 p-0"
+                            onClick={() => updateSteps(-1000)}
+                          >
+                            <Minus className="w-3 h-3 text-red-400" />
+                          </Button>
+                          <div className="flex-1 flex gap-2">
+                            <Button 
+                              variant="outline" 
+                              className="flex-1 border-white/5 text-xs"
+                              onClick={() => updateSteps(1000)}
+                            >
+                              +1k Steps
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              className="flex-1 border-white/5 text-xs"
+                              onClick={() => updateSteps(5000)}
+                            >
+                              +5k Steps
+                            </Button>
+                          </div>
+                        </div>
 
-            <Card className="p-8 space-y-6 bg-brand-surface border-white/5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-emerald-500/10 rounded-lg">
-                    <Footprints className="w-5 h-5 text-emerald-500" />
-                  </div>
-                  <h3 className="font-bold text-gray-200">Movement</h3>
-                </div>
-                <span className="font-mono text-sm text-gray-400">{log.steps}/{log.stepGoal}</span>
-              </div>
-              
-              <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  className="flex-none w-10 border-white/5 hover:border-red-500/30 p-0"
-                  onClick={() => updateSteps(-1000)}
-                >
-                  <Minus className="w-3 h-3 text-red-400" />
-                </Button>
-                <div className="flex-1 flex gap-2">
-                  <Button 
-                    variant="outline" 
-                    className="flex-1 border-white/5 text-xs"
-                    onClick={() => updateSteps(1000)}
-                  >
-                    +1k Steps
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    className="flex-1 border-white/5 text-xs"
-                    onClick={() => updateSteps(5000)}
-                  >
-                    +5k Steps
-                  </Button>
-                </div>
-              </div>
-
-              <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-                <motion.div 
-                  className="h-full bg-emerald-500"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${Math.min((log.steps / log.stepGoal) * 100, 100)}%` }}
-                />
-              </div>
-            </Card>
+                        <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                          <motion.div 
+                            className="h-full bg-emerald-500"
+                            initial={{ width: 0 }}
+                            animate={{ width: `${Math.min((log.steps / log.stepGoal) * 100, 100)}%` }}
+                          />
+                        </div>
+                      </Card>
+                    )}
+                  </SortableTracker>
+                ))}
+              </SortableContext>
+            </DndContext>
           </div>
 
           {/* Workout Details */}
@@ -1424,14 +1527,14 @@ export const ProGym = ({
                         </button>
                       </div>
                     </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left">
+                    <div className="overflow-x-auto -mx-4 px-4 scrollbar-hide">
+                      <table className="w-full text-left min-w-[500px]">
                         <thead className="text-[10px] uppercase tracking-widest text-gray-600 border-b border-white/5">
                           <tr>
-                            <th className="pb-2 font-bold w-full">Exercise</th>
-                            <th className="pb-2 font-bold px-4">Sets</th>
-                            <th className="pb-2 font-bold px-4">Reps</th>
-                            <th className="pb-2 font-bold min-w-[100px]">Weight ({measurementUnits.weight})</th>
+                            <th className="pb-2 font-bold w-1/2">Exercise</th>
+                            <th className="pb-2 font-bold px-4 text-center">Sets</th>
+                            <th className="pb-2 font-bold px-4 text-center">Reps</th>
+                            <th className="pb-2 font-bold min-w-[100px] text-center">Weight ({measurementUnits.weight})</th>
                           </tr>
                         </thead>
                         <tbody className="text-xs">
@@ -1514,14 +1617,14 @@ export const ProGym = ({
                       </Button>
                     )}
                   </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left">
+                  <div className="overflow-x-auto -mx-4 px-4 scrollbar-hide">
+                    <table className="w-full text-left min-w-[500px]">
                       <thead className="text-[10px] uppercase tracking-widest text-gray-600 border-b border-brand-primary/10">
                         <tr>
-                          <th className="pb-2 font-bold w-full">Exercise Pattern</th>
-                          <th className="pb-2 font-bold px-4">Sets</th>
-                          <th className="pb-2 font-bold px-4">Reps</th>
-                          <th className="pb-2 font-bold min-w-[100px]">Weight ({measurementUnits.weight})</th>
+                          <th className="pb-2 font-bold w-1/2">Exercise Pattern</th>
+                          <th className="pb-2 font-bold px-4 text-center">Sets</th>
+                          <th className="pb-2 font-bold px-4 text-center">Reps</th>
+                          <th className="pb-2 font-bold min-w-[100px] text-center">Weight ({measurementUnits.weight})</th>
                         </tr>
                       </thead>
                       <tbody className="text-sm">
@@ -1624,6 +1727,14 @@ export const ProGym = ({
                 <h3 className="font-bold text-gray-100">Daily Nutrition Log</h3>
               </div>
               <div className="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleAddManualMeal}
+                  className="border-brand-primary/20 hover:bg-brand-primary/10 text-brand-primary h-7 px-2 text-[10px] font-black uppercase tracking-widest"
+                >
+                  <Plus className="w-3 h-3 mr-1" /> Add Meal
+                </Button>
                 {latestReport && (
                   <Button 
                     variant="outline" 
@@ -1657,22 +1768,37 @@ export const ProGym = ({
                     <tr key={i} className="border-b border-white/[0.02] last:border-0 hover:bg-brand-primary/[0.02] transition-colors group">
                       <td className="py-4">
                         <div className="flex flex-col">
-                          <span className="text-[10px] uppercase font-black text-gray-500 mb-1">{meal.type}</span>
                           {log.useManualWorkout ? (
-                            <input 
-                              type="text"
-                              className="bg-white/5 border border-white/10 rounded px-2 py-1 text-sm text-brand-primary outline-none focus:border-brand-primary w-full font-bold"
-                              value={meal.name}
-                              onChange={(e) => updateMealMacro(i, 'name', e.target.value)}
-                            />
+                            <div className="flex flex-col gap-1 mb-1">
+                              <select 
+                                className="bg-white/5 border border-white/10 rounded px-1 py-0.5 text-[9px] uppercase font-black text-gray-400 outline-none focus:border-brand-primary w-fit"
+                                value={meal.type}
+                                onChange={(e) => updateMealMacro(i, 'type' as any, e.target.value)}
+                              >
+                                <option value="breakfast">Breakfast</option>
+                                <option value="lunch">Lunch</option>
+                                <option value="dinner">Dinner</option>
+                                <option value="snack">Snack</option>
+                                <option value="other">Other</option>
+                              </select>
+                              <input 
+                                type="text"
+                                className="bg-white/5 border border-white/10 rounded px-2 py-1 text-sm text-brand-primary outline-none focus:border-brand-primary w-full font-bold"
+                                value={meal.name}
+                                onChange={(e) => updateMealMacro(i, 'name', e.target.value)}
+                              />
+                            </div>
                           ) : (
-                            meal.url ? (
-                              <a href={meal.url} target="_blank" rel="noopener noreferrer" className="text-brand-primary font-bold hover:underline">
-                                {meal.name}
-                              </a>
-                            ) : (
-                              <span className="text-brand-primary font-bold">{meal.name}</span>
-                            )
+                            <>
+                              <span className="text-[10px] uppercase font-black text-gray-500 mb-1">{meal.type}</span>
+                              {meal.url ? (
+                                <a href={meal.url} target="_blank" rel="noopener noreferrer" className="text-brand-primary font-bold hover:underline">
+                                  {meal.name}
+                                </a>
+                              ) : (
+                                <span className="text-brand-primary font-bold">{meal.name}</span>
+                              )}
+                            </>
                           )}
                         </div>
                       </td>
@@ -1729,15 +1855,25 @@ export const ProGym = ({
                         />
                       </td>
                       <td className="py-4 text-right">
-                        <button 
-                          onClick={() => toggleMealCompletion(i)}
-                          className={cn(
-                            "p-2 rounded-lg transition-all",
-                            meal.completed ? "bg-brand-primary/20 text-brand-primary" : "bg-white/5 text-gray-500 hover:bg-white/10"
+                        <div className="flex items-center justify-end gap-2">
+                          {log.useManualWorkout && (
+                            <button 
+                              onClick={() => handleRemoveMeal(i)}
+                              className="p-2 text-red-500/50 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"
+                            >
+                              <Minus className="w-4 h-4" />
+                            </button>
                           )}
-                        >
-                          {meal.completed ? <CheckCircle2 className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
-                        </button>
+                          <button 
+                            onClick={() => toggleMealCompletion(i)}
+                            className={cn(
+                              "p-2 rounded-lg transition-all",
+                              meal.completed ? "bg-brand-primary/20 text-brand-primary" : "bg-white/5 text-gray-500 hover:bg-white/10"
+                            )}
+                          >
+                            {meal.completed ? <CheckCircle2 className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
