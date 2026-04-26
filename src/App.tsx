@@ -492,12 +492,17 @@ export default function App() {
       );
       setReport(result);
       
-      if (user) {
+      const currentAuthUser = auth.currentUser;
+      if (currentAuthUser) {
         try {
+          console.log("Saving report to history for user:", currentAuthUser.uid);
           await historyService.saveReport(path, userData, result, photos, path === 'progress' ? progressPhotos : undefined);
           await loadHistory();
+          console.log("Report saved and history reloaded successfully");
         } catch (saveError) {
           console.error("Failed to save report to history:", saveError);
+          // If save fails, we still show the report to the user but warn them
+          alert("Report was generated but could not be saved to your history. You can still download the PDF.");
         }
       }
       
@@ -526,16 +531,50 @@ export default function App() {
     }
   };
 
+  const compressImage = (base64: string): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 800;
+        const MAX_HEIGHT = 1000;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
+      };
+      img.src = base64;
+    });
+  };
+
   const handlePhotoUpload = (view: keyof Photos, file: File, set: 'current' | 'before' | 'after' = 'current') => {
     const reader = new FileReader();
-    reader.onloadend = () => {
+    reader.onloadend = async () => {
       const base64 = reader.result as string;
+      const compressed = await compressImage(base64);
+      
       if (set === 'current') {
-        setPhotos(prev => ({ ...prev, [view]: base64 }));
+        setPhotos(prev => ({ ...prev, [view]: compressed }));
       } else if (set === 'before') {
-        setProgressPhotos(prev => ({ ...prev, before: { ...prev.before, [view]: base64 } }));
+        setProgressPhotos(prev => ({ ...prev, before: { ...prev.before, [view]: compressed } }));
       } else if (set === 'after') {
-        setProgressPhotos(prev => ({ ...prev, after: { ...prev.after, [view]: base64 } }));
+        setProgressPhotos(prev => ({ ...prev, after: { ...prev.after, [view]: compressed } }));
       }
     };
     reader.readAsDataURL(file);

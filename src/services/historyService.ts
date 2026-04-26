@@ -88,15 +88,21 @@ export const historyService = {
     try {
       const q = query(
         collection(db, 'reports'), 
-        where('userId', '==', auth.currentUser.uid),
-        orderBy('timestamp', 'desc')
+        where('userId', '==', auth.currentUser.uid)
       );
       
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({
+      const reports = querySnapshot.docs.map(doc => ({
         ...doc.data(),
         id: doc.id
       })) as SavedReport[];
+
+      // Sort in-memory to avoid composite index requirement
+      return reports.sort((a, b) => {
+        const timeA = a.timestamp?.toMillis?.() || 0;
+        const timeB = b.timestamp?.toMillis?.() || 0;
+        return timeB - timeA;
+      });
     } catch (error) {
       handleFirestoreError(error, 'list', 'reports');
     }
