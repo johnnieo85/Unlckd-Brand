@@ -76,7 +76,7 @@ async function generateCoreAssessment(
 
     FOCUS AREAS:
     1. Comprehensive Physique Ratings & Summaries for all views (Front, Back, Left, Right).
-    2. Health Metrics (BMI, Body Fat, Calorie Targets).
+    2. Health Metrics (BMI, Body Fat, Calorie Targets based on current vs desired activity).
     3. Daily Support Info (Sleep, Hydration, Recovery, Grocery List).
     4. Motivational Quote.
   `;
@@ -214,6 +214,7 @@ async function generateWorkoutPlan(
     
     INSTRUCTIONS:
     - Exactly 12 weeks.
+    - Tailor the volume and intensity progression to bridge the gap between current activity (${userData.physicalActivity}) and desired activity (${userData.desiredPhysicalActivity}).
     - 7 to 10 exercises per main session.
     - EVERY exercise must use markdown links: "[Exercise Name (Sets x Reps)](YouTube Link)".
     - Ensure video links exist and are high quality.
