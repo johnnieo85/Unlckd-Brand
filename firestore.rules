@@ -35,11 +35,9 @@ service cloud.firestore {
     match /reports/{reportId} {
       allow create: if isSignedIn() && 
                       request.resource.data.userId == request.auth.uid &&
-                      hasAccess() &&
                       isValidReport(request.resource.data);
       allow get, list, delete: if isSignedIn() && 
-                                 resource.data.userId == request.auth.uid && 
-                                 hasAccess();
+                                 resource.data.userId == request.auth.uid;
     }
 
     function isValidReport(data) {
