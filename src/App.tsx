@@ -425,6 +425,46 @@ export default function App() {
     setStep('report');
   };
 
+  const handleExportReport = (saved: SavedReport, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const dataStr = JSON.stringify(saved, null, 2);
+    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+    const exportFileDefaultName = `UNLCKD-Report-${saved.userData.name}-${new Date().toISOString().split('T')[0]}.json`;
+
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+  };
+
+  const handleImportReport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const content = event.target?.result as string;
+        const importedData = JSON.parse(content);
+        
+        // Basic validation
+        if (!importedData.report || !importedData.userData || !importedData.path) {
+          throw new Error("Invalid report format");
+        }
+
+        const { id, timestamp, userId, ...reportData } = importedData;
+        await historyService.importReport(reportData);
+        await loadHistory();
+        alert("Report imported successfully!");
+      } catch (error) {
+        console.error("Import failed:", error);
+        alert("Failed to import report. Please ensure the file is a valid UNLCKD report.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = ''; // Reset input
+  };
+
   const handleStart = (selectedPath: Path) => {
     if (!user) {
       handleSignIn();
@@ -535,11 +575,14 @@ export default function App() {
 
       <header className="fixed top-0 w-full z-50 bg-brand-dark/40 backdrop-blur-xl border-b border-white/5 no-print">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-brand-primary rounded-lg flex items-center justify-center shadow-lg shadow-brand-primary/20">
+          <div 
+            className="flex items-center gap-3 cursor-pointer group"
+            onClick={() => setStep('landing')}
+          >
+            <div className="w-10 h-10 bg-brand-primary rounded-lg flex items-center justify-center shadow-lg shadow-brand-primary/20 group-hover:scale-105 transition-transform">
               <Activity className="w-6 h-6 text-brand-dark" />
             </div>
-            <span className="font-display font-bold text-2xl tracking-tight uppercase">UNLCKD <span className="text-brand-primary">Pro</span></span>
+            <span className="font-display font-bold text-2xl tracking-tight uppercase group-hover:text-brand-primary transition-colors">UNLCKD <span className="text-brand-primary">Pro</span></span>
           </div>
           
           <div className="flex items-center gap-4 no-print">
@@ -649,10 +692,27 @@ export default function App() {
                   <h2 className="text-4xl font-display font-bold tracking-tight">Your Transformation History</h2>
                   <p className="text-gray-400 mt-2 text-lg font-light">Your professional assessments, preserved and tracked.</p>
                 </div>
-                <Button variant="outline" onClick={() => setStep('landing')} className="gap-2 border-white/10 hover:bg-white/5 rounded-xl">
-                  <ChevronLeft className="w-4 h-4" />
-                  Back to Dashboard
-                </Button>
+                <div className="flex gap-3">
+                  <input
+                    type="file"
+                    id="report-import"
+                    className="hidden"
+                    accept=".json"
+                    onChange={handleImportReport}
+                  />
+                  <Button 
+                    variant="outline" 
+                    onClick={() => document.getElementById('report-import')?.click()} 
+                    className="gap-2 border-white/10 hover:bg-white/5 rounded-xl"
+                  >
+                    <Download className="w-4 h-4" />
+                    Import JSON
+                  </Button>
+                  <Button variant="outline" onClick={() => setStep('landing')} className="gap-2 border-white/10 hover:bg-white/5 rounded-xl">
+                    <ChevronLeft className="w-4 h-4" />
+                    Back to Dashboard
+                  </Button>
+                </div>
               </div>
 
               {isLoadingHistory ? (
@@ -689,7 +749,15 @@ export default function App() {
                           className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 blur-sm brightness-50"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-brand-dark via-transparent to-transparent" />
-                        <div className="absolute top-4 right-4 z-20">
+                        <div className="absolute top-4 right-4 z-20 flex gap-2">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="bg-brand-primary/10 hover:bg-brand-primary/20 text-brand-primary rounded-full"
+                            onClick={(e) => handleExportReport(saved, e)}
+                          >
+                            <Download className="w-4 h-4" />
+                          </Button>
                           <Button 
                             variant="ghost" 
                             size="icon" 
@@ -1451,6 +1519,23 @@ export default function App() {
                 >
                   <Download className="w-5 h-5" />
                   Download PDF Report
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="md" 
+                  className="gap-2 border-white/10 hover:bg-white/5 rounded-xl text-gray-400 hover:text-white"
+                  onClick={() => handleExportReport({
+                    id: 'current',
+                    timestamp: { toDate: () => new Date() },
+                    path,
+                    userData,
+                    report,
+                    photos,
+                    progressPhotos: path === 'progress' ? progressPhotos : undefined
+                  })}
+                >
+                  <Download className="w-5 h-5" />
+                  Export Data (JSON)
                 </Button>
               </div>
 
