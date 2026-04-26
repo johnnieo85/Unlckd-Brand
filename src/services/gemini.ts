@@ -110,6 +110,7 @@ export async function generateTransformationReport(
              - Structure the response into weeks for relevant paths. If "7-day" is requested, return a single week with 7 days. If "2-week", "4-week", or "12-week" is requested, return the corresponding number of weeks.
              - Each week should have a specific focus or phase.
              - Ensure progressive overload in the workout plan.
+             - EXERCISE COUNT: For each training day, the "mainWork" field MUST contain between 7 to 10 specific, effective exercises.
              - AVOID REPETITION: If certain days or meals are similar across weeks, keep the descriptions extremely short to save tokens.
              - PRIORITY: Completing the entire requested duration is more important than detailed prose.
           5. MOTIVATIONAL QUOTE: Generate a unique, powerful motivational quote specifically for this user's situation. The quote MUST be followed by the text "Unlock your greatness."
@@ -139,8 +140,9 @@ export async function generateTransformationReport(
               - Any reported health conditions or injuries (${userData.injuries || 'None'}).
               Explain the logic behind these targets in the "hydrationTargets" field.
           20. OCCUPATION-CENTERED TRAINING: The workout plan MUST be centered around deep research on their occupation (${userData.occupation}). For example, if they have a sedentary desk job, prioritize posture, hip mobility, and metabolic conditioning. If they have a physically demanding job, prioritize recovery, structural balance, and injury prevention.
-          21. EXTREME CONCISENESS: To prevent JSON truncation, you MUST keep all descriptions, evaluations, and notes extremely brief (under 150 characters per field).
-          22. HEALTH METRICS:
+          21. RECOVERY SCHEDULE: Generate a "recoverySchedule" that includes specific recovery modalities such as cold plunges, saunas, ice baths, mobility work, and active recovery based on the intensity of the generated workout plan.
+          22. EXTREME CONCISENESS: To prevent JSON truncation, you MUST keep all descriptions, evaluations, and notes extremely brief (under 150 characters per field).
+          23. HEALTH METRICS:
               - You MUST calculate:
                 - BMI: (weight in kg) / (height in m)^2.
                 - BMI Category: (Underweight, Fit, Overweight, Obese).
@@ -149,11 +151,11 @@ export async function generateTransformationReport(
                 - Focus: What they should prioritize (e.g., "Focus on a slight calorie deficit to reach a healthy BMI range").
                 - Recommended Calorie Level: (maintain, deficit, surplus).
                 - Estimated Daily Calories: An exact number or narrow range (e.g., "2,200 - 2,400 kcal").
-          23. RECOMMENDED WORKOUT & ADDITIONAL ACTIVITIES (PROGRESS & ASSESSMENT ONLY):
+          24. RECOMMENDED WORKOUT & ADDITIONAL ACTIVITIES (PROGRESS & ASSESSMENT ONLY):
               - If path is "progress" or "assessment":
-                - Recommended Workout: Provide a single, deeply researched workout routine (title, description, and 4-6 specific exercises) tailored to address the "concerning areas" identified in the physique comparison. For each exercise, include a direct YouTube video URL (not a search link or channel link) in the "videoUrl" field. Ensure the link points specifically to a single video showing that exercise, prioritizing equipment-specific instructional videos if smart equipment (like Tonal) is used.
-                - Additional Activities: Conduct deep research and provide a section about additional activities to help reach goals, such as sauna, massages, swimming, or any other activity that may assist with becoming healthy. Include a title, description, and a list of 3-4 specific activities with their benefits and recommended frequency.
-          24. Return ONLY valid JSON matching the provided schema.
+                - Recommended Workout: Provide a single, deeply researched workout routine (title, description, and 7-10 specific exercises) tailored to address the "concerning areas" identified in the physique comparison. For each exercise, include a direct YouTube video URL (not a search link or channel link) in the "videoUrl" field. Ensure the link points specifically to a single video showing that exercise, prioritizing equipment-specific instructional videos if smart equipment (like Tonal) is used.
+                - Additional Activities: Conduct deep research and provide a section about additional activities to help reach goals, such as sauna, cold plunge, ice baths, massages, swimming, or any other activity that may assist with becoming healthy. Include a title, description, and a list of 3-4 specific activities with their benefits and recommended frequency.
+          25. Return ONLY valid JSON matching the provided schema.
         `,
         responseMimeType: "application/json",
         maxOutputTokens: 65536,

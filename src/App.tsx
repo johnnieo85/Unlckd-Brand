@@ -1737,11 +1737,11 @@ export default function App() {
                     </div>
                   )}
 
-                  {path === 'progress' && report.additionalActivities && (
+                  {(path === 'progress' || path === 'assessment') && report.additionalActivities && (
                     <div className="space-y-6 pt-8 border-t border-gray-800">
                       <div className="flex items-center gap-3">
-                        <Sparkles className="w-8 h-8 text-brand-primary" />
-                        <h2 className="text-3xl font-display font-bold text-brand-primary">Additional Health & Wellness Activities</h2>
+                        <Moon className="w-8 h-8 text-brand-primary" />
+                        <h2 className="text-3xl font-display font-bold text-brand-primary">Recovery & Optimization</h2>
                       </div>
                       <div className="p-6 bg-brand-surface border border-gray-800 rounded-2xl">
                         <h3 className="text-xl font-bold text-gray-200 mb-2">{report.additionalActivities.title}</h3>
