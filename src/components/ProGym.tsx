@@ -2388,12 +2388,12 @@ export const ProGym = ({
             </div>
 
             <div className="overflow-x-auto pb-4 custom-scrollbar">
-              <div className="min-w-[800px]">
-                <div className="grid grid-cols-[220px_repeat(31,minmax(24px,1fr))] gap-y-4 items-center">
+              <div className="min-w-[900px]">
+                <div className="grid grid-cols-[240px_repeat(31,minmax(24px,1fr))] gap-y-4 items-center relative">
                   {/* Calendar Days Header */}
-                  <div className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Habit & Consistency</div>
+                  <div className="sticky left-0 z-30 bg-brand-surface text-[10px] font-black text-gray-600 uppercase tracking-widest p-2">Habit & Accuracy</div>
                   {Array.from({ length: new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0).getDate() }).map((_, i) => (
-                    <div key={i} className="text-[10px] font-mono text-gray-600 text-center">{i + 1}</div>
+                    <div key={i} className="text-[10px] font-mono text-gray-600 text-center sticky top-0 bg-brand-surface z-10 py-2 border-b border-white/5">{i + 1}</div>
                   ))}
 
                   {/* Habit Rows */}
@@ -2407,8 +2407,8 @@ export const ProGym = ({
 
                     return (
                       <React.Fragment key={habit}>
-                        <div className="flex items-center gap-2 pr-4 min-w-0">
-                          <span className="text-xs font-bold text-gray-300 truncate">{habit}</span>
+                        <div className="sticky left-0 z-20 bg-brand-surface flex items-center gap-2 pr-4 min-w-0 py-1 shadow-md">
+                          <span className="text-[11px] font-bold text-gray-100 truncate">{habit}</span>
                           <span className="text-[10px] font-mono font-black text-brand-primary shrink-0">{percentage}%</span>
                         </div>
                         {Array.from({ length: daysInMonth }).map((_, i) => {
@@ -2419,9 +2419,9 @@ export const ProGym = ({
                           const isFuture = new Date(dateStr) > new Date();
 
                           return (
-                            <div key={i} className="flex justify-center">
+                            <div key={i} className="flex justify-center h-8 items-center bg-white/[0.01]">
                               {isFuture ? (
-                                <div className="w-2.5 h-2.5 rounded-full bg-white/[0.02]" />
+                                <div className="w-2 h-2 rounded-full bg-white/[0.03]" />
                               ) : isDone ? (
                                 <motion.div 
                                   initial={{ scale: 0 }}
@@ -2429,7 +2429,7 @@ export const ProGym = ({
                                   className="w-2.5 h-2.5 rounded-full bg-brand-primary shadow-[0_0_8px_rgba(16,185,129,0.4)]" 
                                 />
                               ) : (
-                                <div className="w-2.5 h-2.5 rounded-full border border-white/10" />
+                                <div className="w-2 h-2 rounded-full border border-white/10" />
                               )}
                             </div>
                           );
@@ -2439,7 +2439,7 @@ export const ProGym = ({
                   })}
 
                   {/* Built-in Metrics Rows */}
-                  <div className="col-span-full border-t border-white/5 my-4" />
+                  <div className="col-span-full border-t border-white/10 my-4" />
                   
                   {(() => {
                     const daysInMonth = new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0).getDate();
@@ -2454,8 +2454,8 @@ export const ProGym = ({
 
                     return (
                       <>
-                        <div className="flex items-center gap-2 pr-4 min-w-0">
-                          <span className="text-xs font-bold text-gray-300 truncate">10K Step Goal</span>
+                        <div className="sticky left-0 z-20 bg-brand-surface flex items-center gap-2 pr-4 min-w-0 py-1 shadow-md">
+                          <span className="text-[11px] font-bold text-gray-100 truncate">10K Step Goal</span>
                           <span className="text-[10px] font-mono font-black text-emerald-500 shrink-0">{stepPercentage}%</span>
                         </div>
                         {Array.from({ length: daysInMonth }).map((_, i) => {
@@ -2466,17 +2466,17 @@ export const ProGym = ({
                           const isFuture = new Date(dateStr) > new Date();
 
                           return (
-                            <div key={i} className="flex justify-center">
-                              {isFuture ? <div className="w-2.5 h-2.5 rounded-full bg-white/[0.02]" /> :
+                            <div key={i} className="flex justify-center h-8 items-center bg-white/[0.01]">
+                              {isFuture ? <div className="w-2 h-2 rounded-full bg-white/[0.03]" /> :
                                isDone ? <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" /> :
-                               <div className="w-2.5 h-2.5 rounded-full border border-white/10" />
+                               <div className="w-2 h-2 rounded-full border border-white/10" />
                               }
                             </div>
                           );
                         })}
 
-                        <div className="flex items-center gap-2 pr-4 min-w-0">
-                          <span className="text-xs font-bold text-gray-300 truncate">Hydration Target</span>
+                        <div className="sticky left-0 z-20 bg-brand-surface flex items-center gap-2 pr-4 min-w-0 py-1 shadow-md">
+                          <span className="text-[11px] font-bold text-gray-100 truncate">Hydration Target</span>
                           <span className="text-[10px] font-mono font-black text-blue-500 shrink-0">{waterPercentage}%</span>
                         </div>
                         {Array.from({ length: daysInMonth }).map((_, i) => {
@@ -2487,10 +2487,10 @@ export const ProGym = ({
                           const isFuture = new Date(dateStr) > new Date();
 
                           return (
-                            <div key={i} className="flex justify-center">
-                              {isFuture ? <div className="w-2.5 h-2.5 rounded-full bg-white/[0.02]" /> :
+                            <div key={i} className="flex justify-center h-8 items-center bg-white/[0.01]">
+                              {isFuture ? <div className="w-2 h-2 rounded-full bg-white/[0.03]" /> :
                                isDone ? <div className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.4)]" /> :
-                               <div className="w-2.5 h-2.5 rounded-full border border-white/10" />
+                               <div className="w-2 h-2 rounded-full border border-white/10" />
                               }
                             </div>
                           );
