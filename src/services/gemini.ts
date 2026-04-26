@@ -8,7 +8,7 @@ export async function generateTransformationReport(
   photos: Photos | ProgressPhotos,
   path: string
 ): Promise<AssessmentResult> {
-  const model = "gemini-3.1-pro-preview";
+  const model = "gemini-1.5-pro";
 
   const photoParts: any[] = [];
   const processPhoto = (data: string | null) => {
@@ -101,69 +101,32 @@ export async function generateTransformationReport(
           1. NEVER include image data, base64 strings, or photo references in the JSON response.
           2. KEEP EVALUATIONS CONCISE: Each "evaluation" or "summary" field must be under 300 characters.
           3. KEEP PLANS ACTIONABLE BUT BRIEF: Workout and meal descriptions should be clear but not overly verbose.
-          4. PATH-SPECIFIC GENERATION:
-             - If path is "workout" or "meal": You MUST return empty objects/arrays for "toplineRatings", "frontViewAnalysis", "leftViewAnalysis", "backViewAnalysis", "rightViewAnalysis", and "finalSummary".
-             - If path is "assessment": You MUST return empty arrays for "workoutPlan", "mealPlan", and "groceryList", and an empty string for "nutritionStrategy".
-             - If path is "progress": You MUST return empty arrays for "workoutPlan", "mealPlan", "groceryList", "recoverySchedule", "waterSchedule", and empty strings for "nutritionStrategy", "stepGoals", "hydrationTargets", "trainerSummary".
-             - For ALL paths, you MUST provide "healthMetrics", "motivationalQuote", and "sleepRecommendation".
-             - If path is "workout", "meal", or "full": You MUST provide a comprehensive 12-week plan.
-             - Structure the response into exactly 12 weeks. Each week MUST have a specific focus or phase.
-             - Every week should contain a unique focus (e.g., Week 1: Foundational Strength, Week 2: Hypertrophy, etc.).
-             - Ensure progressive overload in the workout plan.
-             - EXERCISE COUNT: For each training day, the "mainWork" field MUST contain between 7 to 10 specific, effective exercises.
-             - AVOID REPETITION: If certain days or meals are similar across weeks, keep the descriptions extremely short to save tokens.
-             - PRIORITY: Completing the entire requested duration is more important than detailed prose.
-          5. MOTIVATIONAL QUOTE: Generate a unique, powerful motivational quote specifically for this user's situation. The quote MUST be followed by the text "Unlock your greatness."
-          6. SLEEP RECOMMENDATION: Provide deep research on sleep requirements tailored to support this user's specific workout routine, occupation, and goals. Explain why this specific amount and quality of sleep is necessary for their recovery and performance.
-          7. DIET STRATEGY (CALORIE PREFERENCE): Strictly adhere to the user's calorie preference (${userData.caloriePreference}). Calculate the estimated number of calories they should be eating daily based on their TDEE.
-             - If "deficit": prioritize a sustainable energy deficit for fat loss (Lose Weight).
-             - If "maintain": prioritize body recomposition and maintenance calories (Maintain Weight).
-             - If "surplus": prioritize muscle gain and a energy surplus (Gain Weight).
-          8. FAT LOSS: If in deficit, prioritize high protein (1.6-2.2g/kg), and resistance training 2-4x/week.
-          9. VISCERAL FAT: Emphasize HIIT and moderate-to-vigorous aerobic work.
-          10. MOBILITY: Integrate dynamic mobility in warm-ups and static stretching for recovery.
-          11. TRAINING MODALITIES & EXERCISE POOL:
-              - Utilize Kettlebells, Resistance Bands, and Bodyweight where appropriate.
-              - KNOWLEDGE BASE: You have deep knowledge of exercises specifically for Dumbbells (e.g., Goblet Squats, Renegade Rows), Weighted Vests (e.g., Vest Pushups, Vest Lunges), and advanced Bodyweight movements (e.g., Hollow Body Holds, Bulgarian Split Squats).
-          12. If NO photos are provided, provide a text-only assessment based on the user's data (age, weight, height, goals, calorie preference).
-          13. WORKOUT VIDEOS: For each exercise in the "mainWork" and "warmUp" fields, you MUST provide a direct YouTube video URL (e.g., https://www.youtube.com/watch?v=...) that shows how to perform the exercise. CRITICAL: The links MUST point to a single video player page, never to a search results page (e.g., /results?search_query=) or a channel page. Use markdown format: [Exercise Name](Direct YouTube URL). Ensure the link is for the specific exercise mentioned. 
-              - EQUIPMENT SPECIFICITY: If the user has specified specialized at-home smart equipment (e.g., Tonal, Mirror, Tempo), you MUST provide video links that specifically demonstrate the exercise on that exact system. If a YouTube video for the specific equipment cannot be found, provide a direct link to a vendor-specific instructional video from their official website or support library.
-              - VIDEO QUALITY CHECK: Before selecting a link, perform a mental quality check to ensure the video is active, public, and provides clear instructional value on the correct equipment.
-          14. QUALITY CONTROL & COMPLETENESS PROTOCOL: Before finalizing the JSON, you MUST perform the FOLLOWING INTERNAL CHECKS:
-              - CHECK 1: Ensure all 12 weeks for workout/meal plans are present if a plan was requested. No truncation allowed.
-              - CHECK 2: Verify that every training day has at least 7 exercises.
-              - CHECK 3: Verify that every meal has a corresponding macro estimate (Calories, P, F, C).
-              - CHECK 4: Confirm that the "Full Transformation Report" mode (${path}) has been fully addressed with no placeholder text like "[Section truncated]".
-              - CHECK 5: Ensure all URLs are direct links and not search queries.
-              If any of these checks fail, you MUST restart your drafting process for that section to ensure a premium, complete experience.
-          15. MEAL RECIPES: For each meal in the meal plan, provide a direct Pinterest recipe link in the corresponding "Url" field (e.g., breakfastUrl).
-          16. MEAL MACROS: In "full" or "meal" plans, you MUST provide estimated macros (calories, protein, fat, carbs) for each of the meals in the fields "breakfastMacros", "lunchMacros", "dinnerMacros", and "snackMacros". These should be realistic for the recipe and the user's weight/goals.
-          17. GROCERY STORE: Recommend a specific grocery store (e.g., Whole Foods, Trader Joe's, Tesco, etc.) where the user can find the majority of their grocery list items based on their location (${userData.location}) and the generated list.
-          18. HYDRATION UNITS: If the user's weight unit is "lbs" (${userData.weightUnit}), provide all hydration targets and water schedules in imperial units (ounces/oz). If "kg", use metric (liters/L).
-          19. GOAL ALIGNMENT SUMMARY: Provide a "goalAlignmentSummary" (under 500 characters) that conducts a short overview of what will help the person reach their desired goal. This must convey that deep research was conducted on their specific goals (${userData.goals}) and their occupation (${userData.occupation}), explaining why the generated workout plan is the optimal fit for them.
-          20. HYDRATION RESEARCH: Conduct deep research on water consumption specifically for this user. The "hydrationTargets" and "waterSchedule" MUST be tailored to:
-              - Their workout desire and intensity.
-              - Recommended daily intake based on weight (${userData.weight} ${userData.weightUnit}) and activity level (${userData.physicalActivity}).
-              - Any reported health conditions or injuries (${userData.injuries || 'None'}).
-              Explain the logic behind these targets in the "hydrationTargets" field.
-          21. OCCUPATION-CENTERED TRAINING: The workout plan MUST be centered around deep research on their occupation (${userData.occupation}). For example, if they have a sedentary desk job, prioritize posture, hip mobility, and metabolic conditioning. If they have a physically demanding job, prioritize recovery, structural balance, and injury prevention.
-          22. RECOVERY SCHEDULE: Generate a "recoverySchedule" that includes specific recovery modalities such as cold plunges, saunas, ice baths, mobility work, and active recovery based on the intensity of the generated workout plan.
-          23. EXTREME CONCISENESS: To prevent JSON truncation, you MUST keep all descriptions, evaluations, and notes extremely brief (under 150 characters per field).
-          24. HEALTH METRICS:
-              - You MUST calculate:
-                - BMI: (weight in kg) / (height in m)^2.
-                - BMI Category: (Underweight, Fit, Overweight, Obese).
-                - Estimated Body Fat %: Based on visual analysis of photos and user data.
-                - Health Status: A summary of their current physical health based on BMI and body fat.
-                - Focus: What they should prioritize (e.g., "Focus on a slight calorie deficit to reach a healthy BMI range").
-                - Recommended Calorie Level: (maintain, deficit, surplus).
-                - Estimated Daily Calories: An exact number or narrow range (e.g., "2,200 - 2,400 kcal").
-          25. RECOMMENDED WORKOUT & ADDITIONAL ACTIVITIES (PROGRESS & ASSESSMENT ONLY):
-              - If path is "progress" or "assessment":
-                - Recommended Workout: Provide a single, deeply researched workout routine (title, description, and 7-10 specific exercises) tailored to address the "concerning areas" identified in the physique comparison. For each exercise, include a direct YouTube video URL (not a search link or channel link) in the "videoUrl" field. Ensure the link points specifically to a single video showing that exercise, prioritizing equipment-specific instructional videos if smart equipment (like Tonal) is used.
-                - Additional Activities: Conduct deep research and provide a section about additional activities to help reach goals, such as sauna, cold plunge, ice baths, massages, swimming, or any other activity that may assist with becoming healthy. Include a title, description, and a list of 3-4 specific activities with their benefits and recommended frequency.
-          26. FINAL VALIDATION RULE: You are FORBIDDEN from ending the generation until you have manually verified that the 'workoutPlan' and 'mealPlan' arrays (if applicable) contain exactly 12 weekly blocks.
-          27. Return ONLY valid JSON matching the provided schema.
+          4. PATH-SPECIFIC GENERATION (CRITICAL):
+             - If path is "full": You MUST provide ALL sections: 
+               a) Physique Assessments: Detailed summaries and at least 3 ratings for Front, Back, Left, and Right views.
+               b) Final Summary: A coaching-oriented overview with a clear "nextSteps" list.
+               c) 12-Week Workout Plan: Exactly 12 weeks of training with video links.
+               d) 12-Week Meal Plan: Exactly 12 weeks of structured meals with macros and Pinterest links.
+               e) Support: Grocery list, recommended store, sleep advice, recovery schedule, hydration targets, and water schedule.
+             - If path is "workout": Provide ONLY 12-week workout plan, sleep, hydration, and recovery. Return empty objects/arrays for physique assessments and meal plans.
+             - If path is "meal": Provide ONLY 12-week meal plan, grocery list, and hydration. Return empty objects/arrays for physique assessments and workout plans.
+             - If path is "assessment": Provide ONLY physique assessment and topline ratings.
+             - If path is "progress": Provide ONLY physique comparison analysis between the provided before/after sets.
+          5. COMPLETE 12-WEEK PLANS: If "full", "workout", or "meal" is requested, you MUST provide exactly 12 weekly blocks. Each week must have a specific phase/focus.
+          6. EXERCISE COUNT: For each training day, the "mainWork" field MUST contain between 5 to 10 specific, effective exercises.
+          7. MOTIVATIONAL QUOTE: Generate a unique, powerful motivational quote specifically for this user's situation. The quote MUST be followed by the text "Unlock your greatness."
+          8. SLEEP RECOMMENDATION: Provide deep research on sleep requirements tailored to support this user's specific workout routine, occupation, and goals. 
+          9. DIET STRATEGY: Strictly adhere to the user's calorie preference (${userData.caloriePreference}). Calculate estimated TDEE and provide an exact daily calorie target.
+          10. VISUAL ANALYSIS: For each photo provided, conduct a thorough assessment of muscle definition, symmetry, and areas for improvement.
+          11. WORKOUT VIDEOS: For each exercise, you MUST provide a direct YouTube video URL.
+          12. QUALITY CONTROL & COMPLETENESS PROTOCOL: Before finalizing the JSON, you MUST verify:
+              - CHECK 1: Are there exactly 12 weeks of plans?
+              - CHECK 2: Do all views (Front, Back, Left, Right) have summaries and ratings?
+              - CHECK 3: Is there a coaching-oriented "nextSteps" list in finalSummary?
+              - CHECK 4: Are macro estimates present for all meals in the 12-week plan?
+              - CHECK 5: Are hydration targets and recovery schedules populated?
+          13. FINAL VALIDATION: You are FORBIDDEN from ending the generation until you have manually verified all checks pass. If data is too large, prioritize conciseness in descriptions to ensure all 12 weeks fit in the output.
+          14. Return ONLY valid JSON matching the provided schema.
         `,
         responseMimeType: "application/json",
         maxOutputTokens: 65536,
@@ -482,7 +445,7 @@ export async function generateTransformationReport(
         checks.push({
           name: "12-Week Workout Plan Completeness",
           pass: (result.workoutPlan?.length || 0) >= 12,
-          error: `Workout plan contains only ${result.workoutPlan?.length || 0} weeks. All 12 weeks are required for a complete profile.`
+          error: `Workout plan contains only ${result.workoutPlan?.length || 0} weeks. All 12 weeks are required.`
         });
       }
 
@@ -490,15 +453,38 @@ export async function generateTransformationReport(
         checks.push({
           name: "12-Week Meal Plan Completeness",
           pass: (result.mealPlan?.length || 0) >= 12,
-          error: `Meal plan contains only ${result.mealPlan?.length || 0} weeks. All 12 weeks are required for a complete profile.`
+          error: `Meal plan contains only ${result.mealPlan?.length || 0} weeks. All 12 weeks are required.`
         });
       }
 
       if (['assessment', 'full', 'progress'].includes(path)) {
         checks.push({
+          name: "Physique Analysis Completeness",
+          pass: !!result.frontViewAnalysis?.summary && (result.frontViewAnalysis.ratings?.length || 0) > 0,
+          error: "Front view analysis is missing or incomplete."
+        });
+        checks.push({
           name: "Health Metrics Evaluation",
           pass: !!result.healthMetrics && !!result.healthMetrics.bmi && !!result.healthMetrics.estimatedBodyFat,
           error: "Health metrics (BMI, Body Fat) are missing or incomplete."
+        });
+      }
+
+      if (path === 'full') {
+        checks.push({
+          name: "Grocery List Completeness",
+          pass: (result.groceryList?.length || 0) > 0 && !!result.recommendedGroceryStore,
+          error: "Grocery list or recommended store is missing."
+        });
+        checks.push({
+          name: "Coaching Next Steps",
+          pass: (result.finalSummary?.nextSteps?.length || 0) > 0,
+          error: "Coaching-oriented next steps are missing."
+        });
+        checks.push({
+          name: "Recovery & Hydration",
+          pass: (result.recoverySchedule?.length || 0) > 0 && !!result.hydrationTargets && (result.waterSchedule?.length || 0) > 0,
+          error: "Recovery schedule or hydration targets are missing."
         });
       }
 
