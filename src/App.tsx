@@ -252,6 +252,7 @@ export default function App() {
     currentWorkout: '',
     caloriePreference: 'maintain',
     physicalActivity: 'moderate',
+    desiredPhysicalActivity: 'high',
     planDuration: '12-week'
   });
   const [photos, setPhotos] = useState<Photos>({
@@ -1114,18 +1115,32 @@ export default function App() {
                   </div>
 
                   {(path !== 'assessment' && path !== 'progress') && (
-                    <Select 
-                      label="Physical Activity Level"
-                      options={[
-                        {label: 'Sedentary (Office job, little exercise)', value: 'sedentary'}, 
-                        {label: 'Lightly Active (Light exercise 1-3 days/week)', value: 'light'},
-                        {label: 'Moderately Active (Moderate exercise 3-5 days/week)', value: 'moderate'},
-                        {label: 'Very Active (Hard exercise 6-7 days/week)', value: 'active'},
-                        {label: 'Extra Active (Very hard exercise & physical job)', value: 'extra'}
-                      ]} 
-                      value={userData.physicalActivity}
-                      onChange={e => setUserData({...userData, physicalActivity: e.target.value})}
-                    />
+                    <div className="space-y-4 md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <Select 
+                        label="Current Physical Activity Level"
+                        options={[
+                          {label: 'Sedentary (Office job, little exercise)', value: 'sedentary'}, 
+                          {label: 'Lightly Active (Light exercise 1-3 days/week)', value: 'light'},
+                          {label: 'Moderately Active (Moderate exercise 3-5 days/week)', value: 'moderate'},
+                          {label: 'Very Active (Hard exercise 6-7 days/week)', value: 'active'},
+                          {label: 'Extra Active (Very hard exercise & physical job)', value: 'extra'}
+                        ]} 
+                        value={userData.physicalActivity}
+                        onChange={e => setUserData({...userData, physicalActivity: e.target.value})}
+                      />
+                      {(path === 'workout' || path === 'full') && (
+                        <Select 
+                          label="Desired Physical Activity Level"
+                          options={[
+                            {label: 'Moderately Active (3-5 days/week)', value: 'moderate'},
+                            {label: 'Very Active (6-7 days/week)', value: 'active'},
+                            {label: 'Extra Active (Athletic/Pro focus)', value: 'extra'}
+                          ]} 
+                          value={userData.desiredPhysicalActivity}
+                          onChange={e => setUserData({...userData, desiredPhysicalActivity: e.target.value})}
+                        />
+                      )}
+                    </div>
                   )}
 
                   {(path !== 'meal' && path !== 'assessment' && path !== 'progress') && (

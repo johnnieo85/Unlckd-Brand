@@ -20,6 +20,7 @@ export interface UserData {
   currentWorkout: string;
   caloriePreference: 'deficit' | 'maintain' | 'surplus';
   physicalActivity: string;
+  desiredPhysicalActivity: string;
   planDuration?: PlanDuration;
 }
 
