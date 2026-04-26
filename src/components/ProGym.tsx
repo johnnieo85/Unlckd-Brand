@@ -2384,7 +2384,7 @@ export const ProGym = ({
             })()}
           </div>
 
-          <Card className="p-8 bg-brand-surface border-white/5 overflow-hidden">
+          <Card className="p-8 bg-brand-surface border-white/5">
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-brand-primary/10 rounded-lg">
@@ -2402,7 +2402,7 @@ export const ProGym = ({
               <div className="min-w-[900px]">
                 <div className="grid grid-cols-[240px_repeat(31,minmax(24px,1fr))] gap-y-4 items-center relative">
                   {/* Calendar Days Header */}
-                  <div className="sticky left-0 z-30 bg-brand-surface text-[10px] font-black text-gray-600 uppercase tracking-widest p-2">Habit & Accuracy</div>
+                  <div className="sticky left-0 z-30 bg-brand-surface text-[10px] font-black text-gray-600 uppercase tracking-widest p-2 border-r border-white/5">Habit & Accuracy</div>
                   {Array.from({ length: new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0).getDate() }).map((_, i) => (
                     <div key={i} className="text-[10px] font-mono text-gray-600 text-center sticky top-0 bg-brand-surface z-10 py-2 border-b border-white/5">{i + 1}</div>
                   ))}
@@ -2418,9 +2418,9 @@ export const ProGym = ({
 
                     return (
                       <React.Fragment key={habit}>
-                        <div className="sticky left-0 z-20 bg-brand-surface flex items-center gap-2 pr-4 min-w-0 py-1 shadow-md">
+                        <div className="sticky left-0 z-20 bg-brand-surface flex items-center gap-2 pr-4 min-w-0 py-1 border-r border-white/5 shadow-sm w-[240px]">
                           <span className="text-[11px] font-bold text-gray-100 truncate">{habit}</span>
-                          <span className="text-[10px] font-mono font-black text-brand-primary shrink-0">{percentage}%</span>
+                          <span className="text-[10px] font-mono font-black text-brand-primary shrink-0 bg-brand-primary/10 px-1 rounded">{percentage}%</span>
                         </div>
                         {Array.from({ length: daysInMonth }).map((_, i) => {
                           const day = i + 1;
@@ -2465,9 +2465,9 @@ export const ProGym = ({
 
                     return (
                       <>
-                        <div className="sticky left-0 z-20 bg-brand-surface flex items-center gap-2 pr-4 min-w-0 py-1 shadow-md">
+                        <div className="sticky left-0 z-20 bg-brand-surface flex items-center gap-2 pr-4 min-w-0 py-1 border-r border-white/5 shadow-sm w-[240px]">
                           <span className="text-[11px] font-bold text-gray-100 truncate">10K Step Goal</span>
-                          <span className="text-[10px] font-mono font-black text-emerald-500 shrink-0">{stepPercentage}%</span>
+                          <span className="text-[10px] font-mono font-black text-emerald-500 shrink-0 bg-emerald-500/10 px-1 rounded">{stepPercentage}%</span>
                         </div>
                         {Array.from({ length: daysInMonth }).map((_, i) => {
                           const day = i + 1;
@@ -2486,9 +2486,9 @@ export const ProGym = ({
                           );
                         })}
 
-                        <div className="sticky left-0 z-20 bg-brand-surface flex items-center gap-2 pr-4 min-w-0 py-1 shadow-md">
+                        <div className="sticky left-0 z-20 bg-brand-surface flex items-center gap-2 pr-4 min-w-0 py-1 border-r border-white/5 shadow-sm w-[240px]">
                           <span className="text-[11px] font-bold text-gray-100 truncate">Hydration Target</span>
-                          <span className="text-[10px] font-mono font-black text-blue-500 shrink-0">{waterPercentage}%</span>
+                          <span className="text-[10px] font-mono font-black text-blue-500 shrink-0 bg-blue-500/10 px-1 rounded">{waterPercentage}%</span>
                         </div>
                         {Array.from({ length: daysInMonth }).map((_, i) => {
                           const day = i + 1;
