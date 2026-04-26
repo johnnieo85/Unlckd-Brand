@@ -425,11 +425,12 @@ export const ProGym = ({ latestReport, userProfile }: { latestReport: SavedRepor
   };
 
   const habitList = [
-    'Diet Discipline',
     'Adequate Sleep',
+    'Water Consumption',
     'Step Goal',
+    'Nutrition Compliance',
     'Daily Stretching',
-    'Water Consumption'
+    'Evening Recovery'
   ];
 
   const calculateXP = () => {
