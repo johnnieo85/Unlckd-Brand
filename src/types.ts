@@ -96,12 +96,16 @@ export interface AssessmentResult {
       day: string;
       breakfast: string;
       breakfastUrl?: string;
+      breakfastMacros?: { calories: string; protein: string; fat: string; carbs: string };
       lunch: string;
       lunchUrl?: string;
+      lunchMacros?: { calories: string; protein: string; fat: string; carbs: string };
       dinner: string;
       dinnerUrl?: string;
+      dinnerMacros?: { calories: string; protein: string; fat: string; carbs: string };
       snack: string;
       snackUrl?: string;
+      snackMacros?: { calories: string; protein: string; fat: string; carbs: string };
     }[];
   }[];
   groceryList: {
@@ -157,4 +161,81 @@ export interface SavedReport {
   report: AssessmentResult;
   photos: Photos;
   progressPhotos?: ProgressPhotos;
+}
+
+export interface Badge {
+  id: string;
+  name: string;
+  icon: string;
+  description: string;
+  unlockedAt: string;
+}
+
+export interface UserProfile {
+  userId: string;
+  email: string;
+  hasAccess: boolean;
+  isPremium: boolean;
+  createdAt: any;
+  badges: Badge[];
+  monthlyGoal?: {
+    title: string;
+    description: string;
+    deadline: string;
+    completed: boolean;
+    badgeId: string;
+  };
+}
+
+export interface DailyLog {
+  id: string;
+  date: string;
+  steps: number;
+  stepGoal: number;
+  water: number;
+  waterGoal: number;
+  waterUnit: 'ml' | 'oz';
+  meals?: {
+    name: string;
+    completed: boolean;
+    type: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+    calories?: string;
+    protein?: string;
+    fat?: string;
+    carbs?: string;
+    url?: string;
+  }[];
+  habits?: {
+    [key: string]: boolean;
+  };
+  completedWorkouts: number;
+  workoutData?: Record<string, { weight: string; sets: string; reps: string; notes: string }>;
+  generalNotes?: string;
+  lastUpdated?: any;
+  useManualWorkout?: boolean;
+  manualWorkout?: {
+    warmUp: string;
+    mainWork: string;
+    focus: string;
+  };
+}
+
+export interface Measurement {
+  id: string;
+  date: string;
+  timestamp: string;
+  weight: number;
+  bodyFat?: number;
+  waist?: number;
+  chest?: number;
+  arms?: number; // legacy/general
+  leftArm?: number;
+  rightArm?: number;
+  leftThigh?: number;
+  rightThigh?: number;
+  neck?: number;
+  units: {
+    weight: 'kg' | 'lbs';
+    length: 'cm' | 'in';
+  };
 }
