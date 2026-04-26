@@ -31,6 +31,11 @@ export async function ensureUserProfile(user: FirebaseUser): Promise<UserProfile
   return userSnap.data() as UserProfile;
 }
 
+export async function updateUserProfile(userId: string, data: Partial<UserProfile>): Promise<void> {
+  const userRef = doc(db, 'users', userId);
+  await setDoc(userRef, data, { merge: true });
+}
+
 export async function checkUserAccess(userId: string): Promise<boolean> {
   const userRef = doc(db, 'users', userId);
   const userSnap = await getDoc(userRef);

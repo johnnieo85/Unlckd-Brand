@@ -333,6 +333,15 @@ export default function App() {
     }
   };
 
+  const refreshProfile = async () => {
+    if (user) {
+      const profile = await ensureUserProfile(user);
+      setUserProfile(profile);
+      setHasAccess(profile.hasAccess);
+      setIsPremium(profile.isPremium);
+    }
+  };
+
   const handleGoogleSignIn = async () => {
     setIsSigningIn(true);
     setAuthError(null);
@@ -725,6 +734,7 @@ export default function App() {
               <ProGym 
                 latestReport={latestReport} 
                 userProfile={userProfile} 
+                onProfileUpdate={refreshProfile}
                 onHomeClick={() => {
                   setStep('landing');
                   setActiveTab('reports');

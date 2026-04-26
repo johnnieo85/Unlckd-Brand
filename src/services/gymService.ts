@@ -111,5 +111,27 @@ export const gymService = {
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
     }
+  },
+
+  async getLogsInRange(startDate: string, endDate: string): Promise<DailyLog[]> {
+    const user = auth.currentUser;
+    if (!user) return [];
+
+    const path = `users/${user.uid}/dailyLogs`;
+    try {
+      const q = query(
+        collection(db, 'users', user.uid, 'dailyLogs'),
+        orderBy('date', 'desc')
+      );
+
+      const querySnapshot = await getDocs(q);
+      const logs = querySnapshot.docs.map(doc => doc.data() as DailyLog);
+      
+      // Filter logically if needed, but for now just filter current fetched set
+      return logs.filter(log => log.date >= startDate && log.date <= endDate);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
   }
 };
