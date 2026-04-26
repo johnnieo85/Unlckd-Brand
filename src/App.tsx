@@ -33,7 +33,8 @@ import {
   Lock,
   Quote,
   Moon,
-  Instagram
+  Instagram,
+  RotateCcw
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Button } from './components/ui/Button';
@@ -425,19 +426,6 @@ export default function App() {
     setStep('report');
   };
 
-  const handleExportReport = (saved: SavedReport, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    const dataStr = JSON.stringify(saved, null, 2);
-    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-    const exportFileDefaultName = `UNLCKD-Report-${saved.userData.name}-${new Date().toISOString().split('T')[0]}.json`;
-
-    const linkElement = document.createElement('a');
-    linkElement.setAttribute('href', dataUri);
-    linkElement.setAttribute('download', exportFileDefaultName);
-    linkElement.click();
-  };
-
-
   const handleStart = (selectedPath: Path) => {
     if (!user) {
       handleSignIn();
@@ -464,9 +452,17 @@ export default function App() {
     }
   };
 
-  const processReport = async () => {
+  const [isResubmitting, setIsResubmitting] = useState(false);
+
+  const processReport = async (isResubmit: boolean = false) => {
     setStep('processing');
-    const messages = [
+    setIsResubmitting(isResubmit);
+    const messages = isResubmit ? [
+      'Re-evaluating your data for accuracy...',
+      'Correcting plan inconsistencies...',
+      'Re-verifying exercise video links...',
+      'Finalizing your corrected report...'
+    ] : [
       'Analyzing your physique data...',
       'Calculating optimal macros...',
       'Designing your 12-week training split...',
@@ -484,7 +480,8 @@ export default function App() {
       const result = await generateTransformationReport(
         userData, 
         path === 'progress' ? progressPhotos : photos, 
-        path
+        path,
+        isResubmit
       );
       setReport(result);
       
@@ -708,14 +705,6 @@ export default function App() {
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-brand-dark via-transparent to-transparent" />
                         <div className="absolute top-4 right-4 z-20 flex gap-2">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="bg-brand-primary/10 hover:bg-brand-primary/20 text-brand-primary rounded-full"
-                            onClick={(e) => handleExportReport(saved, e)}
-                          >
-                            <Download className="w-4 h-4" />
-                          </Button>
                           <Button 
                             variant="ghost" 
                             size="icon" 
@@ -1289,7 +1278,7 @@ export default function App() {
                 <Button 
                   className="flex-1 gap-2" 
                   disabled={!photos.front || !photos.back || !photos.left || !photos.right}
-                  onClick={processReport}
+                  onClick={() => processReport()}
                 >
                   Generate Report <ArrowRight className="w-4 h-4" />
                 </Button>
@@ -1428,7 +1417,7 @@ export default function App() {
                     !progressPhotos.before.front || !progressPhotos.before.back || !progressPhotos.before.left || !progressPhotos.before.right ||
                     !progressPhotos.after.front || !progressPhotos.after.back || !progressPhotos.after.left || !progressPhotos.after.right
                   }
-                  onClick={processReport}
+                  onClick={() => processReport()}
                 >
                   Generate Comparison <ArrowRight className="w-4 h-4" />
                 </Button>
@@ -1477,23 +1466,6 @@ export default function App() {
                 >
                   <Download className="w-5 h-5" />
                   Download PDF Report
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="md" 
-                  className="gap-2 border-white/10 hover:bg-white/5 rounded-xl text-gray-400 hover:text-white"
-                  onClick={() => handleExportReport({
-                    id: 'current',
-                    timestamp: { toDate: () => new Date() },
-                    path,
-                    userData,
-                    report,
-                    photos,
-                    progressPhotos: path === 'progress' ? progressPhotos : undefined
-                  })}
-                >
-                  <Download className="w-5 h-5" />
-                  Export Data (JSON)
                 </Button>
               </div>
 
@@ -2161,11 +2133,19 @@ export default function App() {
                     </table>
                   </div>
                   <LogoBranding />
-                  <div className="mt-12 text-center">
-                    <Button size="lg" onClick={() => setStep('landing')}>Start New Assessment</Button>
-                  </div>
                 </section>
               )}
+
+              <div className="mt-12 flex flex-col items-center gap-6 no-print pb-20">
+                <Button size="lg" onClick={() => setStep('landing')} className="rounded-2xl px-12">Start New Assessment</Button>
+                <button 
+                  onClick={() => processReport(true)}
+                  className="text-gray-500 hover:text-brand-primary text-xs font-bold uppercase tracking-widest transition-colors flex items-center gap-2"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  Resubmit Assessment (Fix Output Issues)
+                </button>
+              </div>
             </motion.div>
           )}
         </>

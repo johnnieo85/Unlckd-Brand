@@ -178,6 +178,7 @@ export interface UserProfile {
   isPremium: boolean;
   createdAt: any;
   badges: Badge[];
+  gymPin?: string;
   monthlyGoal?: {
     title: string;
     description: string;
