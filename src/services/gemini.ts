@@ -129,20 +129,27 @@ export async function generateTransformationReport(
           13. WORKOUT VIDEOS: For each exercise in the "mainWork" and "warmUp" fields, you MUST provide a direct YouTube video URL (e.g., https://www.youtube.com/watch?v=...) that shows how to perform the exercise. CRITICAL: The links MUST point to a single video player page, never to a search results page (e.g., /results?search_query=) or a channel page. Use markdown format: [Exercise Name](Direct YouTube URL). Ensure the link is for the specific exercise mentioned. 
               - EQUIPMENT SPECIFICITY: If the user has specified specialized at-home smart equipment (e.g., Tonal, Mirror, Tempo), you MUST provide video links that specifically demonstrate the exercise on that exact system. If a YouTube video for the specific equipment cannot be found, provide a direct link to a vendor-specific instructional video from their official website or support library.
               - VIDEO QUALITY CHECK: Before selecting a link, perform a mental quality check to ensure the video is active, public, and provides clear instructional value on the correct equipment.
-          14. QUALITY CONTROL: Before finalizing the JSON, perform multiple internal quality checks to ensure all information is accurate, complete, and tailored to the user's specific data. Ensure all URLs (YouTube, Pinterest) are likely to be available and relevant.
+          14. QUALITY CONTROL & COMPLETENESS PROTOCOL: Before finalizing the JSON, you MUST perform the FOLLOWING INTERNAL CHECKS:
+              - CHECK 1: Ensure all 12 weeks for workout/meal plans are present if a plan was requested. No truncation allowed.
+              - CHECK 2: Verify that every training day has at least 7 exercises.
+              - CHECK 3: Verify that every meal has a corresponding macro estimate (Calories, P, F, C).
+              - CHECK 4: Confirm that the "Full Transformation Report" mode (${path}) has been fully addressed with no placeholder text like "[Section truncated]".
+              - CHECK 5: Ensure all URLs are direct links and not search queries.
+              If any of these checks fail, you MUST restart your drafting process for that section to ensure a premium, complete experience.
           15. MEAL RECIPES: For each meal in the meal plan, provide a direct Pinterest recipe link in the corresponding "Url" field (e.g., breakfastUrl).
-          16. GROCERY STORE: Recommend a specific grocery store (e.g., Whole Foods, Trader Joe's, Tesco, etc.) where the user can find the majority of their grocery list items based on their location (${userData.location}) and the generated list.
-          17. HYDRATION UNITS: If the user's weight unit is "lbs" (${userData.weightUnit}), provide all hydration targets and water schedules in imperial units (ounces/oz). If "kg", use metric (liters/L).
-          18. GOAL ALIGNMENT SUMMARY: Provide a "goalAlignmentSummary" (under 500 characters) that conducts a short overview of what will help the person reach their desired goal. This must convey that deep research was conducted on their specific goals (${userData.goals}) and their occupation (${userData.occupation}), explaining why the generated workout plan is the optimal fit for them.
-          19. HYDRATION RESEARCH: Conduct deep research on water consumption specifically for this user. The "hydrationTargets" and "waterSchedule" MUST be tailored to:
+          16. MEAL MACROS: In "full" or "meal" plans, you MUST provide estimated macros (calories, protein, fat, carbs) for each of the meals in the fields "breakfastMacros", "lunchMacros", "dinnerMacros", and "snackMacros". These should be realistic for the recipe and the user's weight/goals.
+          17. GROCERY STORE: Recommend a specific grocery store (e.g., Whole Foods, Trader Joe's, Tesco, etc.) where the user can find the majority of their grocery list items based on their location (${userData.location}) and the generated list.
+          18. HYDRATION UNITS: If the user's weight unit is "lbs" (${userData.weightUnit}), provide all hydration targets and water schedules in imperial units (ounces/oz). If "kg", use metric (liters/L).
+          19. GOAL ALIGNMENT SUMMARY: Provide a "goalAlignmentSummary" (under 500 characters) that conducts a short overview of what will help the person reach their desired goal. This must convey that deep research was conducted on their specific goals (${userData.goals}) and their occupation (${userData.occupation}), explaining why the generated workout plan is the optimal fit for them.
+          20. HYDRATION RESEARCH: Conduct deep research on water consumption specifically for this user. The "hydrationTargets" and "waterSchedule" MUST be tailored to:
               - Their workout desire and intensity.
               - Recommended daily intake based on weight (${userData.weight} ${userData.weightUnit}) and activity level (${userData.physicalActivity}).
               - Any reported health conditions or injuries (${userData.injuries || 'None'}).
               Explain the logic behind these targets in the "hydrationTargets" field.
-          20. OCCUPATION-CENTERED TRAINING: The workout plan MUST be centered around deep research on their occupation (${userData.occupation}). For example, if they have a sedentary desk job, prioritize posture, hip mobility, and metabolic conditioning. If they have a physically demanding job, prioritize recovery, structural balance, and injury prevention.
-          21. RECOVERY SCHEDULE: Generate a "recoverySchedule" that includes specific recovery modalities such as cold plunges, saunas, ice baths, mobility work, and active recovery based on the intensity of the generated workout plan.
-          22. EXTREME CONCISENESS: To prevent JSON truncation, you MUST keep all descriptions, evaluations, and notes extremely brief (under 150 characters per field).
-          23. HEALTH METRICS:
+          21. OCCUPATION-CENTERED TRAINING: The workout plan MUST be centered around deep research on their occupation (${userData.occupation}). For example, if they have a sedentary desk job, prioritize posture, hip mobility, and metabolic conditioning. If they have a physically demanding job, prioritize recovery, structural balance, and injury prevention.
+          22. RECOVERY SCHEDULE: Generate a "recoverySchedule" that includes specific recovery modalities such as cold plunges, saunas, ice baths, mobility work, and active recovery based on the intensity of the generated workout plan.
+          23. EXTREME CONCISENESS: To prevent JSON truncation, you MUST keep all descriptions, evaluations, and notes extremely brief (under 150 characters per field).
+          24. HEALTH METRICS:
               - You MUST calculate:
                 - BMI: (weight in kg) / (height in m)^2.
                 - BMI Category: (Underweight, Fit, Overweight, Obese).
@@ -151,11 +158,12 @@ export async function generateTransformationReport(
                 - Focus: What they should prioritize (e.g., "Focus on a slight calorie deficit to reach a healthy BMI range").
                 - Recommended Calorie Level: (maintain, deficit, surplus).
                 - Estimated Daily Calories: An exact number or narrow range (e.g., "2,200 - 2,400 kcal").
-          24. RECOMMENDED WORKOUT & ADDITIONAL ACTIVITIES (PROGRESS & ASSESSMENT ONLY):
+          25. RECOMMENDED WORKOUT & ADDITIONAL ACTIVITIES (PROGRESS & ASSESSMENT ONLY):
               - If path is "progress" or "assessment":
                 - Recommended Workout: Provide a single, deeply researched workout routine (title, description, and 7-10 specific exercises) tailored to address the "concerning areas" identified in the physique comparison. For each exercise, include a direct YouTube video URL (not a search link or channel link) in the "videoUrl" field. Ensure the link points specifically to a single video showing that exercise, prioritizing equipment-specific instructional videos if smart equipment (like Tonal) is used.
                 - Additional Activities: Conduct deep research and provide a section about additional activities to help reach goals, such as sauna, cold plunge, ice baths, massages, swimming, or any other activity that may assist with becoming healthy. Include a title, description, and a list of 3-4 specific activities with their benefits and recommended frequency.
-          25. Return ONLY valid JSON matching the provided schema.
+          26. FINAL VALIDATION RULE: You are FORBIDDEN from ending the generation until you have manually verified that the 'workoutPlan' and 'mealPlan' arrays (if applicable) contain exactly 12 weekly blocks.
+          27. Return ONLY valid JSON matching the provided schema.
         `,
         responseMimeType: "application/json",
         maxOutputTokens: 65536,
@@ -208,7 +216,7 @@ export async function generateTransformationReport(
                 summary: { type: Type.STRING },
               },
             },
-            backViewAnalysis: {
+            rightViewAnalysis: {
               type: Type.OBJECT,
               properties: {
                 ratings: {
@@ -225,7 +233,7 @@ export async function generateTransformationReport(
                 summary: { type: Type.STRING },
               },
             },
-            rightViewAnalysis: {
+            backViewAnalysis: {
               type: Type.OBJECT,
               properties: {
                 ratings: {
@@ -319,12 +327,48 @@ export async function generateTransformationReport(
                         day: { type: Type.STRING },
                         breakfast: { type: Type.STRING },
                         breakfastUrl: { type: Type.STRING },
+                        breakfastMacros: {
+                          type: Type.OBJECT,
+                          properties: {
+                            calories: { type: Type.STRING },
+                            protein: { type: Type.STRING },
+                            fat: { type: Type.STRING },
+                            carbs: { type: Type.STRING },
+                          },
+                        },
                         lunch: { type: Type.STRING },
                         lunchUrl: { type: Type.STRING },
+                        lunchMacros: {
+                          type: Type.OBJECT,
+                          properties: {
+                            calories: { type: Type.STRING },
+                            protein: { type: Type.STRING },
+                            fat: { type: Type.STRING },
+                            carbs: { type: Type.STRING },
+                          },
+                        },
                         dinner: { type: Type.STRING },
                         dinnerUrl: { type: Type.STRING },
+                        dinnerMacros: {
+                          type: Type.OBJECT,
+                          properties: {
+                            calories: { type: Type.STRING },
+                            protein: { type: Type.STRING },
+                            fat: { type: Type.STRING },
+                            carbs: { type: Type.STRING },
+                          },
+                        },
                         snack: { type: Type.STRING },
                         snackUrl: { type: Type.STRING },
+                        snackMacros: {
+                          type: Type.OBJECT,
+                          properties: {
+                            calories: { type: Type.STRING },
+                            protein: { type: Type.STRING },
+                            fat: { type: Type.STRING },
+                            carbs: { type: Type.STRING },
+                          },
+                        },
                       },
                     },
                   },
@@ -414,7 +458,7 @@ export async function generateTransformationReport(
         },
       },
     });
-
+ 
     const text = response.text || "{}";
     try {
       // Clean potential markdown wrapping and any leading/trailing whitespace
@@ -428,12 +472,48 @@ export async function generateTransformationReport(
         console.warn("Detected potentially truncated JSON, attempting to close it...");
         if (!cleanedText.endsWith("}")) cleanedText += "}";
       }
+ 
+      const result = JSON.parse(cleanedText) as AssessmentResult;
 
-      return JSON.parse(cleanedText);
-    } catch (e) {
-      console.error("Failed to parse Gemini response. Length:", text.length);
-      console.error("Response preview:", text.substring(0, 500) + "...");
-      throw new Error("The AI response was invalid or truncated. Please try again with a more specific goal.");
+      // MULTI-CHECK VALIDATION LOGIC
+      const checks: { name: string; pass: boolean; error: string }[] = [];
+
+      if (['full', 'workout'].includes(path)) {
+        checks.push({
+          name: "12-Week Workout Plan Completeness",
+          pass: (result.workoutPlan?.length || 0) >= 12,
+          error: `Workout plan contains only ${result.workoutPlan?.length || 0} weeks. All 12 weeks are required for a complete profile.`
+        });
+      }
+
+      if (['full', 'meal'].includes(path)) {
+        checks.push({
+          name: "12-Week Meal Plan Completeness",
+          pass: (result.mealPlan?.length || 0) >= 12,
+          error: `Meal plan contains only ${result.mealPlan?.length || 0} weeks. All 12 weeks are required for a complete profile.`
+        });
+      }
+
+      if (['assessment', 'full', 'progress'].includes(path)) {
+        checks.push({
+          name: "Health Metrics Evaluation",
+          pass: !!result.healthMetrics && !!result.healthMetrics.bmi && !!result.healthMetrics.estimatedBodyFat,
+          error: "Health metrics (BMI, Body Fat) are missing or incomplete."
+        });
+      }
+
+      const failedChecks = checks.filter(c => !c.pass);
+      if (failedChecks.length > 0) {
+        throw new Error(`The transformation report failed completeness checks: ${failedChecks.map(c => c.error).join(' ')}`);
+      }
+
+      return result;
+    } catch (e: any) {
+      console.error("Validation Error:", e.message);
+      if (e instanceof SyntaxError) {
+        throw new Error("The AI response was not valid JSON. Please try again.");
+      }
+      throw e;
     }
   } catch (error: any) {
     console.error("Gemini API Error:", error);
