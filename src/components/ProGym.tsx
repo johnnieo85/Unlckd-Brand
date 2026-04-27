@@ -172,6 +172,7 @@ export const ProGym = ({
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddingMeasurement, setIsAddingMeasurement] = useState(false);
+  const [hasDayMeasurement, setHasDayMeasurement] = useState(false);
   const [isMeasurementsExpanded, setIsMeasurementsExpanded] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [unlockedDates, setUnlockedDates] = useState<Set<string>>(new Set([new Date().toISOString().split('T')[0]]));
@@ -565,12 +566,45 @@ export const ProGym = ({
 
   const loadData = async (date: string) => {
     setLoading(true);
-    const [logData, measurementData] = await Promise.all([
+    const [logData, measurementData, dayMeasurement] = await Promise.all([
       gymService.getDailyLog(date),
-      gymService.getLatestMeasurements(5)
+      gymService.getLatestMeasurements(5),
+      gymService.getMeasurement(date)
     ]);
 
     setMeasurements(measurementData);
+    
+    // Pre-fill measurement form for the selected date
+    if (dayMeasurement) {
+      setHasDayMeasurement(true);
+      setNewMeasurement({
+        weight: dayMeasurement.weight,
+        bodyFat: dayMeasurement.bodyFat || 0,
+        waist: dayMeasurement.waist || 0,
+        chest: dayMeasurement.chest || 0,
+        leftArm: dayMeasurement.leftArm || 0,
+        rightArm: dayMeasurement.rightArm || 0,
+        leftThigh: dayMeasurement.leftThigh || 0,
+        rightThigh: dayMeasurement.rightThigh || 0,
+        neck: dayMeasurement.neck || 0
+      });
+      setMeasurementUnits(dayMeasurement.units);
+    } else {
+      setHasDayMeasurement(false);
+      // Reset if no measurement for this day, or maybe keep latest? 
+      // Let's reset to 0 but maybe keeping units is better.
+      setNewMeasurement({
+        weight: 0,
+        bodyFat: 0,
+        waist: 0,
+        chest: 0,
+        leftArm: 0,
+        rightArm: 0,
+        leftThigh: 0,
+        rightThigh: 0,
+        neck: 0
+      });
+    }
 
     if (logData) {
       // Sync habits with profile master list (ensure new habits appear in old logs)
@@ -798,7 +832,7 @@ export const ProGym = ({
   const handleAddMeasurement = async () => {
     if (!newMeasurement.weight) return;
     const measurement: Omit<Measurement, 'id' | 'timestamp'> = {
-      date: today,
+      date: selectedDate,
       weight: Number(newMeasurement.weight),
       bodyFat: Number(newMeasurement.bodyFat),
       waist: Number(newMeasurement.waist),
@@ -1935,7 +1969,7 @@ export const ProGym = ({
                   onClick={() => setIsAddingMeasurement(true)}
                   className="border-white/10 hover:bg-white/5"
                 >
-                  Log New
+                  {hasDayMeasurement ? 'Update Log' : 'Log New'}
                 </Button>
               </div>
             </div>
