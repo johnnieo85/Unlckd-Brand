@@ -181,6 +181,8 @@ export const ProGym = ({
   const [unlockedDates, setUnlockedDates] = useState<Set<string>>(new Set([new Date().toISOString().split('T')[0]]));
   const [isNutritionCollapsed, setIsNutritionCollapsed] = useState(false);
   const [isTrainingCollapsed, setIsTrainingCollapsed] = useState(false);
+  const [isHabitsCollapsed, setIsHabitsCollapsed] = useState(false);
+  const [isWeightCollapsed, setIsWeightCollapsed] = useState(false);
   const [isHubUnlocked, setIsHubUnlocked] = useState(false);
   const [pinEntry, setPinEntry] = useState('');
   const [pinSetup, setPinSetup] = useState({ pin: '', confirm: '' });
@@ -2603,136 +2605,158 @@ export const ProGym = ({
                 </div>
                 <h3 className="font-bold text-gray-100 uppercase tracking-widest text-sm">Monthly Habit Tracker</h3>
               </div>
-              <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-gray-500">
-                 <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-brand-primary" /> Completed</div>
-                 <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full border border-white/10" /> Missed</div>
+              <div className="flex items-center gap-4">
+                <div className="hidden sm:flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-gray-500 mr-2">
+                   <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-brand-primary" /> Completed</div>
+                   <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full border border-white/10" /> Missed</div>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setIsHabitsCollapsed(!isHabitsCollapsed)}
+                  className="text-gray-500 hover:text-white"
+                >
+                  {isHabitsCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+                </Button>
               </div>
             </div>
 
-            <div className="overflow-x-auto pb-6 custom-scrollbar scroll-smooth">
-              {(() => {
-                const daysInMonth = new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0).getDate();
-                return (
-                  <div className="min-w-fit">
-                    <div 
-                      className="grid items-center relative"
-                      style={{ 
-                        gridTemplateColumns: `minmax(180px, 240px) repeat(${daysInMonth}, 32px)` 
-                      }}
-                    >
-                      {/* Calendar Days Header */}
-                      <div className="sticky left-0 z-30 bg-brand-surface text-[10px] font-black text-gray-500 uppercase tracking-widest p-3 border-r border-white/10 shadow-[4px_0_12px_rgba(0,0,0,0.4)] h-12 flex items-center">
-                        Habit & Accuracy
-                      </div>
-                      {Array.from({ length: daysInMonth }).map((_, i) => (
-                        <div key={i} className="text-[10px] font-mono text-gray-600 text-center sticky top-0 bg-brand-surface z-10 h-12 flex items-center justify-center border-b border-white/5">{i + 1}</div>
-                      ))}
-
-                      {/* Habit Rows */}
-                      {habitList.map((habit) => {
-                        const isCurrentMonth = reportDate.getMonth() === new Date().getMonth() && reportDate.getFullYear() === new Date().getFullYear();
-                        const daysToConsider = isCurrentMonth ? new Date().getDate() : daysInMonth;
-                        
-                        const completions = reportLogs.filter(l => l.habits?.[habit]).length;
-                        const percentage = Math.round((completions / Math.max(1, daysToConsider)) * 100);
-
-                        return (
-                          <React.Fragment key={habit}>
-                            <div className="sticky left-0 z-20 bg-brand-surface flex items-center justify-between gap-3 pl-3 pr-4 min-w-0 h-10 border-r border-white/10 shadow-[4px_0_12px_rgba(0,0,0,0.4)]">
-                              <span className="text-xs font-bold text-gray-100 truncate flex-1">{habit}</span>
-                              <span className="text-[10px] font-mono font-black text-brand-primary shrink-0 bg-brand-primary/10 px-1.5 py-0.5 rounded border border-brand-primary/20">{percentage}%</span>
+            <AnimatePresence>
+              {!isHabitsCollapsed && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="overflow-hidden"
+                >
+                  <div className="overflow-x-auto pb-6 custom-scrollbar scroll-smooth">
+                    {(() => {
+                      const daysInMonth = new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0).getDate();
+                      return (
+                        <div className="min-w-fit">
+                          <div 
+                            className="grid items-center relative"
+                            style={{ 
+                              gridTemplateColumns: `minmax(180px, 240px) repeat(${daysInMonth}, 32px)` 
+                            }}
+                          >
+                            {/* Calendar Days Header */}
+                            <div className="sticky left-0 z-30 bg-brand-surface text-[10px] font-black text-gray-500 uppercase tracking-widest p-3 border-r border-white/10 shadow-[4px_0_12px_rgba(0,0,0,0.4)] h-12 flex items-center">
+                              Habit & Accuracy
                             </div>
-                            {Array.from({ length: daysInMonth }).map((_, i) => {
-                              const day = i + 1;
-                              const dateStr = `${reportDate.getFullYear()}-${String(reportDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                              const logAtDate = reportLogs.find(l => l.date === dateStr);
-                              const isDone = logAtDate?.habits?.[habit] || false;
-                              const isFuture = new Date(dateStr) > new Date();
+                            {Array.from({ length: daysInMonth }).map((_, i) => (
+                              <div key={i} className="text-[10px] font-mono text-gray-600 text-center sticky top-0 bg-brand-surface z-10 h-12 flex items-center justify-center border-b border-white/5">{i + 1}</div>
+                            ))}
+
+                            {/* Habit Rows */}
+                            {habitList.map((habit) => {
+                              const isCurrentMonth = reportDate.getMonth() === new Date().getMonth() && reportDate.getFullYear() === new Date().getFullYear();
+                              const daysToConsider = isCurrentMonth ? new Date().getDate() : daysInMonth;
+                              
+                              const completions = reportLogs.filter(l => l.habits?.[habit]).length;
+                              const percentage = Math.round((completions / Math.max(1, daysToConsider)) * 100);
 
                               return (
-                                <div key={i} className="flex justify-center h-10 items-center bg-white/[0.01] border-b border-white/[0.02]">
-                                  {isFuture ? (
-                                    <div className="w-2 h-2 rounded-full bg-white/[0.03]" />
-                                  ) : isDone ? (
-                                    <motion.div 
-                                      initial={{ scale: 0 }}
-                                      animate={{ scale: 1 }}
-                                      className="w-2.5 h-2.5 rounded-full bg-brand-primary shadow-[0_0_8px_rgba(16,185,129,0.4)]" 
-                                    />
-                                  ) : (
-                                    <div className="w-2 h-2 rounded-full border border-white/10" />
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </React.Fragment>
-                        );
-                      })}
+                                <React.Fragment key={habit}>
+                                  <div className="sticky left-0 z-20 bg-brand-surface flex items-center justify-between gap-3 pl-3 pr-4 min-w-0 h-10 border-r border-white/10 shadow-[4px_0_12px_rgba(0,0,0,0.4)]">
+                                    <span className="text-xs font-bold text-gray-100 truncate flex-1">{habit}</span>
+                                    <span className="text-[10px] font-mono font-black text-brand-primary shrink-0 bg-brand-primary/10 px-1.5 py-0.5 rounded border border-brand-primary/20">{percentage}%</span>
+                                  </div>
+                                  {Array.from({ length: daysInMonth }).map((_, i) => {
+                                    const day = i + 1;
+                                    const dateStr = `${reportDate.getFullYear()}-${String(reportDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                                    const logAtDate = reportLogs.find(l => l.date === dateStr);
+                                    const isDone = logAtDate?.habits?.[habit] || false;
+                                    const isFuture = new Date(dateStr) > new Date();
 
-                      {/* Built-in Metrics Rows */}
-                      <div className="col-span-full border-t border-white/10 my-2" />
-                      
-                      {(() => {
-                        const isCurrentMonth = reportDate.getMonth() === new Date().getMonth() && reportDate.getFullYear() === new Date().getFullYear();
-                        const daysToConsider = isCurrentMonth ? new Date().getDate() : daysInMonth;
-                        
-                        const stepCompletions = reportLogs.filter(l => l.steps >= l.stepGoal).length;
-                        const stepPercentage = Math.round((stepCompletions / Math.max(1, daysToConsider)) * 100);
-                        
-                        const waterCompletions = reportLogs.filter(l => l.water >= l.waterGoal).length;
-                        const waterPercentage = Math.round((waterCompletions / Math.max(1, daysToConsider)) * 100);
-
-                        return (
-                          <>
-                            <div className="sticky left-0 z-20 bg-brand-surface flex items-center justify-between gap-3 pl-3 pr-4 min-w-0 h-10 border-r border-white/10 shadow-[4px_0_12px_rgba(0,0,0,0.4)]">
-                              <span className="text-xs font-bold text-gray-100 truncate flex-1">10K Step Goal</span>
-                              <span className="text-[10px] font-mono font-black text-emerald-500 shrink-0 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">{stepPercentage}%</span>
-                            </div>
-                            {Array.from({ length: daysInMonth }).map((_, i) => {
-                              const day = i + 1;
-                              const dateStr = `${reportDate.getFullYear()}-${String(reportDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                              const logAtDate = reportLogs.find(l => l.date === dateStr);
-                              const isDone = logAtDate && logAtDate.steps >= logAtDate.stepGoal;
-                              const isFuture = new Date(dateStr) > new Date();
-
-                              return (
-                                <div key={i} className="flex justify-center h-10 items-center bg-white/[0.01] border-b border-white/[0.02]">
-                                  {isFuture ? <div className="w-2 h-2 rounded-full bg-white/[0.03]" /> :
-                                   isDone ? <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" /> :
-                                   <div className="w-2 h-2 rounded-full border border-white/10" />
-                                  }
-                                </div>
+                                    return (
+                                      <div key={i} className="flex justify-center h-10 items-center bg-white/[0.01] border-b border-white/[0.02]">
+                                        {isFuture ? (
+                                          <div className="w-2 h-2 rounded-full bg-white/[0.03]" />
+                                        ) : isDone ? (
+                                          <motion.div 
+                                            initial={{ scale: 0 }}
+                                            animate={{ scale: 1 }}
+                                            className="w-2.5 h-2.5 rounded-full bg-brand-primary shadow-[0_0_8px_rgba(16,185,129,0.4)]" 
+                                          />
+                                        ) : (
+                                          <div className="w-2 h-2 rounded-full border border-white/10" />
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </React.Fragment>
                               );
                             })}
 
-                            <div className="sticky left-0 z-20 bg-brand-surface flex items-center justify-between gap-3 pl-3 pr-4 min-w-0 h-10 border-r border-white/10 shadow-[4px_0_12px_rgba(0,0,0,0.4)]">
-                              <span className="text-xs font-bold text-gray-100 truncate flex-1">Hydration Target</span>
-                              <span className="text-[10px] font-mono font-black text-blue-500 shrink-0 bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20">{waterPercentage}%</span>
-                            </div>
-                            {Array.from({ length: daysInMonth }).map((_, i) => {
-                              const day = i + 1;
-                              const dateStr = `${reportDate.getFullYear()}-${String(reportDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                              const logAtDate = reportLogs.find(l => l.date === dateStr);
-                              const isDone = logAtDate && logAtDate.water >= logAtDate.waterGoal;
-                              const isFuture = new Date(dateStr) > new Date();
+                            {/* Built-in Metrics Rows */}
+                            <div className="col-span-full border-t border-white/10 my-2" />
+                            
+                            {(() => {
+                              const isCurrentMonth = reportDate.getMonth() === new Date().getMonth() && reportDate.getFullYear() === new Date().getFullYear();
+                              const daysToConsider = isCurrentMonth ? new Date().getDate() : daysInMonth;
+                              
+                              const stepCompletions = reportLogs.filter(l => l.steps >= l.stepGoal).length;
+                              const stepPercentage = Math.round((stepCompletions / Math.max(1, daysToConsider)) * 100);
+                              
+                              const waterCompletions = reportLogs.filter(l => l.water >= l.waterGoal).length;
+                              const waterPercentage = Math.round((waterCompletions / Math.max(1, daysToConsider)) * 100);
 
                               return (
-                                <div key={i} className="flex justify-center h-10 items-center bg-white/[0.01] border-b border-white/[0.02]">
-                                  {isFuture ? <div className="w-2 h-2 rounded-full bg-white/[0.03]" /> :
-                                   isDone ? <div className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.4)]" /> :
-                                   <div className="w-2 h-2 rounded-full border border-white/10" />
-                                  }
-                                </div>
+                                <>
+                                  <div className="sticky left-0 z-20 bg-brand-surface flex items-center justify-between gap-3 pl-3 pr-4 min-w-0 h-10 border-r border-white/10 shadow-[4px_0_12px_rgba(0,0,0,0.4)]">
+                                    <span className="text-xs font-bold text-gray-100 truncate flex-1">10K Step Goal</span>
+                                    <span className="text-[10px] font-mono font-black text-emerald-500 shrink-0 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">{stepPercentage}%</span>
+                                  </div>
+                                  {Array.from({ length: daysInMonth }).map((_, i) => {
+                                    const day = i + 1;
+                                    const dateStr = `${reportDate.getFullYear()}-${String(reportDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                                    const logAtDate = reportLogs.find(l => l.date === dateStr);
+                                    const isDone = logAtDate && logAtDate.steps >= logAtDate.stepGoal;
+                                    const isFuture = new Date(dateStr) > new Date();
+
+                                    return (
+                                      <div key={i} className="flex justify-center h-10 items-center bg-white/[0.01] border-b border-white/[0.02]">
+                                        {isFuture ? <div className="w-2 h-2 rounded-full bg-white/[0.03]" /> :
+                                         isDone ? <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" /> :
+                                         <div className="w-2 h-2 rounded-full border border-white/10" />
+                                        }
+                                      </div>
+                                    );
+                                  })}
+
+                                  <div className="sticky left-0 z-20 bg-brand-surface flex items-center justify-between gap-3 pl-3 pr-4 min-w-0 h-10 border-r border-white/10 shadow-[4px_0_12px_rgba(0,0,0,0.4)]">
+                                    <span className="text-xs font-bold text-gray-100 truncate flex-1">Hydration Target</span>
+                                    <span className="text-[10px] font-mono font-black text-blue-500 shrink-0 bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20">{waterPercentage}%</span>
+                                  </div>
+                                  {Array.from({ length: daysInMonth }).map((_, i) => {
+                                    const day = i + 1;
+                                    const dateStr = `${reportDate.getFullYear()}-${String(reportDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                                    const logAtDate = reportLogs.find(l => l.date === dateStr);
+                                    const isDone = logAtDate && logAtDate.water >= logAtDate.waterGoal;
+                                    const isFuture = new Date(dateStr) > new Date();
+
+                                    return (
+                                      <div key={i} className="flex justify-center h-10 items-center bg-white/[0.01] border-b border-white/[0.02]">
+                                        {isFuture ? <div className="w-2 h-2 rounded-full bg-white/[0.03]" /> :
+                                         isDone ? <div className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.4)]" /> :
+                                         <div className="w-2 h-2 rounded-full border border-white/10" />
+                                        }
+                                      </div>
+                                    );
+                                  })}
+                                </>
                               );
-                            })}
-                          </>
-                        );
-                      })()}
-                    </div>
+                            })()}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
-                );
-              })()}
-            </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </Card>
 
           {/* Weight Progression Chart */}
@@ -2744,12 +2768,31 @@ export const ProGym = ({
                 </div>
                 <h3 className="font-bold text-gray-100 uppercase tracking-widest text-sm">Weight Progression</h3>
               </div>
-              <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-gray-500">
-                 Current: <span className="text-white ml-1">{measurements.length > 0 ? `${measurements[0].weight}${measurements[0].units.weight}` : '--'}</span>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-gray-500">
+                   Current: <span className="text-white ml-1">{measurements.length > 0 ? `${measurements[0].weight}${measurements[0].units.weight}` : '--'}</span>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setIsWeightCollapsed(!isWeightCollapsed)}
+                  className="text-gray-500 hover:text-white"
+                >
+                  {isWeightCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+                </Button>
               </div>
             </div>
 
-            <div className="h-[300px] w-full">
+            <AnimatePresence>
+              {!isWeightCollapsed && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="overflow-hidden"
+                >
+                  <div className="h-[300px] w-full">
               {measurements.length > 1 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
@@ -2808,9 +2851,12 @@ export const ProGym = ({
                 </div>
               )}
             </div>
-          </Card>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Card>
+  </div>
+)}
     </div>
   );
 };

@@ -46,6 +46,27 @@ const getPhotoParts = (path: string, photos: Photos | ProgressPhotos): any[] => 
 };
 
 /**
+ * Safely parses JSON from a string, handling potential markdown wrappers
+ */
+function safeParseJson(text: string): any {
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    // Try to extract JSON from markdown code blocks
+    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (jsonMatch && jsonMatch[1]) {
+      try {
+        return JSON.parse(jsonMatch[1]);
+      } catch (innerE) {
+        throw new SyntaxError(`Failed to parse extracted JSON: ${innerE.message}`);
+      }
+    }
+    throw e;
+  }
+}
+
+/**
  * AI CALL RETRY HELPER
  */
 async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 2000): Promise<T> {
@@ -57,10 +78,11 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 2000): Pr
       error.message?.includes('high demand') ||
       error.message?.includes('504') ||
       error.message?.includes('429') ||
-      error.status === 'UNAVAILABLE';
+      error.status === 'UNAVAILABLE' ||
+      error.message?.includes('fetch failed');
 
     if (retries > 0 && isRetryable) {
-      console.warn(`AI model busy. Retrying in ${delay}ms... (${retries} attempts left)`);
+      console.warn(`AI model busy or network error. Retrying in ${delay}ms... (${retries} attempts left)`);
       await new Promise(resolve => setTimeout(resolve, delay));
       return withRetry(fn, retries - 1, delay * 2); // Exponential backoff
     }
@@ -95,6 +117,7 @@ async function generatePhysiqueAnalysis(
     ` : ''}
 
     FOCUS: Detailed Ratings & Summaries for ALL views (Front, Back, Left, Right).
+    Note: The goal is ${userData.goals}.
   `;
 
   const response = await withRetry(() => ai.models.generateContent({
@@ -105,7 +128,7 @@ async function generatePhysiqueAnalysis(
     config: {
       systemInstruction: `
         You are an elite physique assessor. Return ONLY valid JSON for the physique components.
-        Each evaluation or summary field must be under 200 characters.
+        Each evaluation or summary field must be under 200 characters to ensure the response isn't too large.
       `,
       responseMimeType: "application/json",
       responseSchema: {
@@ -163,7 +186,7 @@ async function generatePhysiqueAnalysis(
     },
   }));
 
-  return JSON.parse(response.text || "{}");
+  return safeParseJson(response.text || "{}");
 }
 
 /**
@@ -247,7 +270,7 @@ async function generateHealthAndSupport(
     },
   }));
 
-  return JSON.parse(response.text || "{}");
+  return safeParseJson(response.text || "{}");
 }
 
 /**
@@ -257,10 +280,11 @@ async function generateWorkoutPlan(
   userData: UserData,
   isResubmit: boolean
 ): Promise<Partial<AssessmentResult>> {
-  const fetchBatch = async (weeks: string): Promise<any[]> => {
+  const fetchBatch = async (week: number): Promise<any[]> => {
     const prompt = `
-      Design Weeks ${weeks} of an elite 12-week workout plan for "UNLCKD Pro Trainer".
+      Design Week ${week} of an elite 12-week workout plan for "UNLCKD Pro Trainer".
       User: ${userData.name}, Goal: ${userData.goals}.
+      Current Week: ${week}.
       EVERY exercise MUST be formatted as "[Name (Sets x Reps)](YouTube Link)".
     `;
 
@@ -268,7 +292,7 @@ async function generateWorkoutPlan(
       model: "gemini-3-flash-preview",
       contents: { parts: [{ text: prompt }] },
       config: {
-        systemInstruction: "Expert S&C Coach. JSON only. Weekly workout arrays.",
+        systemInstruction: "Expert S&C Coach. JSON only. Weekly workout arrays. Keep descriptions concise.",
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -302,17 +326,17 @@ async function generateWorkoutPlan(
       },
     }));
 
-    const data = JSON.parse(response.text || "{}");
+    const data = safeParseJson(response.text || "{}");
     return data.workoutPlan || [];
   };
 
   const workoutPlan: any[] = [];
-  const batches = ["1-2", "3-4", "5-6", "7-8", "9-10", "11-12"];
   
-  for (const range of batches) {
-    const batch = await fetchBatch(range);
+  for (let week = 1; week <= 12; week++) {
+    const batch = await fetchBatch(week);
     workoutPlan.push(...batch);
-    await new Promise(resolve => setTimeout(resolve, 800));
+    // Minimal delay between weeks
+    await new Promise(resolve => setTimeout(resolve, 300));
   }
 
   return { workoutPlan: workoutPlan.sort((a, b) => a.week - b.week) };
@@ -325,17 +349,18 @@ async function generateMealPlan(
   userData: UserData,
   isResubmit: boolean
 ): Promise<Partial<AssessmentResult>> {
-  const fetchBatch = async (weeks: string): Promise<any[]> => {
+  const fetchBatch = async (week: number): Promise<any[]> => {
     const prompt = `
-      Generate Weeks ${weeks} of a personalized 12-week meal plan.
+      Generate Week ${week} of a personalized 12-week meal plan.
       User: ${userData.name}, Preferences: ${userData.caloriePreference}.
+      Current Week: ${week}.
     `;
 
     const response = await withRetry(() => ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: { parts: [{ text: prompt }] },
       config: {
-        systemInstruction: "Nutritionist. JSON only. Weekly meal arrays with full macro breakdown.",
+        systemInstruction: "Nutritionist. JSON only. Weekly meal arrays with full macro breakdown. Keep it concise.",
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -371,17 +396,17 @@ async function generateMealPlan(
       },
     }));
 
-    const data = JSON.parse(response.text || "{}");
+    const data = safeParseJson(response.text || "{}");
     return data.mealPlan || [];
   };
 
   const mealPlan: any[] = [];
-  const batches = ["1-2", "3-4", "5-6", "7-8", "9-10", "11-12"];
 
-  for (const range of batches) {
-    const batch = await fetchBatch(range);
+  for (let week = 1; week <= 12; week++) {
+    const batch = await fetchBatch(week);
     mealPlan.push(...batch);
-    await new Promise(resolve => setTimeout(resolve, 800));
+    // Minimal delay between weeks
+    await new Promise(resolve => setTimeout(resolve, 300));
   }
 
   return { mealPlan: mealPlan.sort((a, b) => a.week - b.week) };
