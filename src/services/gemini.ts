@@ -46,6 +46,29 @@ const getPhotoParts = (path: string, photos: Photos | ProgressPhotos): any[] => 
 };
 
 /**
+ * AI CALL RETRY HELPER
+ */
+async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 2000): Promise<T> {
+  try {
+    return await fn();
+  } catch (error: any) {
+    const isRetryable = 
+      error.message?.includes('503') || 
+      error.message?.includes('high demand') ||
+      error.message?.includes('504') ||
+      error.message?.includes('429') ||
+      error.status === 'UNAVAILABLE';
+
+    if (retries > 0 && isRetryable) {
+      console.warn(`AI model busy. Retrying in ${delay}ms... (${retries} attempts left)`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return withRetry(fn, retries - 1, delay * 2); // Exponential backoff
+    }
+    throw error;
+  }
+}
+
+/**
  * CORE ASSESSMENT GENERATION
  */
 async function generateCoreAssessment(
@@ -81,7 +104,7 @@ async function generateCoreAssessment(
     4. Motivational Quote.
   `;
 
-  const response = await ai.models.generateContent({
+  const response = await withRetry(() => ai.models.generateContent({
     model,
     contents: {
       parts: [{ text: prompt }, ...photoParts],
@@ -190,13 +213,13 @@ async function generateCoreAssessment(
         },
       },
     },
-  });
+  }));
 
   return JSON.parse(response.text || "{}");
 }
 
 /**
- * 12-WEEK WORKOUT GENERATION (Batched)
+ * 12-WEEK WORKOUT GENERATION (Batched & Sequential)
  */
 async function generateWorkoutPlan(
   userData: UserData,
@@ -222,7 +245,7 @@ async function generateWorkoutPlan(
       - Keep evaluations and notes concise (under 200 characters).
     `;
 
-    const response = await ai.models.generateContent({
+    const response = await withRetry(() => ai.models.generateContent({
       model,
       contents: {
         parts: [{ text: prompt }],
@@ -261,7 +284,7 @@ async function generateWorkoutPlan(
           },
         },
       },
-    });
+    }));
 
     try {
       const data = JSON.parse(response.text || "{}");
@@ -272,20 +295,21 @@ async function generateWorkoutPlan(
     }
   };
 
-  // Split into 3 batches of 4 weeks to ensure reliability
-  const [batch1, batch2, batch3] = await Promise.all([
-    fetchBatch("1-4"),
-    fetchBatch("5-8"),
-    fetchBatch("9-12")
-  ]);
+  // Sequential batching to avoid high demand
+  const workoutPlan: any[] = [];
+  const batches = ["1-4", "5-8", "9-12"];
+  
+  for (const range of batches) {
+    const batch = await fetchBatch(range);
+    workoutPlan.push(...batch);
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
 
-  return { 
-    workoutPlan: [...batch1, ...batch2, ...batch3].sort((a, b) => a.week - b.week) 
-  };
+  return { workoutPlan: workoutPlan.sort((a, b) => a.week - b.week) };
 }
 
 /**
- * 12-WEEK MEAL PLAN GENERATION (Batched)
+ * 12-WEEK MEAL PLAN GENERATION (Batched & Sequential)
  */
 async function generateMealPlan(
   userData: UserData,
@@ -310,7 +334,7 @@ async function generateMealPlan(
       - Keep meal descriptions concise.
     `;
 
-    const response = await ai.models.generateContent({
+    const response = await withRetry(() => ai.models.generateContent({
       model,
       contents: {
         parts: [{ text: prompt }],
@@ -355,7 +379,7 @@ async function generateMealPlan(
           },
         },
       },
-    });
+    }));
 
     try {
       const data = JSON.parse(response.text || "{}");
@@ -366,16 +390,16 @@ async function generateMealPlan(
     }
   };
 
-  // Split into 3 batches of 4 weeks
-  const [batch1, batch2, batch3] = await Promise.all([
-    fetchBatch("1-4"),
-    fetchBatch("5-8"),
-    fetchBatch("9-12")
-  ]);
+  const mealPlan: any[] = [];
+  const batches = ["1-4", "5-8", "9-12"];
 
-  return { 
-    mealPlan: [...batch1, ...batch2, ...batch3].sort((a, b) => a.week - b.week) 
-  };
+  for (const range of batches) {
+    const batch = await fetchBatch(range);
+    mealPlan.push(...batch);
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+
+  return { mealPlan: mealPlan.sort((a, b) => a.week - b.week) };
 }
 
 export async function generateTransformationReport(
