@@ -69,39 +69,32 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 2000): Pr
 }
 
 /**
- * CORE ASSESSMENT GENERATION
+ * PHYSIQUE ANALYSIS COMPONENT
  */
-async function generateCoreAssessment(
+async function generatePhysiqueAnalysis(
   userData: UserData,
   photos: Photos | ProgressPhotos,
   path: string,
   isResubmit: boolean
-): Promise<Partial<AssessmentResult>> {
+): Promise<any> {
   const model = "gemini-3-flash-preview";
   const photoParts = getPhotoParts(path, photos);
 
   const prompt = `
-    Perform a professional physique assessment and generate core report data for "UNLCKD Pro Trainer".
+    Perform a professional physique assessment for "UNLCKD Pro Trainer".
     
     User Data:
     ${JSON.stringify(userData, null, 2)}
     
-    ${isResubmit ? "RESUBMIT MODE: Ensure maximum accuracy and completeness." : ""}
+    ${isResubmit ? "RESUBMIT MODE: Ensure maximum accuracy." : ""}
     Requested Path: ${path}
     
     ${path === 'progress' ? `
     PROGRESS PHOTO ENGINE MODE:
-    - You have been provided with up to 8 photos. The first set are "BEFORE" (Front, Back, Left, Right) from ${userData.name}'s assessment on ${(photos as ProgressPhotos).beforeDate} at a weight of ${(photos as ProgressPhotos).beforeWeight}${userData.weightUnit}.
-    - The next set are "AFTER" (Front, Back, Left, Right) from the assessment on ${(photos as ProgressPhotos).afterDate} at a weight of ${(photos as ProgressPhotos).afterWeight}${userData.weightUnit}.
-    - Compare these sets of photos meticulously. Identify visible changes in muscle density, body fat distribution, posture, and overall composition.
-    - Provide feedback focused on the DELTA (the change) between before and after.
+    Compare current photos with previous ones. Identify changes in muscle density, body fat, and posture.
     ` : ''}
 
-    FOCUS AREAS:
-    1. Comprehensive Physique Ratings & Summaries for all views (Front, Back, Left, Right).
-    2. Health Metrics (BMI, Body Fat, Calorie Targets based on current vs desired activity).
-    3. Daily Support Info (Sleep, Hydration, Recovery, Grocery List).
-    4. Motivational Quote.
+    FOCUS: Detailed Ratings & Summaries for ALL views (Front, Back, Left, Right).
   `;
 
   const response = await withRetry(() => ai.models.generateContent({
@@ -111,11 +104,8 @@ async function generateCoreAssessment(
     },
     config: {
       systemInstruction: `
-        You are a world-class premium fitness coach and physique assessor.
-        Your goal is to provide evidence-led, professional, and encouraging feedback.
-        Return ONLY valid JSON for the core assessment and support components of the UNLCKD Pro Trainer report.
-        Strictly adhere to the path constraint: ${path}.
-        Each evaluation or summary field must be under 300 characters for conciseness.
+        You are an elite physique assessor. Return ONLY valid JSON for the physique components.
+        Each evaluation or summary field must be under 200 characters.
       `,
       responseMimeType: "application/json",
       responseSchema: {
@@ -168,6 +158,48 @@ async function generateCoreAssessment(
               nextSteps: { type: Type.ARRAY, items: { type: Type.STRING } },
             },
           },
+        },
+      },
+    },
+  }));
+
+  return JSON.parse(response.text || "{}");
+}
+
+/**
+ * HEALTH & SUPPORT COMPONENT
+ */
+async function generateHealthAndSupport(
+  userData: UserData,
+  isResubmit: boolean
+): Promise<any> {
+  const model = "gemini-3-flash-preview";
+
+  const prompt = `
+    Generate health metrics and supportive guidance for "UNLCKD Pro Trainer".
+    
+    User Data:
+    ${JSON.stringify(userData, null, 2)}
+    
+    FOCUS: 
+    1. Health Metrics (BMI, Body Fat, Calorie Targets).
+    2. Daily Life (Sleep, Grocery store recommendation, Water, Steps).
+    3. Motivation and Nutrition strategies.
+  `;
+
+  const response = await withRetry(() => ai.models.generateContent({
+    model,
+    contents: {
+      parts: [{ text: prompt }],
+    },
+    config: {
+      systemInstruction: `
+        You are a performance nutritionist and lifestyle coach. Return ONLY valid JSON.
+      `,
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
           healthMetrics: {
             type: Type.OBJECT,
             properties: {
@@ -219,41 +251,25 @@ async function generateCoreAssessment(
 }
 
 /**
- * 12-WEEK WORKOUT GENERATION (Batched & Sequential)
+ * 12-WEEK WORKOUT GENERATION (Micro-Batched)
  */
 async function generateWorkoutPlan(
   userData: UserData,
   isResubmit: boolean
 ): Promise<Partial<AssessmentResult>> {
-  const model = "gemini-3-flash-preview";
-
   const fetchBatch = async (weeks: string): Promise<any[]> => {
     const prompt = `
-      Design an elite 12-week progressive workout plan for "UNLCKD Pro Trainer".
-      
-      User Data:
-      ${JSON.stringify(userData, null, 2)}
-      
-      ${isResubmit ? "RESUBMIT MODE: Double check all exercise links and completeness." : ""}
-      
-      INSTRUCTIONS:
-      - Generate only Weeks ${weeks} of the 12-week plan.
-      - Tailor the volume and intensity progression to bridge the gap between current activity (${userData.physicalActivity}) and desired activity (${userData.desiredPhysicalActivity}).
-      - 7 to 10 exercises per main session.
-      - EVERY exercise must use markdown links: "[Exercise Name (Sets x Reps)](YouTube Link)".
-      - Ensure video links exist and are high quality.
-      - Keep evaluations and notes concise (under 200 characters).
+      Design Weeks ${weeks} of an elite 12-week workout plan for "UNLCKD Pro Trainer".
+      User: ${userData.name}, Goal: ${userData.goals}.
+      EVERY exercise MUST be formatted as "[Name (Sets x Reps)](YouTube Link)".
     `;
 
     const response = await withRetry(() => ai.models.generateContent({
-      model,
-      contents: {
-        parts: [{ text: prompt }],
-      },
+      model: "gemini-3-flash-preview",
+      contents: { parts: [{ text: prompt }] },
       config: {
-        systemInstruction: "You are an elite Strength & Conditioning coach. Return ONLY a JSON object containing the 'workoutPlan' array for the requested weeks. Use high-quality YouTube links from established fitness channels.",
+        systemInstruction: "Expert S&C Coach. JSON only. Weekly workout arrays.",
         responseMimeType: "application/json",
-        maxOutputTokens: 8192,
         responseSchema: {
           type: Type.OBJECT,
           properties: {
@@ -286,63 +302,41 @@ async function generateWorkoutPlan(
       },
     }));
 
-    try {
-      const data = JSON.parse(response.text || "{}");
-      return data.workoutPlan || [];
-    } catch (e) {
-      console.error(`Error parsing batch ${weeks}:`, e);
-      throw e;
-    }
+    const data = JSON.parse(response.text || "{}");
+    return data.workoutPlan || [];
   };
 
-  // Sequential batching to avoid high demand
   const workoutPlan: any[] = [];
-  const batches = ["1-4", "5-8", "9-12"];
+  const batches = ["1-2", "3-4", "5-6", "7-8", "9-10", "11-12"];
   
   for (const range of batches) {
     const batch = await fetchBatch(range);
     workoutPlan.push(...batch);
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 800));
   }
 
   return { workoutPlan: workoutPlan.sort((a, b) => a.week - b.week) };
 }
 
 /**
- * 12-WEEK MEAL PLAN GENERATION (Batched & Sequential)
+ * 12-WEEK MEAL PLAN GENERATION (Micro-Batched)
  */
 async function generateMealPlan(
   userData: UserData,
   isResubmit: boolean
 ): Promise<Partial<AssessmentResult>> {
-  const model = "gemini-3-flash-preview";
-
   const fetchBatch = async (weeks: string): Promise<any[]> => {
     const prompt = `
-      Create a personalized 12-week meal plan for "UNLCKD Pro Trainer".
-      
-      User Data:
-      ${JSON.stringify(userData, null, 2)}
-      
-      Preference: ${userData.caloriePreference}
-      
-      INSTRUCTIONS:
-      - Generate only Weeks ${weeks} of the 12-week plan.
-      - Include recipe descriptions and links.
-      - Include full macro details for each meal.
-      - Adhere strictly to dietary considerations: ${userData.allergies || 'None'}.
-      - Keep meal descriptions concise.
+      Generate Weeks ${weeks} of a personalized 12-week meal plan.
+      User: ${userData.name}, Preferences: ${userData.caloriePreference}.
     `;
 
     const response = await withRetry(() => ai.models.generateContent({
-      model,
-      contents: {
-        parts: [{ text: prompt }],
-      },
+      model: "gemini-3-flash-preview",
+      contents: { parts: [{ text: prompt }] },
       config: {
-        systemInstruction: "You are a performance nutritionist. Return ONLY a JSON object containing the 'mealPlan' array for the requested weeks. Ensure calculations match user's goals.",
+        systemInstruction: "Nutritionist. JSON only. Weekly meal arrays with full macro breakdown.",
         responseMimeType: "application/json",
-        maxOutputTokens: 8192,
         responseSchema: {
           type: Type.OBJECT,
           properties: {
@@ -359,16 +353,12 @@ async function generateMealPlan(
                       properties: {
                         day: { type: Type.STRING },
                         breakfast: { type: Type.STRING },
-                        breakfastUrl: { type: Type.STRING },
-                        breakfastMacros: { type: Type.OBJECT, properties: { calories: { type: Type.STRING }, protein: { type: Type.STRING }, fat: { type: Type.STRING }, carbs: { type: Type.STRING } } },
                         lunch: { type: Type.STRING },
-                        lunchUrl: { type: Type.STRING },
-                        lunchMacros: { type: Type.OBJECT, properties: { calories: { type: Type.STRING }, protein: { type: Type.STRING }, fat: { type: Type.STRING }, carbs: { type: Type.STRING } } },
                         dinner: { type: Type.STRING },
-                        dinnerUrl: { type: Type.STRING },
-                        dinnerMacros: { type: Type.OBJECT, properties: { calories: { type: Type.STRING }, protein: { type: Type.STRING }, fat: { type: Type.STRING }, carbs: { type: Type.STRING } } },
                         snack: { type: Type.STRING },
-                        snackUrl: { type: Type.STRING },
+                        breakfastMacros: { type: Type.OBJECT, properties: { calories: { type: Type.STRING }, protein: { type: Type.STRING }, fat: { type: Type.STRING }, carbs: { type: Type.STRING } } },
+                        lunchMacros: { type: Type.OBJECT, properties: { calories: { type: Type.STRING }, protein: { type: Type.STRING }, fat: { type: Type.STRING }, carbs: { type: Type.STRING } } },
+                        dinnerMacros: { type: Type.OBJECT, properties: { calories: { type: Type.STRING }, protein: { type: Type.STRING }, fat: { type: Type.STRING }, carbs: { type: Type.STRING } } },
                         snackMacros: { type: Type.OBJECT, properties: { calories: { type: Type.STRING }, protein: { type: Type.STRING }, fat: { type: Type.STRING }, carbs: { type: Type.STRING } } },
                       },
                     },
@@ -381,22 +371,17 @@ async function generateMealPlan(
       },
     }));
 
-    try {
-      const data = JSON.parse(response.text || "{}");
-      return data.mealPlan || [];
-    } catch (e) {
-      console.error(`Error parsing meal batch ${weeks}:`, e);
-      throw e;
-    }
+    const data = JSON.parse(response.text || "{}");
+    return data.mealPlan || [];
   };
 
   const mealPlan: any[] = [];
-  const batches = ["1-4", "5-8", "9-12"];
+  const batches = ["1-2", "3-4", "5-6", "7-8", "9-10", "11-12"];
 
   for (const range of batches) {
     const batch = await fetchBatch(range);
     mealPlan.push(...batch);
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 800));
   }
 
   return { mealPlan: mealPlan.sort((a, b) => a.week - b.week) };
@@ -411,19 +396,20 @@ export async function generateTransformationReport(
   try {
     let result: Partial<AssessmentResult> = {};
 
-    // 1. GENERATE CORE ASSESSMENT (Always if not just meal/workout)
+    // 1. GENERATE ASSESSMENT PIECES
     if (['full', 'assessment', 'progress'].includes(path)) {
-      const core = await generateCoreAssessment(userData, photos, path, isResubmit);
-      result = { ...result, ...core };
+      const physique = await generatePhysiqueAnalysis(userData, photos, path, isResubmit);
+      const lifestyle = await generateHealthAndSupport(userData, isResubmit);
+      result = { ...result, ...physique, ...lifestyle };
     }
 
-    // 2. GENERATE WORKOUT PLAN (if requested)
+    // 2. GENERATE WORKOUT PLAN
     if (['full', 'workout'].includes(path)) {
       const workout = await generateWorkoutPlan(userData, isResubmit);
       result = { ...result, ...workout };
     }
 
-    // 3. GENERATE MEAL PLAN (if requested)
+    // 3. GENERATE MEAL PLAN
     if (['full', 'meal'].includes(path)) {
       const meal = await generateMealPlan(userData, isResubmit);
       result = { ...result, ...meal };
