@@ -83,7 +83,7 @@ function safeParseJson(text: string): any {
 /**
  * AI CALL RETRY HELPER
  */
-async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 1500): Promise<T> {
+async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 2000): Promise<T> {
   try {
     return await fn();
   } catch (error: any) {
@@ -114,7 +114,7 @@ async function generatePhysiqueAnalysis(
   path: string,
   isResubmit: boolean
 ): Promise<any> {
-  const model = "gemini-2.0-flash";
+  const model = "gemini-1.5-flash";
   const photoParts = getPhotoParts(path, photos);
 
   const prompt = `
@@ -209,7 +209,7 @@ async function generateHealthAndSupport(
   userData: UserData,
   isResubmit: boolean
 ): Promise<any> {
-  const model = "gemini-2.0-flash";
+  const model = "gemini-1.5-flash";
 
   const prompt = `
     Generate health metrics and supportive guidance for "UNLCKD Pro Trainer".
@@ -305,7 +305,7 @@ async function generateWorkoutPlan(
 
     try {
       const response = await withRetry(() => ai.models.generateContent({
-        model: "gemini-2.0-flash",
+        model: "gemini-1.5-flash",
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         config: {
           systemInstruction: "Expert S&C Coach. JSON only. Weekly workout arrays. Keep descriptions concise. Ensure exact requested weeks are provided.",
@@ -382,7 +382,7 @@ async function generateMealPlan(
 
     try {
       const response = await withRetry(() => ai.models.generateContent({
-        model: "gemini-2.0-flash",
+        model: "gemini-1.5-flash",
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         config: {
           systemInstruction: "Nutritionist. JSON only. Weekly meal arrays with macro breakdown. Keep descriptions concise. Ensure exact requested weeks are provided.",
