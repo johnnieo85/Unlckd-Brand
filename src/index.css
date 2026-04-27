@@ -19,6 +19,21 @@
 }
 
 @layer utilities {
+  @keyframes pulse-border {
+    0%, 100% {
+      border-color: rgba(16, 185, 129, 0.4);
+      box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+    }
+    50% {
+      border-color: rgba(16, 185, 129, 1);
+      box-shadow: 0 0 20px 4px rgba(16, 185, 129, 0.3);
+    }
+  }
+
+  .animate-pulse-border {
+    animation: pulse-border 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
   @media print {
     .no-print {
       display: none !important;
