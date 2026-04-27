@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   DndContext, 
   closestCenter,
@@ -48,7 +48,8 @@ import {
   ClipboardList,
   GripVertical,
   Edit2,
-  Trash2
+  Trash2,
+  Shield
 } from 'lucide-react';
 import { Card, Badge } from './ui/Card';
 import { Button } from './ui/Button';
@@ -178,6 +179,8 @@ export const ProGym = ({
   const [isMeasurementsExpanded, setIsMeasurementsExpanded] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [unlockedDates, setUnlockedDates] = useState<Set<string>>(new Set([new Date().toISOString().split('T')[0]]));
+  const [isNutritionCollapsed, setIsNutritionCollapsed] = useState(false);
+  const [isTrainingCollapsed, setIsTrainingCollapsed] = useState(false);
   const [isHubUnlocked, setIsHubUnlocked] = useState(false);
   const [pinEntry, setPinEntry] = useState('');
   const [pinSetup, setPinSetup] = useState({ pin: '', confirm: '' });
@@ -320,6 +323,35 @@ export const ProGym = ({
   };
 
   const dayOfWeek = new Date(selectedDate).getDay();
+  const getNutritionTotals = () => {
+    if (!log?.meals) return { calories: 0, protein: 0, fat: 0, carbs: 0 };
+    return log.meals.reduce((acc, meal) => ({
+      calories: acc.calories + (parseInt(meal.calories?.toString() || '0') || 0),
+      protein: acc.protein + (parseInt(meal.protein?.toString() || '0') || 0),
+      fat: acc.fat + (parseInt(meal.fat?.toString() || '0') || 0),
+      carbs: acc.carbs + (parseInt(meal.carbs?.toString() || '0') || 0),
+    }), { calories: 0, protein: 0, fat: 0, carbs: 0 });
+  };
+
+  const getTrainingTotals = () => {
+    const workout = getWorkoutForSelectedDate() as any;
+    if (!workout) return 0;
+    
+    // In manual mode, keys are mainWork, warmUp. In plan mode, keys are usually mainWorkout, warmUpSequence etc. 
+    // Need to check the actual returned structure from getWorkoutForSelectedDate
+    const warmUp = workout.warmUp || workout.warmUpSequence || [];
+    const mainWork = workout.mainWork || workout.mainWorkout || [];
+    const coolDown = workout.coolDown || workout.coolDownStretch || [];
+    
+    const parseList = (val: any) => {
+      if (Array.isArray(val)) return val.length;
+      if (typeof val === 'string' && val.trim()) return val.split('\n').length;
+      return 0;
+    };
+
+    return parseList(warmUp) + parseList(mainWork) + parseList(coolDown);
+  };
+
   const dailyMessage = motivationalMessages[dayOfWeek] || "Consistency is the key to transformation.";
 
   // Helper to find the best matching day in the workout plan
@@ -967,6 +999,33 @@ export const ProGym = ({
 
   if (!log) return null;
 
+  if (!userProfile?.hasAccess) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center space-y-6">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="p-6 bg-red-500/10 rounded-[2rem] border border-red-500/20"
+        >
+          <Shield className="w-16 h-16 text-red-500" />
+        </motion.div>
+        <div className="space-y-3 max-w-sm">
+           <h2 className="text-4xl font-display font-black text-white uppercase tracking-tighter italic">Access <span className="text-red-500">Denied</span></h2>
+           <p className="text-gray-400 font-light leading-relaxed">
+             Specialized training protocols are currently locked. Your account requires professional authorization from an UNLCKD instructor.
+           </p>
+        </div>
+        <Button 
+          variant="outline" 
+          onClick={onHomeClick}
+          className="border-white/10 hover:bg-white/5 rounded-2xl px-8"
+        >
+          Return to Dashboard
+        </Button>
+      </div>
+    );
+  }
+
   if (!isHubUnlocked) {
     const hasPin = !!userProfile?.gymPin;
     const isFirstTime = !hasPin && !isSettingPin;
@@ -1518,12 +1577,27 @@ export const ProGym = ({
                 <div className="p-2 bg-brand-primary/10 rounded-lg">
                   <Dumbbell className="w-5 h-5 text-brand-primary" />
                 </div>
-                <h3 className="font-bold text-gray-100">
-                  {log?.useManualWorkout ? 'Manual Training Log' : 'Prescribed Training'}
-                </h3>
+                <div className="flex flex-col">
+                  <h3 className="font-bold text-gray-100">
+                    {log?.useManualWorkout ? 'Manual Training Log' : 'Prescribed Training'}
+                  </h3>
+                  {isTrainingCollapsed && (
+                    <div className="flex items-center gap-3 mt-1">
+                      <span className="text-[10px] font-mono text-brand-primary font-bold">{getTrainingTotals()} EXERCISES</span>
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-2">
-                {latestReport && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setIsTrainingCollapsed(!isTrainingCollapsed)}
+                  className="text-gray-500 hover:text-white"
+                >
+                  {isTrainingCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+                </Button>
+                {!isTrainingCollapsed && latestReport && (
                   <Button 
                     variant="outline" 
                     size="sm"
@@ -1536,13 +1610,22 @@ export const ProGym = ({
                     {log?.useManualWorkout ? 'Using Manual Mode' : 'Switch to Manual'}
                   </Button>
                 )}
-                {!latestReport && (
+                {!isTrainingCollapsed && !latestReport && (
                   <Badge className="bg-brand-primary/10 text-brand-primary border-brand-primary/20 font-black text-[10px]">MANUAL MODE</Badge>
                 )}
               </div>
             </div>
             
-            <div className="space-y-6">
+            <AnimatePresence>
+              {!isTrainingCollapsed && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="overflow-hidden"
+                >
+                  <div className="space-y-6">
               {(log?.useManualWorkout || !latestReport) && (
                 <div className="space-y-4 mb-4">
                   <div className="p-4 bg-brand-primary/5 border border-brand-primary/20 rounded-xl">
@@ -1789,7 +1872,10 @@ export const ProGym = ({
                   </div>
                 </div>
               </div>
-            </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </Card>
 
           {/* Meal Log */}
           <Card className="p-8 bg-brand-surface border-white/5">
@@ -1798,26 +1884,53 @@ export const ProGym = ({
                 <div className="p-2 bg-brand-primary/10 rounded-lg">
                   <Utensils className="w-5 h-5 text-brand-primary" />
                 </div>
-                <h3 className="font-bold text-gray-100">Daily Nutrition Log</h3>
+                <div className="flex flex-col">
+                  <h3 className="font-bold text-gray-100">Daily Nutrition Log</h3>
+                  {isNutritionCollapsed && log?.meals && log.meals.length > 0 && (
+                    <div className="flex items-center gap-3 mt-1">
+                      {(() => {
+                        const totals = getNutritionTotals();
+                        return (
+                          <>
+                            <span className="text-[10px] font-mono text-brand-primary font-bold">{totals.calories} CAL</span>
+                            <span className="text-[10px] font-mono text-gray-500">{totals.protein}P / {totals.fat}F / {totals.carbs}C</span>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <Button 
-                  variant="outline" 
+                  variant="ghost" 
                   size="sm" 
-                  onClick={handleAddManualMeal}
-                  className="border-brand-primary/20 hover:bg-brand-primary/10 text-brand-primary h-7 px-2 text-[10px] font-black uppercase tracking-widest"
+                  onClick={() => setIsNutritionCollapsed(!isNutritionCollapsed)}
+                  className="text-gray-500 hover:text-white"
                 >
-                  <Plus className="w-3 h-3 mr-1" /> Add Meal
+                  {isNutritionCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
                 </Button>
-                {latestReport && (
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={importMealsFromPlan}
-                    className="border-brand-primary/20 hover:bg-brand-primary/10 text-brand-primary h-7 px-2 text-[10px] font-black uppercase tracking-widest"
-                  >
-                    Sync from Plan
-                  </Button>
+                {!isNutritionCollapsed && (
+                  <>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={handleAddManualMeal}
+                      className="border-brand-primary/20 hover:bg-brand-primary/10 text-brand-primary h-7 px-2 text-[10px] font-black uppercase tracking-widest"
+                    >
+                      <Plus className="w-3 h-3 mr-1" /> Add Meal
+                    </Button>
+                    {latestReport && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={importMealsFromPlan}
+                        className="border-brand-primary/20 hover:bg-brand-primary/10 text-brand-primary h-7 px-2 text-[10px] font-black uppercase tracking-widest"
+                      >
+                        Sync from Plan
+                      </Button>
+                    )}
+                  </>
                 )}
                 <Badge className="bg-brand-primary/10 text-brand-primary border-brand-primary/20 font-black text-[10px]">
                   {log?.useManualWorkout ? 'MANUAL EDITS ENABLED' : 'GUIDED PLAN'}
@@ -1825,8 +1938,17 @@ export const ProGym = ({
               </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
+            <AnimatePresence>
+              {!isNutritionCollapsed && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="overflow-hidden"
+                >
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
                 <thead className="text-[10px] uppercase tracking-widest text-gray-600 border-b border-brand-primary/10">
                   <tr>
                     <th className="pb-2 font-bold w-1/3">Meal</th>
@@ -1954,7 +2076,10 @@ export const ProGym = ({
                 </tbody>
               </table>
             </div>
-          </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Card>
 
           {/* Measurements */}
           <Card id="measurements-section" className="p-8 bg-brand-surface border-white/5">
