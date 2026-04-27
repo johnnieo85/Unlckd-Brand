@@ -99,7 +99,7 @@ async function generatePhysiqueAnalysis(
   path: string,
   isResubmit: boolean
 ): Promise<any> {
-  const model = "gemini-3-flash-preview";
+  const model = "gemini-1.5-flash";
   const photoParts = getPhotoParts(path, photos);
 
   const prompt = `
@@ -196,7 +196,7 @@ async function generateHealthAndSupport(
   userData: UserData,
   isResubmit: boolean
 ): Promise<any> {
-  const model = "gemini-3-flash-preview";
+  const model = "gemini-1.5-flash";
 
   const prompt = `
     Generate health metrics and supportive guidance for "UNLCKD Pro Trainer".
@@ -280,133 +280,151 @@ async function generateWorkoutPlan(
   userData: UserData,
   isResubmit: boolean
 ): Promise<Partial<AssessmentResult>> {
-  const fetchBatch = async (week: number): Promise<any[]> => {
+  const workoutPlan: any[] = [];
+  
+  const fetchBatch = async (startWeek: number, endWeek: number): Promise<any[]> => {
     const prompt = `
-      Design Week ${week} of an elite 12-week workout plan for "UNLCKD Pro Trainer".
+      Design Weeks ${startWeek} through ${endWeek} of an elite 12-week workout plan for "UNLCKD Pro Trainer".
       User: ${userData.name}, Goal: ${userData.goals}.
-      Current Week: ${week}.
+      Current Range: Weeks ${startWeek}-${endWeek}.
+      
       EVERY exercise MUST be formatted as "[Name (Sets x Reps)](YouTube Link)".
+      Return exactly ${endWeek - startWeek + 1} week objects in the workoutPlan array.
     `;
 
-    const response = await withRetry(() => ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: { parts: [{ text: prompt }] },
-      config: {
-        systemInstruction: "Expert S&C Coach. JSON only. Weekly workout arrays. Keep descriptions concise.",
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            workoutPlan: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  week: { type: Type.NUMBER },
-                  phase: { type: Type.STRING },
-                  days: {
-                    type: Type.ARRAY,
-                    items: {
-                      type: Type.OBJECT,
-                      properties: {
-                        day: { type: Type.STRING },
-                        focus: { type: Type.STRING },
-                        warmUp: { type: Type.STRING },
-                        mainWork: { type: Type.STRING },
-                        videoUrl: { type: Type.STRING },
-                        notes: { type: Type.STRING },
+    try {
+      const response = await withRetry(() => ai.models.generateContent({
+        model: "gemini-1.5-flash",
+        contents: { parts: [{ text: prompt }] },
+        config: {
+          systemInstruction: "Expert S&C Coach. JSON only. Weekly workout arrays. Keep descriptions concise and impactful. Ensure exactly requested number of weeks are provided.",
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              workoutPlan: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    week: { type: Type.NUMBER },
+                    phase: { type: Type.STRING },
+                    days: {
+                      type: Type.ARRAY,
+                      items: {
+                        type: Type.OBJECT,
+                        properties: {
+                          day: { type: Type.STRING },
+                          focus: { type: Type.STRING },
+                          warmUp: { type: Type.STRING },
+                          mainWork: { type: Type.STRING },
+                          videoUrl: { type: Type.STRING },
+                          notes: { type: Type.STRING },
+                        },
                       },
                     },
                   },
                 },
               },
             },
+            required: ["workoutPlan"]
           },
         },
-      },
-    }));
+      }));
 
-    const data = safeParseJson(response.text || "{}");
-    return data.workoutPlan || [];
+      const data = safeParseJson(response.text || "{}");
+      return data.workoutPlan || [];
+    } catch (error) {
+      console.error(`Error fetching workout weeks ${startWeek}-${endWeek}:`, error);
+      throw error;
+    }
   };
 
-  const workoutPlan: any[] = [];
+  // Fetch in batches of 4 weeks (3 calls total for 12 weeks)
+  const batches = [[1, 4], [5, 8], [9, 12]];
   
-  for (let week = 1; week <= 12; week++) {
-    const batch = await fetchBatch(week);
+  for (const [start, end] of batches) {
+    const batch = await fetchBatch(start, end);
     workoutPlan.push(...batch);
-    // Minimal delay between weeks
-    await new Promise(resolve => setTimeout(resolve, 300));
+    await new Promise(resolve => setTimeout(resolve, 500));
   }
 
   return { workoutPlan: workoutPlan.sort((a, b) => a.week - b.week) };
 }
 
 /**
- * 12-WEEK MEAL PLAN GENERATION (Micro-Batched)
+ * 12-WEEK MEAL PLAN GENERATION (Batched)
  */
 async function generateMealPlan(
   userData: UserData,
   isResubmit: boolean
 ): Promise<Partial<AssessmentResult>> {
-  const fetchBatch = async (week: number): Promise<any[]> => {
+  const mealPlan: any[] = [];
+
+  const fetchBatch = async (startWeek: number, endWeek: number): Promise<any[]> => {
     const prompt = `
-      Generate Week ${week} of a personalized 12-week meal plan.
+      Generate Weeks ${startWeek} through ${endWeek} of a personalized 12-week meal plan.
       User: ${userData.name}, Preferences: ${userData.caloriePreference}.
-      Current Week: ${week}.
+      Current Range: Weeks ${startWeek}-${endWeek}.
+      Return exactly ${endWeek - startWeek + 1} week objects in the mealPlan array.
     `;
 
-    const response = await withRetry(() => ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: { parts: [{ text: prompt }] },
-      config: {
-        systemInstruction: "Nutritionist. JSON only. Weekly meal arrays with full macro breakdown. Keep it concise.",
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            mealPlan: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  week: { type: Type.NUMBER },
-                  days: {
-                    type: Type.ARRAY,
-                    items: {
-                      type: Type.OBJECT,
-                      properties: {
-                        day: { type: Type.STRING },
-                        breakfast: { type: Type.STRING },
-                        lunch: { type: Type.STRING },
-                        dinner: { type: Type.STRING },
-                        snack: { type: Type.STRING },
-                        breakfastMacros: { type: Type.OBJECT, properties: { calories: { type: Type.STRING }, protein: { type: Type.STRING }, fat: { type: Type.STRING }, carbs: { type: Type.STRING } } },
-                        lunchMacros: { type: Type.OBJECT, properties: { calories: { type: Type.STRING }, protein: { type: Type.STRING }, fat: { type: Type.STRING }, carbs: { type: Type.STRING } } },
-                        dinnerMacros: { type: Type.OBJECT, properties: { calories: { type: Type.STRING }, protein: { type: Type.STRING }, fat: { type: Type.STRING }, carbs: { type: Type.STRING } } },
-                        snackMacros: { type: Type.OBJECT, properties: { calories: { type: Type.STRING }, protein: { type: Type.STRING }, fat: { type: Type.STRING }, carbs: { type: Type.STRING } } },
+    try {
+      const response = await withRetry(() => ai.models.generateContent({
+        model: "gemini-1.5-flash",
+        contents: { parts: [{ text: prompt }] },
+        config: {
+          systemInstruction: "Nutritionist. JSON only. Weekly meal arrays with macro breakdown. Keep descriptions concise. Ensure exactly requested number of weeks are provided.",
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              mealPlan: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    week: { type: Type.NUMBER },
+                    days: {
+                      type: Type.ARRAY,
+                      items: {
+                        type: Type.OBJECT,
+                        properties: {
+                          day: { type: Type.STRING },
+                          breakfast: { type: Type.STRING },
+                          lunch: { type: Type.STRING },
+                          dinner: { type: Type.STRING },
+                          snack: { type: Type.STRING },
+                          breakfastMacros: { type: Type.OBJECT, properties: { calories: { type: Type.STRING }, protein: { type: Type.STRING }, fat: { type: Type.STRING }, carbs: { type: Type.STRING } } },
+                          lunchMacros: { type: Type.OBJECT, properties: { calories: { type: Type.STRING }, protein: { type: Type.STRING }, fat: { type: Type.STRING }, carbs: { type: Type.STRING } } },
+                          dinnerMacros: { type: Type.OBJECT, properties: { calories: { type: Type.STRING }, protein: { type: Type.STRING }, fat: { type: Type.STRING }, carbs: { type: Type.STRING } } },
+                          snackMacros: { type: Type.OBJECT, properties: { calories: { type: Type.STRING }, protein: { type: Type.STRING }, fat: { type: Type.STRING }, carbs: { type: Type.STRING } } },
+                        },
                       },
                     },
                   },
                 },
               },
             },
+            required: ["mealPlan"]
           },
         },
-      },
-    }));
+      }));
 
-    const data = safeParseJson(response.text || "{}");
-    return data.mealPlan || [];
+      const data = safeParseJson(response.text || "{}");
+      return data.mealPlan || [];
+    } catch (error) {
+      console.error(`Error fetching meal weeks ${startWeek}-${endWeek}:`, error);
+      throw error;
+    }
   };
 
-  const mealPlan: any[] = [];
+  const batches = [[1, 4], [5, 8], [9, 12]];
 
-  for (let week = 1; week <= 12; week++) {
-    const batch = await fetchBatch(week);
+  for (const [start, end] of batches) {
+    const batch = await fetchBatch(start, end);
     mealPlan.push(...batch);
-    // Minimal delay between weeks
-    await new Promise(resolve => setTimeout(resolve, 300));
+    await new Promise(resolve => setTimeout(resolve, 500));
   }
 
   return { mealPlan: mealPlan.sort((a, b) => a.week - b.week) };
@@ -418,26 +436,51 @@ export async function generateTransformationReport(
   path: string,
   isResubmit: boolean = false
 ): Promise<AssessmentResult> {
+  // Truncate goals if extremely long
+  const cleanUserData = {
+    ...userData,
+    goals: userData.goals?.length > 1000 ? userData.goals.substring(0, 1000) + '...' : userData.goals
+  };
+
   try {
     let result: Partial<AssessmentResult> = {};
 
     // 1. GENERATE ASSESSMENT PIECES
     if (['full', 'assessment', 'progress'].includes(path)) {
-      const physique = await generatePhysiqueAnalysis(userData, photos, path, isResubmit);
-      const lifestyle = await generateHealthAndSupport(userData, isResubmit);
-      result = { ...result, ...physique, ...lifestyle };
+      try {
+        console.log("Generating physique analysis...");
+        const physique = await generatePhysiqueAnalysis(cleanUserData, photos, path, isResubmit);
+        console.log("Generating health and support...");
+        const lifestyle = await generateHealthAndSupport(cleanUserData, isResubmit);
+        result = { ...result, ...physique, ...lifestyle };
+      } catch (e) {
+        console.error("Analysis step failed:", e);
+        throw new Error(`Analysis failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
+      }
     }
 
     // 2. GENERATE WORKOUT PLAN
     if (['full', 'workout'].includes(path)) {
-      const workout = await generateWorkoutPlan(userData, isResubmit);
-      result = { ...result, ...workout };
+      try {
+        console.log("Generating 12-week workout plan...");
+        const workout = await generateWorkoutPlan(cleanUserData, isResubmit);
+        result = { ...result, ...workout };
+      } catch (e) {
+        console.error("Workout generation failed:", e);
+        throw new Error(`Workout plan generation failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
+      }
     }
 
     // 3. GENERATE MEAL PLAN
     if (['full', 'meal'].includes(path)) {
-      const meal = await generateMealPlan(userData, isResubmit);
-      result = { ...result, ...meal };
+      try {
+        console.log("Generating 12-week meal plan...");
+        const meal = await generateMealPlan(cleanUserData, isResubmit);
+        result = { ...result, ...meal };
+      } catch (e) {
+        console.error("Meal generation failed:", e);
+        throw new Error(`Meal plan generation failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
+      }
     }
 
     // Final Validation & Cleanup
@@ -455,16 +498,16 @@ export async function generateTransformationReport(
     const checks: { name: string; pass: boolean; error: string }[] = [];
     if (['full', 'workout'].includes(path)) {
       checks.push({
-        name: "12-Week Workout Plan Completeness",
+        name: "12-Week Workout Plan",
         pass: (finalResult.workoutPlan?.length || 0) >= 12,
-        error: `Workout plan contains only ${finalResult.workoutPlan?.length || 0} weeks. All 12 weeks are required.`
+        error: `Workout plan incomplete (${finalResult.workoutPlan?.length || 0}/12 weeks).`
       });
     }
     if (['full', 'meal'].includes(path)) {
       checks.push({
-        name: "12-Week Meal Plan Completeness",
+        name: "12-Week Meal Plan",
         pass: (finalResult.mealPlan?.length || 0) >= 12,
-        error: `Meal plan contains only ${finalResult.mealPlan?.length || 0} weeks. All 12 weeks are required.`
+        error: `Meal plan incomplete (${finalResult.mealPlan?.length || 0}/12 weeks).`
       });
     }
 
@@ -476,10 +519,12 @@ export async function generateTransformationReport(
     return finalResult;
   } catch (error: any) {
     console.error("Gemini Multi-Step Error:", error);
-    // Provide a clear user-facing error
-    if (error instanceof SyntaxError) {
-      throw new Error("The AI response was invalid. This often happens with very large reports. Please try shortening your goal description or try again.");
+    
+    // Handle JSON syntax errors specifically
+    if (error instanceof SyntaxError || error.message?.includes('JSON')) {
+      throw new Error("The AI response format was invalid. This often happens with very detailed requests. Please try again or slightly shorten your goals.");
     }
+    
     throw new Error(error.message || "An error occurred during report generation. Please try again.");
   }
 }
