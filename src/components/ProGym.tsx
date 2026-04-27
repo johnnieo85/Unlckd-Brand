@@ -46,7 +46,9 @@ import {
   Settings,
   BarChart3,
   ClipboardList,
-  GripVertical
+  GripVertical,
+  Edit2,
+  Trash2
 } from 'lucide-react';
 import { Card, Badge } from './ui/Card';
 import { Button } from './ui/Button';
@@ -846,6 +848,12 @@ export const ProGym = ({
     };
     await gymService.addMeasurement(measurement);
     setIsAddingMeasurement(false);
+    loadData(selectedDate);
+  };
+
+  const handleDeleteMeasurement = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this measurement?')) return;
+    await gymService.deleteMeasurement(id);
     loadData(selectedDate);
   };
 
@@ -1949,7 +1957,7 @@ export const ProGym = ({
           </Card>
 
           {/* Measurements */}
-          <Card className="p-8 bg-brand-surface border-white/5">
+          <Card id="measurements-section" className="p-8 bg-brand-surface border-white/5">
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-purple-500/10 rounded-lg">
@@ -2088,11 +2096,12 @@ export const ProGym = ({
                       <th className="pb-4 font-bold">Waist/Neck</th>
                       <th className="pb-4 font-bold">Arms (L/R)</th>
                       <th className="pb-4 font-bold">Thighs (L/R)</th>
+                      <th className="pb-4 font-bold text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="text-sm">
                     {measurements.map((m) => (
-                      <tr key={m.id} className="border-b border-white/[0.02] last:border-0">
+                      <tr key={m.id} className="border-b border-white/[0.02] last:border-0 group">
                         <td className="py-4 text-gray-400">{new Date(m.date).toLocaleDateString()}</td>
                         <td className="py-4 font-mono text-gray-200">{m.weight}{m.units?.weight || 'kg'}</td>
                         <td className="py-4 font-mono text-gray-200">{m.bodyFat || 0}%</td>
@@ -2104,6 +2113,28 @@ export const ProGym = ({
                         </td>
                         <td className="py-4 font-mono text-gray-200">
                           {m.leftThigh || '-'}/{m.rightThigh || '-'}{m.units?.length || 'cm'}
+                        </td>
+                        <td className="py-4 text-right">
+                          <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button 
+                              onClick={() => {
+                                setSelectedDate(m.date);
+                                setIsAddingMeasurement(true);
+                                document.getElementById('measurements-section')?.scrollIntoView({ behavior: 'smooth' });
+                              }}
+                              className="p-1.5 hover:bg-white/5 rounded-lg text-gray-500 hover:text-brand-primary"
+                              title="Edit Entry"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteMeasurement(m.id)}
+                              className="p-1.5 hover:bg-white/5 rounded-lg text-gray-500 hover:text-red-500"
+                              title="Delete Entry"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}

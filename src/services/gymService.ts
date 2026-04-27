@@ -131,6 +131,20 @@ export const gymService = {
     }
   },
 
+  async deleteMeasurement(id: string): Promise<void> {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const path = `users/${user.uid}/measurements/${id}`;
+    try {
+      const { deleteDoc } = await import('firebase/firestore');
+      const docRef = doc(db, 'users', user.uid, 'measurements', id);
+      await deleteDoc(docRef);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+    }
+  },
+
   async getLogsInRange(startDate: string, endDate: string): Promise<DailyLog[]> {
     const user = auth.currentUser;
     if (!user) return [];
