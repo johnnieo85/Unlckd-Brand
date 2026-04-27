@@ -55,6 +55,19 @@ import { gymService } from '../services/gymService';
 import { DailyLog, SavedReport, Measurement, UserProfile, Badge as UserBadge } from '../types';
 import { cn } from '../lib/utils';
 import { updateGymPin, updateUserProfile } from '../services/accessService';
+import { 
+  LineChart, 
+  Line, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer, 
+  ReferenceLine,
+  Scatter,
+  ScatterChart,
+  ZAxis
+} from 'recharts';
 
 const SortableTracker = ({ id, children }: { id: string; children: React.ReactNode }) => {
   const {
@@ -886,8 +899,13 @@ export const ProGym = ({
     const firstDay = new Date(year, month, 1).toISOString().split('T')[0];
     const lastDay = new Date(year, month + 1, 0).toISOString().split('T')[0];
     
-    const logs = await gymService.getLogsInRange(firstDay, lastDay);
+    const [logs, monthMeasurements] = await Promise.all([
+      gymService.getLogsInRange(firstDay, lastDay),
+      gymService.getMeasurementsInRange(firstDay, lastDay)
+    ]);
+
     setReportLogs(logs);
+    setMeasurements(monthMeasurements);
     setIsReportLoading(false);
   };
 
@@ -2398,121 +2416,204 @@ export const ProGym = ({
               </div>
             </div>
 
-            <div className="overflow-x-auto pb-6 custom-scrollbar">
-              <div className="min-w-[1050px]">
-                <div className="grid grid-cols-[260px_repeat(31,minmax(28px,1fr))] gap-y-4 items-center relative">
-                  {/* Calendar Days Header */}
-                  <div className="sticky left-0 z-30 bg-brand-surface text-[10px] font-black text-gray-500 uppercase tracking-widest p-3 border-r border-white/10 shadow-[4px_0_12px_rgba(0,0,0,0.4)]">
-                    Habit & Accuracy
+            <div className="overflow-x-auto pb-6 custom-scrollbar scroll-smooth">
+              {(() => {
+                const daysInMonth = new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0).getDate();
+                return (
+                  <div className="min-w-fit">
+                    <div 
+                      className="grid items-center relative"
+                      style={{ 
+                        gridTemplateColumns: `minmax(180px, 240px) repeat(${daysInMonth}, 32px)` 
+                      }}
+                    >
+                      {/* Calendar Days Header */}
+                      <div className="sticky left-0 z-30 bg-brand-surface text-[10px] font-black text-gray-500 uppercase tracking-widest p-3 border-r border-white/10 shadow-[4px_0_12px_rgba(0,0,0,0.4)] h-12 flex items-center">
+                        Habit & Accuracy
+                      </div>
+                      {Array.from({ length: daysInMonth }).map((_, i) => (
+                        <div key={i} className="text-[10px] font-mono text-gray-600 text-center sticky top-0 bg-brand-surface z-10 h-12 flex items-center justify-center border-b border-white/5">{i + 1}</div>
+                      ))}
+
+                      {/* Habit Rows */}
+                      {habitList.map((habit) => {
+                        const isCurrentMonth = reportDate.getMonth() === new Date().getMonth() && reportDate.getFullYear() === new Date().getFullYear();
+                        const daysToConsider = isCurrentMonth ? new Date().getDate() : daysInMonth;
+                        
+                        const completions = reportLogs.filter(l => l.habits?.[habit]).length;
+                        const percentage = Math.round((completions / Math.max(1, daysToConsider)) * 100);
+
+                        return (
+                          <React.Fragment key={habit}>
+                            <div className="sticky left-0 z-20 bg-brand-surface flex items-center justify-between gap-3 pl-3 pr-4 min-w-0 h-10 border-r border-white/10 shadow-[4px_0_12px_rgba(0,0,0,0.4)]">
+                              <span className="text-xs font-bold text-gray-100 truncate flex-1">{habit}</span>
+                              <span className="text-[10px] font-mono font-black text-brand-primary shrink-0 bg-brand-primary/10 px-1.5 py-0.5 rounded border border-brand-primary/20">{percentage}%</span>
+                            </div>
+                            {Array.from({ length: daysInMonth }).map((_, i) => {
+                              const day = i + 1;
+                              const dateStr = `${reportDate.getFullYear()}-${String(reportDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                              const logAtDate = reportLogs.find(l => l.date === dateStr);
+                              const isDone = logAtDate?.habits?.[habit] || false;
+                              const isFuture = new Date(dateStr) > new Date();
+
+                              return (
+                                <div key={i} className="flex justify-center h-10 items-center bg-white/[0.01] border-b border-white/[0.02]">
+                                  {isFuture ? (
+                                    <div className="w-2 h-2 rounded-full bg-white/[0.03]" />
+                                  ) : isDone ? (
+                                    <motion.div 
+                                      initial={{ scale: 0 }}
+                                      animate={{ scale: 1 }}
+                                      className="w-2.5 h-2.5 rounded-full bg-brand-primary shadow-[0_0_8px_rgba(16,185,129,0.4)]" 
+                                    />
+                                  ) : (
+                                    <div className="w-2 h-2 rounded-full border border-white/10" />
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </React.Fragment>
+                        );
+                      })}
+
+                      {/* Built-in Metrics Rows */}
+                      <div className="col-span-full border-t border-white/10 my-2" />
+                      
+                      {(() => {
+                        const isCurrentMonth = reportDate.getMonth() === new Date().getMonth() && reportDate.getFullYear() === new Date().getFullYear();
+                        const daysToConsider = isCurrentMonth ? new Date().getDate() : daysInMonth;
+                        
+                        const stepCompletions = reportLogs.filter(l => l.steps >= l.stepGoal).length;
+                        const stepPercentage = Math.round((stepCompletions / Math.max(1, daysToConsider)) * 100);
+                        
+                        const waterCompletions = reportLogs.filter(l => l.water >= l.waterGoal).length;
+                        const waterPercentage = Math.round((waterCompletions / Math.max(1, daysToConsider)) * 100);
+
+                        return (
+                          <>
+                            <div className="sticky left-0 z-20 bg-brand-surface flex items-center justify-between gap-3 pl-3 pr-4 min-w-0 h-10 border-r border-white/10 shadow-[4px_0_12px_rgba(0,0,0,0.4)]">
+                              <span className="text-xs font-bold text-gray-100 truncate flex-1">10K Step Goal</span>
+                              <span className="text-[10px] font-mono font-black text-emerald-500 shrink-0 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">{stepPercentage}%</span>
+                            </div>
+                            {Array.from({ length: daysInMonth }).map((_, i) => {
+                              const day = i + 1;
+                              const dateStr = `${reportDate.getFullYear()}-${String(reportDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                              const logAtDate = reportLogs.find(l => l.date === dateStr);
+                              const isDone = logAtDate && logAtDate.steps >= logAtDate.stepGoal;
+                              const isFuture = new Date(dateStr) > new Date();
+
+                              return (
+                                <div key={i} className="flex justify-center h-10 items-center bg-white/[0.01] border-b border-white/[0.02]">
+                                  {isFuture ? <div className="w-2 h-2 rounded-full bg-white/[0.03]" /> :
+                                   isDone ? <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" /> :
+                                   <div className="w-2 h-2 rounded-full border border-white/10" />
+                                  }
+                                </div>
+                              );
+                            })}
+
+                            <div className="sticky left-0 z-20 bg-brand-surface flex items-center justify-between gap-3 pl-3 pr-4 min-w-0 h-10 border-r border-white/10 shadow-[4px_0_12px_rgba(0,0,0,0.4)]">
+                              <span className="text-xs font-bold text-gray-100 truncate flex-1">Hydration Target</span>
+                              <span className="text-[10px] font-mono font-black text-blue-500 shrink-0 bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20">{waterPercentage}%</span>
+                            </div>
+                            {Array.from({ length: daysInMonth }).map((_, i) => {
+                              const day = i + 1;
+                              const dateStr = `${reportDate.getFullYear()}-${String(reportDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                              const logAtDate = reportLogs.find(l => l.date === dateStr);
+                              const isDone = logAtDate && logAtDate.water >= logAtDate.waterGoal;
+                              const isFuture = new Date(dateStr) > new Date();
+
+                              return (
+                                <div key={i} className="flex justify-center h-10 items-center bg-white/[0.01] border-b border-white/[0.02]">
+                                  {isFuture ? <div className="w-2 h-2 rounded-full bg-white/[0.03]" /> :
+                                   isDone ? <div className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.4)]" /> :
+                                   <div className="w-2 h-2 rounded-full border border-white/10" />
+                                  }
+                                </div>
+                              );
+                            })}
+                          </>
+                        );
+                      })()}
+                    </div>
                   </div>
-                  {Array.from({ length: new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0).getDate() }).map((_, i) => (
-                    <div key={i} className="text-[10px] font-mono text-gray-600 text-center sticky top-0 bg-brand-surface z-10 py-3 border-b border-white/5">{i + 1}</div>
-                  ))}
+                );
+              })()}
+            </div>
+          </Card>
 
-                  {/* Habit Rows */}
-                  {habitList.map((habit) => {
-                    const daysInMonth = new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0).getDate();
-                    const isCurrentMonth = reportDate.getMonth() === new Date().getMonth() && reportDate.getFullYear() === new Date().getFullYear();
-                    const daysToConsider = isCurrentMonth ? new Date().getDate() : daysInMonth;
-                    
-                    const completions = reportLogs.filter(l => l.habits?.[habit]).length;
-                    const percentage = Math.round((completions / Math.max(1, daysToConsider)) * 100);
-
-                    return (
-                      <React.Fragment key={habit}>
-                        <div className="sticky left-0 z-20 bg-brand-surface flex items-center justify-start gap-3 pl-3 pr-4 min-w-0 py-2 border-r border-white/10 shadow-[4px_0_12px_rgba(0,0,0,0.4)] w-[260px]">
-                          <span className="text-xs font-bold text-gray-100 truncate flex-1">{habit}</span>
-                          <span className="text-[10px] font-mono font-black text-brand-primary shrink-0 bg-brand-primary/10 px-1.5 py-0.5 rounded border border-brand-primary/20">{percentage}%</span>
-                        </div>
-                        {Array.from({ length: daysInMonth }).map((_, i) => {
-                          const day = i + 1;
-                          const dateStr = `${reportDate.getFullYear()}-${String(reportDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                          const logAtDate = reportLogs.find(l => l.date === dateStr);
-                          const isDone = logAtDate?.habits?.[habit] || false;
-                          const isFuture = new Date(dateStr) > new Date();
-
-                          return (
-                            <div key={i} className="flex justify-center h-8 items-center bg-white/[0.01]">
-                              {isFuture ? (
-                                <div className="w-2 h-2 rounded-full bg-white/[0.03]" />
-                              ) : isDone ? (
-                                <motion.div 
-                                  initial={{ scale: 0 }}
-                                  animate={{ scale: 1 }}
-                                  className="w-2.5 h-2.5 rounded-full bg-brand-primary shadow-[0_0_8px_rgba(16,185,129,0.4)]" 
-                                />
-                              ) : (
-                                <div className="w-2 h-2 rounded-full border border-white/10" />
-                              )}
-                            </div>
-                          );
-                        })}
-                      </React.Fragment>
-                    );
-                  })}
-
-                  {/* Built-in Metrics Rows */}
-                  <div className="col-span-full border-t border-white/10 my-4" />
-                  
-                  {(() => {
-                    const daysInMonth = new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0).getDate();
-                    const isCurrentMonth = reportDate.getMonth() === new Date().getMonth() && reportDate.getFullYear() === new Date().getFullYear();
-                    const daysToConsider = isCurrentMonth ? new Date().getDate() : daysInMonth;
-                    
-                    const stepCompletions = reportLogs.filter(l => l.steps >= l.stepGoal).length;
-                    const stepPercentage = Math.round((stepCompletions / Math.max(1, daysToConsider)) * 100);
-                    
-                    const waterCompletions = reportLogs.filter(l => l.water >= l.waterGoal).length;
-                    const waterPercentage = Math.round((waterCompletions / Math.max(1, daysToConsider)) * 100);
-
-                    return (
-                      <>
-                        <div className="sticky left-0 z-20 bg-brand-surface flex items-center justify-start gap-3 pl-3 pr-4 min-w-0 py-2 border-r border-white/10 shadow-[4px_0_12px_rgba(0,0,0,0.4)] w-[260px]">
-                          <span className="text-xs font-bold text-gray-100 truncate flex-1">10K Step Goal</span>
-                          <span className="text-[10px] font-mono font-black text-emerald-500 shrink-0 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">{stepPercentage}%</span>
-                        </div>
-                        {Array.from({ length: daysInMonth }).map((_, i) => {
-                          const day = i + 1;
-                          const dateStr = `${reportDate.getFullYear()}-${String(reportDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                          const logAtDate = reportLogs.find(l => l.date === dateStr);
-                          const isDone = logAtDate && logAtDate.steps >= logAtDate.stepGoal;
-                          const isFuture = new Date(dateStr) > new Date();
-
-                          return (
-                            <div key={i} className="flex justify-center h-8 items-center bg-white/[0.01]">
-                              {isFuture ? <div className="w-2 h-2 rounded-full bg-white/[0.03]" /> :
-                               isDone ? <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" /> :
-                               <div className="w-2 h-2 rounded-full border border-white/10" />
-                              }
-                            </div>
-                          );
-                        })}
-
-                        <div className="sticky left-0 z-20 bg-brand-surface flex items-center justify-start gap-3 pl-3 pr-4 min-w-0 py-2 border-r border-white/10 shadow-[4px_0_12px_rgba(0,0,0,0.4)] w-[260px]">
-                          <span className="text-xs font-bold text-gray-100 truncate flex-1">Hydration Target</span>
-                          <span className="text-[10px] font-mono font-black text-blue-500 shrink-0 bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20">{waterPercentage}%</span>
-                        </div>
-                        {Array.from({ length: daysInMonth }).map((_, i) => {
-                          const day = i + 1;
-                          const dateStr = `${reportDate.getFullYear()}-${String(reportDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                          const logAtDate = reportLogs.find(l => l.date === dateStr);
-                          const isDone = logAtDate && logAtDate.water >= logAtDate.waterGoal;
-                          const isFuture = new Date(dateStr) > new Date();
-
-                          return (
-                            <div key={i} className="flex justify-center h-8 items-center bg-white/[0.01]">
-                              {isFuture ? <div className="w-2 h-2 rounded-full bg-white/[0.03]" /> :
-                               isDone ? <div className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.4)]" /> :
-                               <div className="w-2 h-2 rounded-full border border-white/10" />
-                              }
-                            </div>
-                          );
-                        })}
-                      </>
-                    );
-                  })()}
+          {/* Weight Progression Chart */}
+          <Card className="p-8 bg-brand-surface border-white/5">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-emerald-500/10 rounded-lg">
+                  <TrendingUp className="w-5 h-5 text-emerald-500" />
                 </div>
+                <h3 className="font-bold text-gray-100 uppercase tracking-widest text-sm">Weight Progression</h3>
               </div>
+              <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-gray-500">
+                 Current: <span className="text-white ml-1">{measurements.length > 0 ? `${measurements[0].weight}${measurements[0].units.weight}` : '--'}</span>
+              </div>
+            </div>
+
+            <div className="h-[300px] w-full">
+              {measurements.length > 1 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={measurements
+                      .filter(m => m.weight)
+                      .map(m => ({
+                        date: new Date(m.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
+                        weight: m.weight,
+                        rawDate: m.date
+                      }))
+                      .sort((a, b) => a.rawDate.localeCompare(b.rawDate))
+                    }
+                    margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={false} />
+                    <XAxis 
+                      dataKey="date" 
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#737373', fontSize: 10, fontWeight: 900 }}
+                      dy={10}
+                    />
+                    <YAxis 
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#737373', fontSize: 10, fontWeight: 900 }}
+                      domain={['auto', 'auto']}
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: '#0A0A0A', 
+                        border: '1px solid rgba(255,255,255,0.05)',
+                        borderRadius: '12px',
+                        fontSize: '12px',
+                        color: '#fff'
+                      }}
+                      itemStyle={{ color: '#10b981', fontWeight: 900 }}
+                      labelStyle={{ color: '#737373', marginBottom: '4px', fontWeight: 500 }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="weight" 
+                      stroke="#10b981" 
+                      strokeWidth={3}
+                      dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#000' }}
+                      activeDot={{ r: 6, fill: '#10b981', strokeWidth: 0 }}
+                      animationDuration={1500}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center text-gray-500 gap-3 border border-dashed border-white/5 rounded-2xl">
+                  <TrendingUp className="w-8 h-8 opacity-20" />
+                  <p className="text-[10px] font-black uppercase tracking-widest">Insufficient data for chart</p>
+                  <p className="text-[10px] font-bold text-gray-600">Add at least two weight entries this month</p>
+                </div>
+              )}
             </div>
           </Card>
         </div>
