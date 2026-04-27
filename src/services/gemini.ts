@@ -46,22 +46,36 @@ const getPhotoParts = (path: string, photos: Photos | ProgressPhotos): any[] => 
 };
 
 /**
- * Safely parses JSON from a string, handling potential markdown wrappers
+ * Safely parses JSON from a string, handling potential markdown wrappers or prefix text
  */
 function safeParseJson(text: string): any {
   if (!text) return {};
+  const cleaned = text.trim();
   try {
-    return JSON.parse(text);
+    return JSON.parse(cleaned);
   } catch (e) {
     // Try to extract JSON from markdown code blocks
-    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    const jsonMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
     if (jsonMatch && jsonMatch[1]) {
       try {
         return JSON.parse(jsonMatch[1]);
       } catch (innerE) {
-        throw new SyntaxError(`Failed to parse extracted JSON: ${innerE.message}`);
+        // fallback to further cleaning below
       }
     }
+    
+    // Last ditch effort: find the first { and last }
+    const firstBrace = cleaned.indexOf('{');
+    const lastBrace = cleaned.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      const maybeJson = cleaned.substring(firstBrace, lastBrace + 1);
+      try {
+        return JSON.parse(maybeJson);
+      } catch (innerE) {
+        throw new SyntaxError(`AI returned malformed JSON: ${innerE.message}`);
+      }
+    }
+    
     throw e;
   }
 }
@@ -69,7 +83,7 @@ function safeParseJson(text: string): any {
 /**
  * AI CALL RETRY HELPER
  */
-async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 2000): Promise<T> {
+async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 1500): Promise<T> {
   try {
     return await fn();
   } catch (error: any) {
@@ -78,11 +92,12 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 2000): Pr
       error.message?.includes('high demand') ||
       error.message?.includes('504') ||
       error.message?.includes('429') ||
+      error.message?.includes('deadline exceeded') ||
       error.status === 'UNAVAILABLE' ||
       error.message?.includes('fetch failed');
 
     if (retries > 0 && isRetryable) {
-      console.warn(`AI model busy or network error. Retrying in ${delay}ms... (${retries} attempts left)`);
+      console.warn(`Gemini busy or network error. Retrying in ${delay}ms... (${retries} attempts left)`);
       await new Promise(resolve => setTimeout(resolve, delay));
       return withRetry(fn, retries - 1, delay * 2); // Exponential backoff
     }
@@ -99,7 +114,7 @@ async function generatePhysiqueAnalysis(
   path: string,
   isResubmit: boolean
 ): Promise<any> {
-  const model = "gemini-1.5-flash";
+  const model = "gemini-2.0-flash";
   const photoParts = getPhotoParts(path, photos);
 
   const prompt = `
@@ -122,13 +137,11 @@ async function generatePhysiqueAnalysis(
 
   const response = await withRetry(() => ai.models.generateContent({
     model,
-    contents: {
-      parts: [{ text: prompt }, ...photoParts],
-    },
+    contents: [{ role: "user", parts: [{ text: prompt }, ...photoParts] }],
     config: {
       systemInstruction: `
         You are an elite physique assessor. Return ONLY valid JSON for the physique components.
-        Each evaluation or summary field must be under 200 characters to ensure the response isn't too large.
+        Each evaluation or summary field must be under 150 characters to ensure the response remains stable.
       `,
       responseMimeType: "application/json",
       responseSchema: {
@@ -196,7 +209,7 @@ async function generateHealthAndSupport(
   userData: UserData,
   isResubmit: boolean
 ): Promise<any> {
-  const model = "gemini-1.5-flash";
+  const model = "gemini-2.0-flash";
 
   const prompt = `
     Generate health metrics and supportive guidance for "UNLCKD Pro Trainer".
@@ -212,9 +225,7 @@ async function generateHealthAndSupport(
 
   const response = await withRetry(() => ai.models.generateContent({
     model,
-    contents: {
-      parts: [{ text: prompt }],
-    },
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
     config: {
       systemInstruction: `
         You are a performance nutritionist and lifestyle coach. Return ONLY valid JSON.
@@ -274,7 +285,7 @@ async function generateHealthAndSupport(
 }
 
 /**
- * 12-WEEK WORKOUT GENERATION (Micro-Batched)
+ * 12-WEEK WORKOUT GENERATION (Batched)
  */
 async function generateWorkoutPlan(
   userData: UserData,
@@ -294,10 +305,10 @@ async function generateWorkoutPlan(
 
     try {
       const response = await withRetry(() => ai.models.generateContent({
-        model: "gemini-1.5-flash",
-        contents: { parts: [{ text: prompt }] },
+        model: "gemini-2.0-flash",
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
         config: {
-          systemInstruction: "Expert S&C Coach. JSON only. Weekly workout arrays. Keep descriptions concise and impactful. Ensure exactly requested number of weeks are provided.",
+          systemInstruction: "Expert S&C Coach. JSON only. Weekly workout arrays. Keep descriptions concise. Ensure exact requested weeks are provided.",
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.OBJECT,
@@ -340,13 +351,13 @@ async function generateWorkoutPlan(
     }
   };
 
-  // Fetch in batches of 4 weeks (3 calls total for 12 weeks)
-  const batches = [[1, 4], [5, 8], [9, 12]];
+  // Process in smaller batches of 2-3 weeks for higher reliability in Flash
+  const batches = [[1, 3], [4, 6], [7, 9], [10, 12]];
   
   for (const [start, end] of batches) {
     const batch = await fetchBatch(start, end);
     workoutPlan.push(...batch);
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 300));
   }
 
   return { workoutPlan: workoutPlan.sort((a, b) => a.week - b.week) };
@@ -371,10 +382,10 @@ async function generateMealPlan(
 
     try {
       const response = await withRetry(() => ai.models.generateContent({
-        model: "gemini-1.5-flash",
-        contents: { parts: [{ text: prompt }] },
+        model: "gemini-2.0-flash",
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
         config: {
-          systemInstruction: "Nutritionist. JSON only. Weekly meal arrays with macro breakdown. Keep descriptions concise. Ensure exactly requested number of weeks are provided.",
+          systemInstruction: "Nutritionist. JSON only. Weekly meal arrays with macro breakdown. Keep descriptions concise. Ensure exact requested weeks are provided.",
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.OBJECT,
@@ -419,12 +430,12 @@ async function generateMealPlan(
     }
   };
 
-  const batches = [[1, 4], [5, 8], [9, 12]];
+  const batches = [[1, 3], [4, 6], [7, 9], [10, 12]];
 
   for (const [start, end] of batches) {
     const batch = await fetchBatch(start, end);
     mealPlan.push(...batch);
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 300));
   }
 
   return { mealPlan: mealPlan.sort((a, b) => a.week - b.week) };
