@@ -2318,10 +2318,13 @@ export default function App() {
                 <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest pl-1">Activation PIN</label>
                 <Input 
                   type="password"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  autoComplete="one-time-code"
                   placeholder="••••"
                   maxLength={4}
                   value={gymAuthPin}
-                  onChange={(e) => setGymAuthPin(e.target.value)}
+                  onChange={(e) => setGymAuthPin(e.target.value.replace(/\D/g, ''))}
                   className="text-center text-2xl tracking-[1em] font-mono"
                 />
               </div>

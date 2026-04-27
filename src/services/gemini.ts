@@ -196,7 +196,7 @@ async function generateCoreAssessment(
 }
 
 /**
- * 12-WEEK WORKOUT GENERATION
+ * 12-WEEK WORKOUT GENERATION (Batched)
  */
 async function generateWorkoutPlan(
   userData: UserData,
@@ -204,51 +204,55 @@ async function generateWorkoutPlan(
 ): Promise<Partial<AssessmentResult>> {
   const model = "gemini-3-flash-preview";
 
-  const prompt = `
-    Design an elite 12-week progressive workout plan for "UNLCKD Pro Trainer".
-    
-    User Data:
-    ${JSON.stringify(userData, null, 2)}
-    
-    ${isResubmit ? "RESUBMIT MODE: Double check all exercise links and 12-week completeness." : ""}
-    
-    INSTRUCTIONS:
-    - Exactly 12 weeks.
-    - Tailor the volume and intensity progression to bridge the gap between current activity (${userData.physicalActivity}) and desired activity (${userData.desiredPhysicalActivity}).
-    - 7 to 10 exercises per main session.
-    - EVERY exercise must use markdown links: "[Exercise Name (Sets x Reps)](YouTube Link)".
-    - Ensure video links exist and are high quality.
-  `;
+  const fetchBatch = async (weeks: string): Promise<any[]> => {
+    const prompt = `
+      Design an elite 12-week progressive workout plan for "UNLCKD Pro Trainer".
+      
+      User Data:
+      ${JSON.stringify(userData, null, 2)}
+      
+      ${isResubmit ? "RESUBMIT MODE: Double check all exercise links and completeness." : ""}
+      
+      INSTRUCTIONS:
+      - Generate only Weeks ${weeks} of the 12-week plan.
+      - Tailor the volume and intensity progression to bridge the gap between current activity (${userData.physicalActivity}) and desired activity (${userData.desiredPhysicalActivity}).
+      - 7 to 10 exercises per main session.
+      - EVERY exercise must use markdown links: "[Exercise Name (Sets x Reps)](YouTube Link)".
+      - Ensure video links exist and are high quality.
+      - Keep evaluations and notes concise (under 200 characters).
+    `;
 
-  const response = await ai.models.generateContent({
-    model,
-    contents: {
-      parts: [{ text: prompt }],
-    },
-    config: {
-      systemInstruction: "You are an elite Strength & Conditioning coach. Return ONLY a JSON object containing the 'workoutPlan' array with exactly 12 weeks. Use high-quality YouTube links from established fitness channels.",
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          workoutPlan: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                week: { type: Type.NUMBER },
-                phase: { type: Type.STRING },
-                days: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      day: { type: Type.STRING },
-                      focus: { type: Type.STRING },
-                      warmUp: { type: Type.STRING },
-                      mainWork: { type: Type.STRING },
-                      videoUrl: { type: Type.STRING },
-                      notes: { type: Type.STRING },
+    const response = await ai.models.generateContent({
+      model,
+      contents: {
+        parts: [{ text: prompt }],
+      },
+      config: {
+        systemInstruction: "You are an elite Strength & Conditioning coach. Return ONLY a JSON object containing the 'workoutPlan' array for the requested weeks. Use high-quality YouTube links from established fitness channels.",
+        responseMimeType: "application/json",
+        maxOutputTokens: 8192,
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            workoutPlan: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  week: { type: Type.NUMBER },
+                  phase: { type: Type.STRING },
+                  days: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        day: { type: Type.STRING },
+                        focus: { type: Type.STRING },
+                        warmUp: { type: Type.STRING },
+                        mainWork: { type: Type.STRING },
+                        videoUrl: { type: Type.STRING },
+                        notes: { type: Type.STRING },
+                      },
                     },
                   },
                 },
@@ -257,14 +261,31 @@ async function generateWorkoutPlan(
           },
         },
       },
-    },
-  });
+    });
 
-  return JSON.parse(response.text || "{}");
+    try {
+      const data = JSON.parse(response.text || "{}");
+      return data.workoutPlan || [];
+    } catch (e) {
+      console.error(`Error parsing batch ${weeks}:`, e);
+      throw e;
+    }
+  };
+
+  // Split into 3 batches of 4 weeks to ensure reliability
+  const [batch1, batch2, batch3] = await Promise.all([
+    fetchBatch("1-4"),
+    fetchBatch("5-8"),
+    fetchBatch("9-12")
+  ]);
+
+  return { 
+    workoutPlan: [...batch1, ...batch2, ...batch3].sort((a, b) => a.week - b.week) 
+  };
 }
 
 /**
- * 12-WEEK MEAL PLAN GENERATION
+ * 12-WEEK MEAL PLAN GENERATION (Batched)
  */
 async function generateMealPlan(
   userData: UserData,
@@ -272,56 +293,60 @@ async function generateMealPlan(
 ): Promise<Partial<AssessmentResult>> {
   const model = "gemini-3-flash-preview";
 
-  const prompt = `
-    Create a personalized 12-week meal plan for "UNLCKD Pro Trainer".
-    
-    User Data:
-    ${JSON.stringify(userData, null, 2)}
-    
-    Preference: ${userData.caloriePreference}
-    
-    INSTRUCTIONS:
-    - Exactly 12 weeks of structured meals.
-    - Include recipe descriptions and links.
-    - Include full macro details for each meal.
-    - Adhere strictly to dietary considerations: ${userData.allergies || 'None'}.
-  `;
+  const fetchBatch = async (weeks: string): Promise<any[]> => {
+    const prompt = `
+      Create a personalized 12-week meal plan for "UNLCKD Pro Trainer".
+      
+      User Data:
+      ${JSON.stringify(userData, null, 2)}
+      
+      Preference: ${userData.caloriePreference}
+      
+      INSTRUCTIONS:
+      - Generate only Weeks ${weeks} of the 12-week plan.
+      - Include recipe descriptions and links.
+      - Include full macro details for each meal.
+      - Adhere strictly to dietary considerations: ${userData.allergies || 'None'}.
+      - Keep meal descriptions concise.
+    `;
 
-  const response = await ai.models.generateContent({
-    model,
-    contents: {
-      parts: [{ text: prompt }],
-    },
-    config: {
-      systemInstruction: "You are a performance nutritionist. Return ONLY a JSON object containing the 'mealPlan' array with exactly 12 weeks. Ensure calculations match user's goals.",
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          mealPlan: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                week: { type: Type.NUMBER },
-                days: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      day: { type: Type.STRING },
-                      breakfast: { type: Type.STRING },
-                      breakfastUrl: { type: Type.STRING },
-                      breakfastMacros: { type: Type.OBJECT, properties: { calories: { type: Type.STRING }, protein: { type: Type.STRING }, fat: { type: Type.STRING }, carbs: { type: Type.STRING } } },
-                      lunch: { type: Type.STRING },
-                      lunchUrl: { type: Type.STRING },
-                      lunchMacros: { type: Type.OBJECT, properties: { calories: { type: Type.STRING }, protein: { type: Type.STRING }, fat: { type: Type.STRING }, carbs: { type: Type.STRING } } },
-                      dinner: { type: Type.STRING },
-                      dinnerUrl: { type: Type.STRING },
-                      dinnerMacros: { type: Type.OBJECT, properties: { calories: { type: Type.STRING }, protein: { type: Type.STRING }, fat: { type: Type.STRING }, carbs: { type: Type.STRING } } },
-                      snack: { type: Type.STRING },
-                      snackUrl: { type: Type.STRING },
-                      snackMacros: { type: Type.OBJECT, properties: { calories: { type: Type.STRING }, protein: { type: Type.STRING }, fat: { type: Type.STRING }, carbs: { type: Type.STRING } } },
+    const response = await ai.models.generateContent({
+      model,
+      contents: {
+        parts: [{ text: prompt }],
+      },
+      config: {
+        systemInstruction: "You are a performance nutritionist. Return ONLY a JSON object containing the 'mealPlan' array for the requested weeks. Ensure calculations match user's goals.",
+        responseMimeType: "application/json",
+        maxOutputTokens: 8192,
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            mealPlan: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  week: { type: Type.NUMBER },
+                  days: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        day: { type: Type.STRING },
+                        breakfast: { type: Type.STRING },
+                        breakfastUrl: { type: Type.STRING },
+                        breakfastMacros: { type: Type.OBJECT, properties: { calories: { type: Type.STRING }, protein: { type: Type.STRING }, fat: { type: Type.STRING }, carbs: { type: Type.STRING } } },
+                        lunch: { type: Type.STRING },
+                        lunchUrl: { type: Type.STRING },
+                        lunchMacros: { type: Type.OBJECT, properties: { calories: { type: Type.STRING }, protein: { type: Type.STRING }, fat: { type: Type.STRING }, carbs: { type: Type.STRING } } },
+                        dinner: { type: Type.STRING },
+                        dinnerUrl: { type: Type.STRING },
+                        dinnerMacros: { type: Type.OBJECT, properties: { calories: { type: Type.STRING }, protein: { type: Type.STRING }, fat: { type: Type.STRING }, carbs: { type: Type.STRING } } },
+                        snack: { type: Type.STRING },
+                        snackUrl: { type: Type.STRING },
+                        snackMacros: { type: Type.OBJECT, properties: { calories: { type: Type.STRING }, protein: { type: Type.STRING }, fat: { type: Type.STRING }, carbs: { type: Type.STRING } } },
+                      },
                     },
                   },
                 },
@@ -330,10 +355,27 @@ async function generateMealPlan(
           },
         },
       },
-    },
-  });
+    });
 
-  return JSON.parse(response.text || "{}");
+    try {
+      const data = JSON.parse(response.text || "{}");
+      return data.mealPlan || [];
+    } catch (e) {
+      console.error(`Error parsing meal batch ${weeks}:`, e);
+      throw e;
+    }
+  };
+
+  // Split into 3 batches of 4 weeks
+  const [batch1, batch2, batch3] = await Promise.all([
+    fetchBatch("1-4"),
+    fetchBatch("5-8"),
+    fetchBatch("9-12")
+  ]);
+
+  return { 
+    mealPlan: [...batch1, ...batch2, ...batch3].sort((a, b) => a.week - b.week) 
+  };
 }
 
 export async function generateTransformationReport(

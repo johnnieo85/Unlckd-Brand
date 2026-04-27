@@ -1004,6 +1004,7 @@ export const ProGym = ({
                       type="password"
                       inputMode="numeric"
                       pattern="[0-9]*"
+                      autoComplete="one-time-code"
                       placeholder="••••"
                       value={pinSetup.pin}
                       onChange={(e) => setPinSetup(prev => ({ ...prev, pin: e.target.value.replace(/\D/g, '') }))}
@@ -1017,6 +1018,7 @@ export const ProGym = ({
                       type="password"
                       inputMode="numeric"
                       pattern="[0-9]*"
+                      autoComplete="one-time-code"
                       placeholder="••••"
                       value={pinSetup.confirm}
                       onChange={(e) => setPinSetup(prev => ({ ...prev, confirm: e.target.value.replace(/\D/g, '') }))}
@@ -1048,6 +1050,7 @@ export const ProGym = ({
                     type="password"
                     inputMode="numeric"
                     pattern="[0-9]*"
+                    autoComplete="one-time-code"
                     placeholder="••••"
                     value={pinEntry}
                     onChange={(e) => setPinEntry(e.target.value.replace(/\D/g, ''))}
