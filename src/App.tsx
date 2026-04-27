@@ -41,7 +41,7 @@ import ReactMarkdown from 'react-markdown';
 import { Button } from './components/ui/Button';
 import { Input, Select } from './components/ui/Input';
 import { Card, Badge } from './components/ui/Card';
-import { cn } from './lib/utils';
+import { cn, downloadFile } from './lib/utils';
 import { Path, UserData, Photos, ProgressPhotos, AssessmentResult, Rating, SavedReport, UserProfile } from './types';
 import { generateTransformationReport } from './services/gemini';
 import { auth } from './lib/firebase';
@@ -75,7 +75,7 @@ const RatingTable = ({ title, ratings = [], summary, photo }: { title: string; r
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5 print:divide-gray-200">
-              {ratings.map((r, i) => (
+              {ratings?.map((r, i) => (
                 <tr key={i} className="hover:bg-white/[0.02] transition-colors print:text-black">
                   <td className="px-6 py-4 font-semibold text-gray-200 border-r border-white/5 print:text-black print:border-gray-200">{r.category}</td>
                   <td className="px-6 py-4 border-r border-white/5 print:border-gray-200">
@@ -160,7 +160,7 @@ const ProgressComparison = ({ title, ratings = [], summary, beforePhoto, afterPh
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5 print:divide-gray-200">
-              {ratings.map((r, i) => (
+              {ratings?.map((r, i) => (
                 <tr key={i} className="hover:bg-white/[0.02] transition-colors print:text-black">
                   <td className="px-6 py-4 font-semibold text-gray-200 border-r border-white/5 print:text-black print:border-gray-200">{r.category}</td>
                   <td className="px-6 py-4 border-r border-white/5 print:border-gray-200">
@@ -1253,14 +1253,16 @@ export default function App() {
                       onChange={e => setUserData({...userData, goals: e.target.value})}
                     />
                     <Input 
-                      label="Current Workout (Optional)" 
+                      label="Current Workout" 
                       placeholder="Describe your current routine or 'None'" 
+                      required
                       value={userData.currentWorkout}
                       onChange={e => setUserData({...userData, currentWorkout: e.target.value})}
                     />
                     <Input 
-                      label="Event Focus (Optional)" 
+                      label="Event Focus" 
                       placeholder="e.g. Wedding in 3 months, Beach holiday" 
+                      required
                       value={userData.eventFocus}
                       onChange={e => setUserData({...userData, eventFocus: e.target.value})}
                     />
@@ -1268,7 +1270,8 @@ export default function App() {
                     {(path === 'workout' || path === 'full' || path === 'progress') && (
                       <Input 
                         label="Current or Past Injuries" 
-                        placeholder="e.g. Lower back pain, ACL surgery 2 years ago" 
+                        placeholder="e.g. Lower back pain, ACL surgery 2 years ago, or 'None'" 
+                        required
                         value={userData.injuries}
                         onChange={e => setUserData({...userData, injuries: e.target.value})}
                       />
@@ -1279,7 +1282,8 @@ export default function App() {
                 {(path === 'meal' || path === 'full') && (
                   <Input 
                     label="Food preferences and Dietary Considerations (ex gout-prone, dislike tofu, dairy allergy)" 
-                    placeholder="e.g. Gout-prone, dislike tofu, dairy allergy" 
+                    placeholder="e.g. Gout-prone, dislike tofu, dairy allergy, or 'None'" 
+                    required
                     value={userData.allergies}
                     onChange={e => setUserData({...userData, allergies: e.target.value})}
                   />
@@ -2154,33 +2158,43 @@ export default function App() {
               {/* Grocery List */}
               {(path !== 'workout' && path !== 'progress') && (
                 <section className="space-y-8 pt-16 border-t border-gray-800">
-                  <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-                    <h2 className="text-3xl font-display font-bold text-brand-primary">Grocery List</h2>
-                    {report.recommendedGroceryStore && (
-                      <div className="flex items-center gap-2 px-4 py-2 bg-brand-primary/10 border border-brand-primary/30 rounded-lg">
-                        <MapPin className="w-4 h-4 text-brand-primary" />
-                        <span className="text-sm font-medium text-gray-200">Recommended Store: <span className="text-brand-primary">{report.recommendedGroceryStore}</span></span>
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="space-y-1">
+                        <h2 className="text-3xl font-display font-bold text-brand-primary">Grocery Checklist</h2>
+                        <p className="text-gray-400 text-sm">Download your custom grocery list aligned with your meal plan.</p>
                       </div>
-                    )}
-                  </div>
-                  <div className="bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl overflow-hidden">
-                    <table className="w-full text-sm text-left border-collapse">
-                      <thead className="bg-brand-secondary/20 text-gray-400 uppercase text-[10px] tracking-wider">
-                        <tr>
-                          <th className="px-6 py-3 font-semibold border-r border-gray-800 w-1/3">Category</th>
-                          <th className="px-6 py-3 font-semibold">Items</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-800">
-                        {report.groceryList?.map((row, i) => (
-                          <tr key={i}>
-                            <td className="px-6 py-4 bg-brand-secondary/20 font-bold text-gray-200 border-r border-gray-800">{row.category}</td>
-                            <td className="px-6 py-4 text-gray-300">{row.items}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                      <div className="flex flex-wrap items-center gap-3">
+                        {report.recommendedGroceryStore && (
+                          <div className="flex items-center gap-2 px-4 py-2 bg-brand-primary/10 border border-brand-primary/30 rounded-lg whitespace-nowrap">
+                            <MapPin className="w-4 h-4 text-brand-primary" />
+                            <span className="text-sm font-medium text-gray-200">Store: <span className="text-brand-primary">{report.recommendedGroceryStore}</span></span>
+                          </div>
+                        )}
+                        <button 
+                          onClick={() => {
+                            let content = `UNLCKD PRO TRAINER - GROCERY CHECKLIST\n`;
+                            content += `==========================================\n\n`;
+                            
+                            report.groceryList.forEach(g => {
+                              content += `${g.category.toUpperCase()}\n`;
+                              content += `-----------------\n`;
+                              // Split items by comma and clean them up
+                              const items = g.items.split(',').map(i => i.trim()).filter(i => i !== '');
+                              items.forEach(item => {
+                                content += `[ ] ${item}\n`;
+                              });
+                              content += `\n`;
+                            });
+                            
+                            downloadFile('unlckd-grocery-list.txt', content);
+                          }}
+                          className="flex items-center gap-2 px-6 py-3 bg-brand-primary hover:bg-brand-primary/90 text-black rounded-lg text-sm font-bold transition-all transform hover:scale-105 shadow-lg shadow-brand-primary/20 active:scale-95 outline-none"
+                        >
+                          <Download className="w-4 h-4" />
+                          Download Checklist (.txt)
+                        </button>
+                      </div>
+                    </div>
                   <LogoBranding />
                 </section>
               )}
@@ -2218,7 +2232,7 @@ export default function App() {
                           <div className="space-y-3">
                             <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Optimization Tips</span>
                             <ul className="space-y-2">
-                              {report.sleepRecommendation.tips.map((tip, i) => (
+                              {report.sleepRecommendation.tips?.map((tip, i) => (
                                 <li key={i} className="flex gap-3 text-sm text-gray-400">
                                   <div className="w-1.5 h-1.5 rounded-full bg-brand-primary/40 mt-1.5 shrink-0" />
                                   {tip}
