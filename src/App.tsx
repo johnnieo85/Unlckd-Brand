@@ -958,67 +958,103 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <Card className="p-8 bg-white/[0.02] backdrop-blur-sm border-white/5 hover:border-brand-primary/50 transition-all cursor-pointer group relative overflow-hidden" onClick={() => handleStart('assessment')}>
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/5 blur-3xl -mr-16 -mt-16 group-hover:bg-brand-primary/10 transition-colors" />
-                  <div className="flex flex-col items-center text-center gap-6 relative z-10">
-                    <div className="w-14 h-14 rounded-2xl bg-brand-primary/10 flex items-center justify-center group-hover:scale-110 group-hover:bg-brand-primary/20 transition-all duration-500">
-                      <Camera className="w-7 h-7 text-brand-primary" />
+              <div className="space-y-6">
+                {/* Top Row: Featured Services */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Featured: Pro Gym Hub */}
+                  <Card 
+                    className="p-8 bg-brand-primary/5 border-2 animate-pulse-border transition-all cursor-pointer group relative overflow-hidden" 
+                    onClick={() => {
+                      if (!isPremium) {
+                        setShowGymAuth(true);
+                      } else {
+                        setActiveTab('gym');
+                      }
+                    }}
+                  >
+                    <div className="absolute inset-0 bg-brand-primary/5 group-hover:bg-brand-primary/10 transition-colors" />
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-brand-primary/10 blur-3xl -mr-32 -mt-32 group-hover:bg-brand-primary/20 transition-colors" />
+                    <div className="absolute bottom-0 left-0 w-64 h-64 bg-brand-primary/5 blur-3xl -ml-32 -mb-32 group-hover:bg-brand-primary/10 transition-colors" />
+                    <div className="flex flex-col items-center text-center gap-6 relative z-10 h-full justify-center">
+                      <div className="w-16 h-16 rounded-2xl bg-brand-primary/20 flex items-center justify-center group-hover:scale-110 group-hover:bg-brand-primary/30 transition-all duration-500 shadow-[0_0_20px_rgba(16,185,129,0.3)]">
+                        <Lock className="w-8 h-8 text-brand-primary" />
+                      </div>
+                      <div className="max-w-md mx-auto">
+                        <h3 className="font-display font-bold text-2xl tracking-tight text-white mb-2">Pro Gym Hub</h3>
+                        <p className="text-sm text-gray-400 leading-relaxed italic">"Your private high-performance optimization center. Access professional training environments."</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-display font-bold text-2xl tracking-tight">Physique Assessment</h3>
-                      <p className="text-sm text-gray-500 mt-2 leading-relaxed">Detailed visual review and category ratings.</p>
+                  </Card>
+
+                  {/* Featured: Full Transformation Report */}
+                  <Card className="p-8 bg-brand-primary border-transparent hover:brightness-110 transition-all cursor-pointer group relative overflow-hidden" onClick={() => handleStart('full')}>
+                    <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 blur-3xl -mr-24 -mt-24 group-hover:bg-white/20 transition-colors" />
+                    <div className="flex flex-col items-center text-center gap-6 relative z-10 h-full justify-center">
+                      <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center group-hover:scale-110 transition-all duration-500 backdrop-blur-sm">
+                        <FileText className="w-8 h-8 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="font-display font-bold text-2xl tracking-tight text-white">Full Transformation Report</h3>
+                        <p className="text-white/70 mt-2 text-sm leading-relaxed max-w-sm">The complete assessment, training, and nutrition package for serious results.</p>
+                      </div>
                     </div>
-                  </div>
-                </Card>
-                <Card className="p-8 bg-white/[0.02] backdrop-blur-sm border-white/5 hover:border-brand-primary/50 transition-all cursor-pointer group relative overflow-hidden" onClick={() => handleStart('workout')}>
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/5 blur-3xl -mr-16 -mt-16 group-hover:bg-brand-primary/10 transition-colors" />
-                  <div className="flex flex-col items-center text-center gap-6 relative z-10">
-                    <div className="w-14 h-14 rounded-2xl bg-brand-primary/10 flex items-center justify-center group-hover:scale-110 group-hover:bg-brand-primary/20 transition-all duration-500">
-                      <Dumbbell className="w-7 h-7 text-brand-primary" />
+                  </Card>
+                </div>
+
+                {/* Bottom Row: Core Services */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <Card className="p-6 bg-white/[0.02] backdrop-blur-sm border-white/5 hover:border-brand-primary/50 transition-all cursor-pointer group relative overflow-hidden" onClick={() => handleStart('assessment')}>
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/5 blur-3xl -mr-16 -mt-16 group-hover:bg-brand-primary/10 transition-colors" />
+                    <div className="flex flex-col items-center text-center gap-4 relative z-10">
+                      <div className="w-12 h-12 rounded-xl bg-brand-primary/10 flex items-center justify-center group-hover:scale-110 group-hover:bg-brand-primary/20 transition-all duration-500">
+                        <Camera className="w-6 h-6 text-brand-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-display font-bold text-lg tracking-tight">Physique Assessment</h3>
+                        <p className="text-xs text-gray-500 mt-1 leading-relaxed">Detailed visual review and category ratings.</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-display font-bold text-2xl tracking-tight">Workout Plan</h3>
-                      <p className="text-sm text-gray-500 mt-2 leading-relaxed">Tailored training split with sets and reps.</p>
+                  </Card>
+                  
+                  <Card className="p-6 bg-white/[0.02] backdrop-blur-sm border-white/5 hover:border-brand-primary/50 transition-all cursor-pointer group relative overflow-hidden" onClick={() => handleStart('workout')}>
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/5 blur-3xl -mr-16 -mt-16 group-hover:bg-brand-primary/10 transition-colors" />
+                    <div className="flex flex-col items-center text-center gap-4 relative z-10">
+                      <div className="w-12 h-12 rounded-xl bg-brand-primary/10 flex items-center justify-center group-hover:scale-110 group-hover:bg-brand-primary/20 transition-all duration-500">
+                        <Dumbbell className="w-6 h-6 text-brand-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-display font-bold text-lg tracking-tight">Workout Plan</h3>
+                        <p className="text-xs text-gray-500 mt-1 leading-relaxed">Tailored training split with sets and reps.</p>
+                      </div>
                     </div>
-                  </div>
-                </Card>
-                <Card className="p-8 bg-brand-primary/5 border-brand-primary/20 hover:border-brand-primary/50 transition-all cursor-pointer group relative overflow-hidden" onClick={() => handleStart('meal')}>
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/10 blur-3xl -mr-16 -mt-16 group-hover:bg-brand-primary/20 transition-colors" />
-                  <div className="flex flex-col items-center text-center gap-6 relative z-10">
-                    <div className="w-14 h-14 rounded-2xl bg-brand-primary/10 flex items-center justify-center group-hover:scale-110 group-hover:bg-brand-primary/20 transition-all duration-500">
-                      <Utensils className="w-7 h-7 text-brand-primary" />
+                  </Card>
+
+                  <Card className="p-6 bg-brand-primary/5 border-brand-primary/20 hover:border-brand-primary/50 transition-all cursor-pointer group relative overflow-hidden" onClick={() => handleStart('meal')}>
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/10 blur-3xl -mr-16 -mt-16 group-hover:bg-brand-primary/20 transition-colors" />
+                    <div className="flex flex-col items-center text-center gap-4 relative z-10">
+                      <div className="w-12 h-12 rounded-xl bg-brand-primary/10 flex items-center justify-center group-hover:scale-110 group-hover:bg-brand-primary/20 transition-all duration-500">
+                        <Utensils className="w-6 h-6 text-brand-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-display font-bold text-lg tracking-tight">Meal Plan</h3>
+                        <p className="text-xs text-gray-500 mt-1 leading-relaxed">Goal-matched nutrition and grocery lists.</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-display font-bold text-2xl tracking-tight">Meal Plan</h3>
-                      <p className="text-sm text-gray-500 mt-2 leading-relaxed">Goal-matched nutrition and grocery lists.</p>
+                  </Card>
+
+                  <Card className="p-6 bg-white/[0.02] backdrop-blur-sm border-white/5 hover:border-brand-primary/50 transition-all cursor-pointer group relative overflow-hidden" onClick={() => handleStart('progress')}>
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/5 blur-3xl -mr-16 -mt-16 group-hover:bg-brand-primary/10 transition-colors" />
+                    <div className="flex flex-col items-center text-center gap-4 relative z-10">
+                      <div className="w-12 h-12 rounded-xl bg-brand-primary/10 flex items-center justify-center group-hover:scale-110 group-hover:bg-brand-primary/20 transition-all duration-500">
+                        <Activity className="w-6 h-6 text-brand-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-display font-bold text-lg tracking-tight">Progress Engine</h3>
+                        <p className="text-xs text-gray-500 mt-1 leading-relaxed">Weekly photo comparison and feedback.</p>
+                      </div>
                     </div>
-                  </div>
-                </Card>
-                <Card className="p-8 bg-white/[0.02] backdrop-blur-sm border-white/5 hover:border-brand-primary/50 transition-all cursor-pointer group relative overflow-hidden" onClick={() => handleStart('progress')}>
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/5 blur-3xl -mr-16 -mt-16 group-hover:bg-brand-primary/10 transition-colors" />
-                  <div className="flex flex-col items-center text-center gap-6 relative z-10">
-                    <div className="w-14 h-14 rounded-2xl bg-brand-primary/10 flex items-center justify-center group-hover:scale-110 group-hover:bg-brand-primary/20 transition-all duration-500">
-                      <Activity className="w-7 h-7 text-brand-primary" />
-                    </div>
-                    <div>
-                      <h3 className="font-display font-bold text-2xl tracking-tight">Weekly Progress Engine</h3>
-                      <p className="text-sm text-gray-500 mt-2 leading-relaxed">Compare before/after photos with expert feedback.</p>
-                    </div>
-                  </div>
-                </Card>
-                <Card className="p-8 bg-brand-primary border-transparent hover:brightness-110 transition-all cursor-pointer group md:col-span-2 relative overflow-hidden" onClick={() => handleStart('full')}>
-                  <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 blur-3xl -mr-24 -mt-24 group-hover:bg-white/20 transition-colors" />
-                  <div className="flex flex-col items-center text-center gap-6 relative z-10">
-                    <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center group-hover:scale-110 transition-all duration-500 backdrop-blur-sm">
-                      <FileText className="w-8 h-8 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="font-display font-bold text-3xl tracking-tight text-white">Full Transformation Report</h3>
-                      <p className="text-white/70 mt-2 leading-relaxed max-w-md">The complete assessment, training, and nutrition package for serious results.</p>
-                    </div>
-                  </div>
-                </Card>
+                  </Card>
+                </div>
               </div>
             </motion.div>
           )}
