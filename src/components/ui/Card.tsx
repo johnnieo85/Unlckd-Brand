@@ -1,8 +1,9 @@
 import React from 'react';
 import { cn } from '../../lib/utils';
 
-export const Card = ({ className, children, onClick }: { className?: string; children: React.ReactNode; onClick?: () => void }) => (
+export const Card = ({ className, children, onClick, id }: { className?: string; children: React.ReactNode; onClick?: () => void; id?: string }) => (
   <div 
+    id={id}
     className={cn("bg-brand-surface border border-gray-800 rounded-xl overflow-hidden", className)}
     onClick={onClick}
   >

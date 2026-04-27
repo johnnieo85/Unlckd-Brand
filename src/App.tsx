@@ -670,6 +670,10 @@ export default function App() {
                   variant="ghost" 
                   size="sm" 
                   onClick={() => {
+                    if (!hasAccess) {
+                      setStep('no-access');
+                      return;
+                    }
                     if (!isPremium) {
                       setShowGymAuth(true);
                     } else {
@@ -965,6 +969,14 @@ export default function App() {
                   <Card 
                     className="p-8 bg-brand-primary/5 border-2 animate-pulse-border transition-all cursor-pointer group relative overflow-hidden" 
                     onClick={() => {
+                      if (!user) {
+                        handleSignIn();
+                        return;
+                      }
+                      if (!hasAccess) {
+                        setStep('no-access');
+                        return;
+                      }
                       if (!isPremium) {
                         setShowGymAuth(true);
                       } else {
