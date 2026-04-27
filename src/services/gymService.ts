@@ -95,11 +95,29 @@ export const gymService = {
     }
   },
 
+  async getMeasurement(date: string): Promise<Measurement | null> {
+    const user = auth.currentUser;
+    if (!user) return null;
+
+    const path = `users/${user.uid}/measurements/${date}`;
+    try {
+      const docRef = doc(db, 'users', user.uid, 'measurements', date);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        return docSnap.data() as Measurement;
+      }
+      return null;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, path);
+      return null;
+    }
+  },
+
   async addMeasurement(data: Omit<Measurement, 'id' | 'timestamp'>): Promise<void> {
     const user = auth.currentUser;
     if (!user) return;
 
-    const id = Date.now().toString();
+    const id = data.date;
     const path = `users/${user.uid}/measurements/${id}`;
     try {
       const docRef = doc(db, 'users', user.uid, 'measurements', id);
