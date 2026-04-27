@@ -77,15 +77,15 @@ export interface AssessmentResult {
       focus: string;
       warmUp: string;
       mainWork: string;
-      videoUrl?: string;
+      videoUrl: string;
       notes: string;
     }[];
   }[];
-  motivationalQuote?: {
+  motivationalQuote: {
     text: string;
-    author?: string;
+    author: string;
   };
-  sleepRecommendation?: {
+  sleepRecommendation: {
     duration: string;
     rationale: string;
     tips: string[];
@@ -96,24 +96,24 @@ export interface AssessmentResult {
     days: {
       day: string;
       breakfast: string;
-      breakfastUrl?: string;
-      breakfastMacros?: { calories: string; protein: string; fat: string; carbs: string };
+      breakfastUrl: string;
+      breakfastMacros: { calories: string; protein: string; fat: string; carbs: string };
       lunch: string;
-      lunchUrl?: string;
-      lunchMacros?: { calories: string; protein: string; fat: string; carbs: string };
+      lunchUrl: string;
+      lunchMacros: { calories: string; protein: string; fat: string; carbs: string };
       dinner: string;
-      dinnerUrl?: string;
-      dinnerMacros?: { calories: string; protein: string; fat: string; carbs: string };
+      dinnerUrl: string;
+      dinnerMacros: { calories: string; protein: string; fat: string; carbs: string };
       snack: string;
-      snackUrl?: string;
-      snackMacros?: { calories: string; protein: string; fat: string; carbs: string };
+      snackUrl: string;
+      snackMacros: { calories: string; protein: string; fat: string; carbs: string };
     }[];
   }[];
   groceryList: {
     category: string;
     items: string;
   }[];
-  recommendedGroceryStore?: string;
+  recommendedGroceryStore: string;
   recoverySchedule: {
     day: string;
     focus: string;
@@ -123,7 +123,7 @@ export interface AssessmentResult {
   hydrationTargets: string;
   goalAlignmentSummary: string;
   trainerSummary: string;
-  healthMetrics?: {
+  healthMetrics: {
     bmi: number;
     bmiCategory: string;
     estimatedBodyFat: string;
@@ -132,7 +132,7 @@ export interface AssessmentResult {
     recommendedCalorieLevel: 'maintain' | 'deficit' | 'surplus';
     dailyCalorieTarget: string;
   };
-  recommendedWorkout?: {
+  recommendedWorkout: {
     title: string;
     description: string;
     exercises: {
@@ -140,10 +140,10 @@ export interface AssessmentResult {
       sets: string;
       reps: string;
       focus: string;
-      videoUrl?: string;
+      videoUrl: string;
     }[];
   };
-  additionalActivities?: {
+  additionalActivities: {
     title: string;
     description: string;
     activities: {

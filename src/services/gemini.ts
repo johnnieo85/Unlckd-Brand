@@ -46,59 +46,89 @@ const getPhotoParts = (path: string, photos: Photos | ProgressPhotos): any[] => 
 };
 
 /**
- * Safely parses JSON from a string, handling potential markdown wrappers or prefix text
+ * Safely parses JSON from a string, handling markdown, trailing commas, and truncated responses
  */
 function safeParseJson(text: string): any {
   if (!text) return {};
-  const cleaned = text.trim();
+  let cleaned = text.trim();
+  
+  // 1. Remove markdown backticks if present
+  const jsonMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  if (jsonMatch && jsonMatch[1]) {
+    cleaned = jsonMatch[1].trim();
+  }
+
+  // 2. Attempt direct parse
   try {
     return JSON.parse(cleaned);
   } catch (e) {
-    // Try to extract JSON from markdown code blocks
-    const jsonMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-    if (jsonMatch && jsonMatch[1]) {
-      try {
-        return JSON.parse(jsonMatch[1]);
-      } catch (innerE) {
-        // fallback to further cleaning below
+    // 3. Attempt simple repairs (missing commas between structures)
+    try {
+      let repaired = cleaned
+        .replace(/\}\s*\{/g, '}, {')
+        .replace(/\]\s*\[/g, '], [')
+        .replace(/,\s*([\]}])/g, '$1') // Trailing commas
+        .replace(/(\w+)\s*:\s*([^,"'{\[][^,}\]]*)/g, '"$1": "$2"') // Wrap unquoted values
+        .trim();
+        
+      if (!repaired.endsWith('}') && !repaired.endsWith(']')) {
+         // Try to close hanging JSON
+         if (repaired.lastIndexOf('{') > repaired.lastIndexOf('}')) repaired += '"}';
+         else if (repaired.lastIndexOf('[') > repaired.lastIndexOf(']')) repaired += '"]';
       }
-    }
-    
-    // Last ditch effort: find the first { and last }
-    const firstBrace = cleaned.indexOf('{');
-    const lastBrace = cleaned.lastIndexOf('}');
-    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-      const maybeJson = cleaned.substring(firstBrace, lastBrace + 1);
-      try {
-        return JSON.parse(maybeJson);
-      } catch (innerE) {
-        throw new SyntaxError(`AI returned malformed JSON: ${innerE.message}`);
+
+      return JSON.parse(repaired);
+    } catch (innerE) {
+      // 4. Last ditch: Find first '{' and last '}'
+      const firstBrace = cleaned.indexOf('{');
+      const lastBrace = cleaned.lastIndexOf('}');
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        const maybeJson = cleaned.substring(firstBrace, lastBrace + 1);
+        try {
+          // One more repair attempt on the substring
+          const repairedSub = maybeJson
+            .replace(/\}\s*\{/g, '}, {')
+            .replace(/\]\s*\[/g, '], [')
+            .replace(/,\s*([\]}])/g, '$1');
+          return JSON.parse(repairedSub);
+        } catch (finalE) {
+          console.error("Failed to repair JSON:", finalE);
+          throw new SyntaxError(`AI returned malformed JSON: ${finalE.message}`);
+        }
       }
+      throw e;
     }
-    
-    throw e;
   }
 }
 
 /**
  * AI CALL RETRY HELPER
  */
-async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 2000): Promise<T> {
+async function withRetry<T>(fn: () => Promise<T>, retries = 5, delay = 4000): Promise<T> {
   try {
     return await fn();
   } catch (error: any) {
+    const errorMsg = error.message?.toLowerCase() || '';
+    const isRateLimit = 
+      errorMsg.includes('429') || 
+      errorMsg.includes('quota') || 
+      errorMsg.includes('throttle') ||
+      errorMsg.includes('throttled') ||
+      errorMsg.includes('resource_exhausted');
+
     const isRetryable = 
-      error.message?.includes('503') || 
-      error.message?.includes('high demand') ||
-      error.message?.includes('504') ||
-      error.message?.includes('429') ||
-      error.message?.includes('deadline exceeded') ||
+      isRateLimit ||
+      errorMsg.includes('503') || 
+      errorMsg.includes('high demand') ||
+      errorMsg.includes('504') ||
+      errorMsg.includes('deadline exceeded') ||
       error.status === 'UNAVAILABLE' ||
-      error.message?.includes('fetch failed');
+      errorMsg.includes('fetch failed');
 
     if (retries > 0 && isRetryable) {
-      console.warn(`Gemini busy or network error. Retrying in ${delay}ms... (${retries} attempts left)`);
-      await new Promise(resolve => setTimeout(resolve, delay));
+      const waitTime = isRateLimit ? delay * 3 : delay;
+      console.warn(`Gemini busy, rate limited, or network error. Retrying in ${waitTime}ms... (${retries} attempts left)`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
       return withRetry(fn, retries - 1, delay * 2); // Exponential backoff
     }
     throw error;
@@ -114,7 +144,7 @@ async function generatePhysiqueAnalysis(
   path: string,
   isResubmit: boolean
 ): Promise<any> {
-  const model = "gemini-1.5-flash";
+  const model = "gemini-flash-latest";
   const photoParts = getPhotoParts(path, photos);
 
   const prompt = `
@@ -140,8 +170,10 @@ async function generatePhysiqueAnalysis(
     contents: [{ role: "user", parts: [{ text: prompt }, ...photoParts] }],
     config: {
       systemInstruction: `
-        You are an elite physique assessor. Return ONLY valid JSON for the physique components.
-        Each evaluation or summary field must be under 150 characters to ensure the response remains stable.
+        You are an elite physique assessor. Return ONLY valid JSON.
+        CRITICAL: Never miss commas between items in arrays or objects.
+        STRICT LIMIT: Each text field must be under 100 characters. 
+        Be extremely concise.
       `,
       responseMimeType: "application/json",
       responseSchema: {
@@ -157,44 +189,51 @@ async function generatePhysiqueAnalysis(
                 rating: { type: Type.NUMBER },
                 evaluation: { type: Type.STRING },
               },
+              required: ["category", "rating", "evaluation"],
             },
           },
           frontViewAnalysis: {
             type: Type.OBJECT,
             properties: {
-              ratings: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { category: { type: Type.STRING }, rating: { type: Type.NUMBER }, evaluation: { type: Type.STRING } } } },
+              ratings: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { category: { type: Type.STRING }, rating: { type: Type.NUMBER }, evaluation: { type: Type.STRING } }, required: ["category", "rating", "evaluation"] } },
               summary: { type: Type.STRING },
             },
+            required: ["ratings", "summary"],
           },
           leftViewAnalysis: {
             type: Type.OBJECT,
             properties: {
-              ratings: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { category: { type: Type.STRING }, rating: { type: Type.NUMBER }, evaluation: { type: Type.STRING } } } },
+              ratings: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { category: { type: Type.STRING }, rating: { type: Type.NUMBER }, evaluation: { type: Type.STRING } }, required: ["category", "rating", "evaluation"] } },
               summary: { type: Type.STRING },
             },
+            required: ["ratings", "summary"],
           },
           rightViewAnalysis: {
             type: Type.OBJECT,
             properties: {
-              ratings: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { category: { type: Type.STRING }, rating: { type: Type.NUMBER }, evaluation: { type: Type.STRING } } } },
+              ratings: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { category: { type: Type.STRING }, rating: { type: Type.NUMBER }, evaluation: { type: Type.STRING } }, required: ["category", "rating", "evaluation"] } },
               summary: { type: Type.STRING },
             },
+            required: ["ratings", "summary"],
           },
           backViewAnalysis: {
             type: Type.OBJECT,
             properties: {
-              ratings: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { category: { type: Type.STRING }, rating: { type: Type.NUMBER }, evaluation: { type: Type.STRING } } } },
+              ratings: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { category: { type: Type.STRING }, rating: { type: Type.NUMBER }, evaluation: { type: Type.STRING } }, required: ["category", "rating", "evaluation"] } },
               summary: { type: Type.STRING },
             },
+            required: ["ratings", "summary"],
           },
           finalSummary: {
             type: Type.OBJECT,
             properties: {
-              ratings: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { category: { type: Type.STRING }, rating: { type: Type.NUMBER }, evaluation: { type: Type.STRING } } } },
+              ratings: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { category: { type: Type.STRING }, rating: { type: Type.NUMBER }, evaluation: { type: Type.STRING } }, required: ["category", "rating", "evaluation"] } },
               nextSteps: { type: Type.ARRAY, items: { type: Type.STRING } },
             },
+            required: ["ratings", "nextSteps"],
           },
         },
+        required: ["toplineSummary", "toplineRatings", "frontViewAnalysis", "leftViewAnalysis", "rightViewAnalysis", "backViewAnalysis", "finalSummary"],
       },
     },
   }));
@@ -209,7 +248,7 @@ async function generateHealthAndSupport(
   userData: UserData,
   isResubmit: boolean
 ): Promise<any> {
-  const model = "gemini-1.5-flash";
+  const model = "gemini-flash-latest";
 
   const prompt = `
     Generate health metrics and supportive guidance for "UNLCKD Pro Trainer".
@@ -229,8 +268,16 @@ async function generateHealthAndSupport(
     config: {
       systemInstruction: `
         You are a performance nutritionist and lifestyle coach. Return ONLY valid JSON.
+        CRITICAL: The grocery list must be 100% accurate and strictly aligned with the meals you recommend. 
+        Every single ingredient required for the meal plan MUST be included in the grocery list.
+        Include all staples and specifics.
+        Never miss commas between items.
+        STRICT LIMIT: Each text field must be under 120 characters. 
+        Focus on extreme brevity.
       `,
       responseMimeType: "application/json",
+      tools: [{ googleSearch: {} }],
+      toolConfig: { includeServerSideToolInvocations: true },
       responseSchema: {
         type: Type.OBJECT,
         properties: {
@@ -245,6 +292,7 @@ async function generateHealthAndSupport(
               recommendedCalorieLevel: { type: Type.STRING },
               dailyCalorieTarget: { type: Type.STRING },
             },
+            required: ["bmi", "bmiCategory", "estimatedBodyFat", "healthStatus", "focus", "recommendedCalorieLevel", "dailyCalorieTarget"],
           },
           motivationalQuote: {
             type: Type.OBJECT,
@@ -252,6 +300,7 @@ async function generateHealthAndSupport(
               text: { type: Type.STRING },
               author: { type: Type.STRING },
             },
+            required: ["text", "author"],
           },
           sleepRecommendation: {
             type: Type.OBJECT,
@@ -260,23 +309,96 @@ async function generateHealthAndSupport(
               rationale: { type: Type.STRING },
               tips: { type: Type.ARRAY, items: { type: Type.STRING } },
             },
-          },
-          groceryList: {
-            type: Type.ARRAY,
-            items: { type: Type.OBJECT, properties: { category: { type: Type.STRING }, items: { type: Type.STRING } } },
+            required: ["duration", "rationale", "tips"],
           },
           recommendedGroceryStore: { type: Type.STRING },
+          groceryList: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                category: { type: Type.STRING },
+                items: { type: Type.STRING },
+              },
+              required: ["category", "items"],
+            },
+          },
+          hydrationTargets: { type: Type.STRING },
+          waterSchedule: { type: Type.ARRAY, items: { type: Type.STRING } },
+          stepGoals: { type: Type.STRING },
           recoverySchedule: {
             type: Type.ARRAY,
-            items: { type: Type.OBJECT, properties: { day: { type: Type.STRING }, focus: { type: Type.STRING } } },
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                day: { type: Type.STRING },
+                focus: { type: Type.STRING },
+              },
+              required: ["day", "focus"],
+            },
           },
-          waterSchedule: { type: Type.ARRAY, items: { type: Type.STRING } },
-          hydrationTargets: { type: Type.STRING },
-          nutritionStrategy: { type: Type.STRING },
-          stepGoals: { type: Type.STRING },
+          recommendedWorkout: {
+            type: Type.OBJECT,
+            properties: {
+              title: { type: Type.STRING },
+              description: { type: Type.STRING },
+              exercises: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    name: { type: Type.STRING },
+                    sets: { type: Type.STRING },
+                    reps: { type: Type.STRING },
+                    focus: { type: Type.STRING },
+                    videoUrl: { type: Type.STRING },
+                  },
+                  required: ["name", "sets", "reps", "focus", "videoUrl"],
+                },
+              },
+            },
+            required: ["title", "description", "exercises"],
+          },
+          additionalActivities: {
+            type: Type.OBJECT,
+            properties: {
+              title: { type: Type.STRING },
+              description: { type: Type.STRING },
+              activities: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    name: { type: Type.STRING },
+                    benefit: { type: Type.STRING },
+                    frequency: { type: Type.STRING },
+                  },
+                  required: ["name", "benefit", "frequency"],
+                },
+              },
+            },
+            required: ["title", "description", "activities"],
+          },
           goalAlignmentSummary: { type: Type.STRING },
           trainerSummary: { type: Type.STRING },
+          nutritionStrategy: { type: Type.STRING },
         },
+        required: [
+          "healthMetrics", 
+          "motivationalQuote", 
+          "sleepRecommendation", 
+          "groceryList", 
+          "hydrationTargets", 
+          "stepGoals", 
+          "nutritionStrategy", 
+          "recoverySchedule", 
+          "waterSchedule", 
+          "goalAlignmentSummary", 
+          "trainerSummary",
+          "recommendedGroceryStore",
+          "recommendedWorkout",
+          "additionalActivities"
+        ],
       },
     },
   }));
@@ -299,17 +421,28 @@ async function generateWorkoutPlan(
       User: ${userData.name}, Goal: ${userData.goals}.
       Current Range: Weeks ${startWeek}-${endWeek}.
       
+      CRITICAL: You MUST use the search tool to find and verify active, non-broken YouTube video links.
+      ONLY use videos from established, high-authority fitness channels: "Renaissance Periodization", "Jeff Nippard", "Squat University", "Athlean-X", "ScottHermanFitness", "Mind Pump TV", "Buff Dudes", "Alan Thrall". 
+      Avoid "Shorts", deleted videos, or private clips. Every videoUrl MUST be a high-accuracy, reliable tutorial.
+      
       EVERY exercise MUST be formatted as "[Name (Sets x Reps)](YouTube Link)".
+      CRITICAL: Use a NEW LINE (\n) for EACH exercise in the "mainWork" and "warmUp" strings. 
+      Every exercise must be on its own row. Do not group multiple exercises into a single paragraph or string without newlines.
       Return exactly ${endWeek - startWeek + 1} week objects in the workoutPlan array.
     `;
 
     try {
       const response = await withRetry(() => ai.models.generateContent({
-        model: "gemini-1.5-flash",
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        model: "gemini-flash-latest",
+        contents: prompt,
         config: {
-          systemInstruction: "Expert S&C Coach. JSON only. Weekly workout arrays. Keep descriptions concise. Ensure exact requested weeks are provided.",
+          systemInstruction: `Expert S&C Coach. JSON only. 
+          CRITICAL: Every videoUrl MUST be a verified, active YouTube tutorial from one of these channels: "Renaissance Periodization", "Jeff Nippard", "Squat University", "Athlean-X", "ScottHermanFitness".
+          Use the search tool for EVERY exercise to ensure the link works and is NOT a short.
+          Ensure exact requested weeks are provided.`,
           responseMimeType: "application/json",
+          tools: [{ googleSearch: {} }],
+          toolConfig: { includeServerSideToolInvocations: true },
           responseSchema: {
             type: Type.OBJECT,
             properties: {
@@ -332,9 +465,11 @@ async function generateWorkoutPlan(
                           videoUrl: { type: Type.STRING },
                           notes: { type: Type.STRING },
                         },
+                        required: ["day", "focus", "warmUp", "mainWork", "videoUrl", "notes"],
                       },
                     },
                   },
+                  required: ["week", "phase", "days"],
                 },
               },
             },
@@ -351,13 +486,14 @@ async function generateWorkoutPlan(
     }
   };
 
-  // Process in smaller batches of 2-3 weeks for higher reliability in Flash
-  const batches = [[1, 3], [4, 6], [7, 9], [10, 12]];
+  // Process in smaller batches of 2 weeks for higher reliability and less chance of client-side throttling
+  const batches = [[1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12]];
   
   for (const [start, end] of batches) {
     const batch = await fetchBatch(start, end);
     workoutPlan.push(...batch);
-    await new Promise(resolve => setTimeout(resolve, 300));
+    // Significant delay to avoid rate limiting with heavy tool usage
+    await new Promise(resolve => setTimeout(resolve, 4000));
   }
 
   return { workoutPlan: workoutPlan.sort((a, b) => a.week - b.week) };
@@ -374,19 +510,32 @@ async function generateMealPlan(
 
   const fetchBatch = async (startWeek: number, endWeek: number): Promise<any[]> => {
     const prompt = `
-      Generate Weeks ${startWeek} through ${endWeek} of a personalized 12-week meal plan.
-      User: ${userData.name}, Preferences: ${userData.caloriePreference}.
+      Generate Weeks ${startWeek} through ${endWeek} of a personalized 12-week meal plan for UNLCKD Pro Trainer.
+      User: ${userData.name}, Preferences: ${userData.caloriePreference}, Allergies: ${userData.allergies}.
+      
+      CRITICAL: You MUST use the search tool to find and verify direct, active Pinterest recipe links.
+      Prefer pins from verified recipe developers: "Skinnytaste", "Minimalist Baker", "EatingWell", "AllRecipes", "Food Network".
+      Every meal URL MUST be a direct Pinterest recipe pin (format: https://www.pinterest.com/pin/XXXXXXXXXXXX/). 
+      Check that the Pin ID is still active. No dead links.
+      
       Current Range: Weeks ${startWeek}-${endWeek}.
       Return exactly ${endWeek - startWeek + 1} week objects in the mealPlan array.
     `;
 
     try {
       const response = await withRetry(() => ai.models.generateContent({
-        model: "gemini-1.5-flash",
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        model: "gemini-flash-latest",
+        contents: prompt,
         config: {
-          systemInstruction: "Nutritionist. JSON only. Weekly meal arrays with macro breakdown. Keep descriptions concise. Ensure exact requested weeks are provided.",
+          systemInstruction: `Elite Nutritionist. JSON only. 
+          CRITICAL: Every URL MUST be a direct, active Pinterest recipe pin. 
+          Use the search tool to verify every link leads to a live recipe. NO broken links.
+          NEVER guess a Pin ID.
+          The grocery list (generated separately) will be cross-referenced, so ensure these recipes are standard and realistic.
+          Ensure exact requested weeks are provided.`,
           responseMimeType: "application/json",
+          tools: [{ googleSearch: {} }],
+          toolConfig: { includeServerSideToolInvocations: true },
           responseSchema: {
             type: Type.OBJECT,
             properties: {
@@ -403,17 +552,23 @@ async function generateMealPlan(
                         properties: {
                           day: { type: Type.STRING },
                           breakfast: { type: Type.STRING },
+                          breakfastUrl: { type: Type.STRING },
                           lunch: { type: Type.STRING },
+                          lunchUrl: { type: Type.STRING },
                           dinner: { type: Type.STRING },
+                          dinnerUrl: { type: Type.STRING },
                           snack: { type: Type.STRING },
-                          breakfastMacros: { type: Type.OBJECT, properties: { calories: { type: Type.STRING }, protein: { type: Type.STRING }, fat: { type: Type.STRING }, carbs: { type: Type.STRING } } },
-                          lunchMacros: { type: Type.OBJECT, properties: { calories: { type: Type.STRING }, protein: { type: Type.STRING }, fat: { type: Type.STRING }, carbs: { type: Type.STRING } } },
-                          dinnerMacros: { type: Type.OBJECT, properties: { calories: { type: Type.STRING }, protein: { type: Type.STRING }, fat: { type: Type.STRING }, carbs: { type: Type.STRING } } },
-                          snackMacros: { type: Type.OBJECT, properties: { calories: { type: Type.STRING }, protein: { type: Type.STRING }, fat: { type: Type.STRING }, carbs: { type: Type.STRING } } },
+                          snackUrl: { type: Type.STRING },
+                          breakfastMacros: { type: Type.OBJECT, properties: { calories: { type: Type.STRING }, protein: { type: Type.STRING }, fat: { type: Type.STRING }, carbs: { type: Type.STRING } }, required: ["calories", "protein", "fat", "carbs"] },
+                          lunchMacros: { type: Type.OBJECT, properties: { calories: { type: Type.STRING }, protein: { type: Type.STRING }, fat: { type: Type.STRING }, carbs: { type: Type.STRING } }, required: ["calories", "protein", "fat", "carbs"] },
+                          dinnerMacros: { type: Type.OBJECT, properties: { calories: { type: Type.STRING }, protein: { type: Type.STRING }, fat: { type: Type.STRING }, carbs: { type: Type.STRING } }, required: ["calories", "protein", "fat", "carbs"] },
+                          snackMacros: { type: Type.OBJECT, properties: { calories: { type: Type.STRING }, protein: { type: Type.STRING }, fat: { type: Type.STRING }, carbs: { type: Type.STRING } }, required: ["calories", "protein", "fat", "carbs"] },
                         },
+                        required: ["day", "breakfast", "breakfastUrl", "lunch", "lunchUrl", "dinner", "dinnerUrl", "snack", "snackUrl", "breakfastMacros", "lunchMacros", "dinnerMacros", "snackMacros"],
                       },
                     },
                   },
+                  required: ["week", "days"],
                 },
               },
             },
@@ -430,12 +585,13 @@ async function generateMealPlan(
     }
   };
 
-  const batches = [[1, 3], [4, 6], [7, 9], [10, 12]];
+  const batches = [[1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12]];
 
   for (const [start, end] of batches) {
     const batch = await fetchBatch(start, end);
     mealPlan.push(...batch);
-    await new Promise(resolve => setTimeout(resolve, 300));
+    // Significant delay to avoid rate limiting with heavy tool usage
+    await new Promise(resolve => setTimeout(resolve, 4000));
   }
 
   return { mealPlan: mealPlan.sort((a, b) => a.week - b.week) };
@@ -498,12 +654,49 @@ export async function generateTransformationReport(
     const finalResult = result as AssessmentResult;
     
     // Ensure all required fields exist to avoid UI crashes
+    finalResult.toplineSummary = finalResult.toplineSummary || "Assessment incoming...";
     finalResult.toplineRatings = finalResult.toplineRatings || [];
+    
+    const baseView = { ratings: [], summary: "Consultation in progress..." };
+    finalResult.frontViewAnalysis = finalResult.frontViewAnalysis || { ...baseView };
+    finalResult.leftViewAnalysis = finalResult.leftViewAnalysis || { ...baseView };
+    finalResult.rightViewAnalysis = finalResult.rightViewAnalysis || { ...baseView };
+    finalResult.backViewAnalysis = finalResult.backViewAnalysis || { ...baseView };
+    
+    finalResult.finalSummary = finalResult.finalSummary || { ratings: [], nextSteps: [] };
     finalResult.workoutPlan = finalResult.workoutPlan || [];
     finalResult.mealPlan = finalResult.mealPlan || [];
     finalResult.groceryList = finalResult.groceryList || [];
     finalResult.recoverySchedule = finalResult.recoverySchedule || [];
     finalResult.waterSchedule = finalResult.waterSchedule || [];
+    
+    finalResult.motivationalQuote = finalResult.motivationalQuote || { text: "Believe in the process.", author: "UNLCKD" };
+    finalResult.sleepRecommendation = finalResult.sleepRecommendation || { duration: "7-9 hours", rationale: "Standard recovery", tips: [] };
+    finalResult.nutritionStrategy = finalResult.nutritionStrategy || "Focused on goals.";
+    finalResult.recommendedGroceryStore = finalResult.recommendedGroceryStore || "Global Mart";
+    finalResult.stepGoals = finalResult.stepGoals || "8,000 - 10,000 steps daily";
+    finalResult.hydrationTargets = finalResult.hydrationTargets || "2.5L - 3.5L daily";
+    finalResult.goalAlignmentSummary = finalResult.goalAlignmentSummary || "Plan aligned with requirements.";
+    finalResult.trainerSummary = finalResult.trainerSummary || "Keep pushing forward.";
+    finalResult.healthMetrics = finalResult.healthMetrics || {
+      bmi: 0,
+      bmiCategory: "Calculating...",
+      estimatedBodyFat: "TBD",
+      healthStatus: "Assessment Pending",
+      focus: "General Fitness",
+      recommendedCalorieLevel: "maintain",
+      dailyCalorieTarget: "Calculated post-analysis"
+    };
+    finalResult.recommendedWorkout = finalResult.recommendedWorkout || {
+      title: "Daily Foundation",
+      description: "Fundamental movements",
+      exercises: []
+    };
+    finalResult.additionalActivities = finalResult.additionalActivities || {
+      title: "Active Recovery",
+      description: "Low impact movement",
+      activities: []
+    };
 
     // Validation checks for completeness
     const checks: { name: string; pass: boolean; error: string }[] = [];
