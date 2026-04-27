@@ -133,5 +133,26 @@ export const gymService = {
       handleFirestoreError(error, OperationType.LIST, path);
       return [];
     }
+  },
+
+  async getMeasurementsInRange(startDate: string, endDate: string): Promise<Measurement[]> {
+    const user = auth.currentUser;
+    if (!user) return [];
+
+    const path = `users/${user.uid}/measurements`;
+    try {
+      const q = query(
+        collection(db, 'users', user.uid, 'measurements'),
+        orderBy('timestamp', 'desc')
+      );
+
+      const querySnapshot = await getDocs(q);
+      const measurements = querySnapshot.docs.map(doc => doc.data() as Measurement);
+      
+      return measurements.filter(m => m.date >= startDate && m.date <= endDate);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
   }
 };
