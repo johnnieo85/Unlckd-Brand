@@ -22,6 +22,7 @@ import {
   Droplets, 
   Zap as ZapIcon,
   Check,
+  Save,
   Footprints, 
   CheckCircle2, 
   Plus, 
@@ -669,35 +670,40 @@ export const ProGym = ({
     const sortedLogs = [...logs].sort((a, b) => b.date.localeCompare(a.date));
     let streak = 0;
     
+    // Use local date strings for consistent comparison
     const todayStr = getLocalDateString(new Date());
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = getLocalDateString(yesterday);
 
-    const hasToday = sortedLogs.some(l => l.date === todayStr && (l.completedWorkouts || 0) > 0);
-    const hasYesterday = sortedLogs.some(l => l.date === yesterdayStr && (l.completedWorkouts || 0) > 0);
+    // Filter logs that actually have completed workouts
+    const workoutDays = logs
+      .filter(l => (Number(l.completedWorkouts) || 0) > 0)
+      .map(l => l.date);
+    
+    // Sort unique dates descending
+    const uniqueWorkoutDays = Array.from(new Set(workoutDays)).sort((a, b) => b.localeCompare(a));
 
-    if (hasToday || hasYesterday) {
-      let cursor = new Date();
-      cursor.setHours(0, 0, 0, 0);
+    if (uniqueWorkoutDays.length > 0) {
+      const latestWorkoutDate = uniqueWorkoutDays[0];
       
-      // If today is not done, start checking from yesterday for the streak chain
-      if (!hasToday) {
-        cursor.setDate(cursor.getDate() - 1);
-      }
-
-      while (true) {
-        const dateStr = getLocalDateString(cursor);
-        const dayLog = sortedLogs.find(l => l.date === dateStr);
+      // If the latest workout is not today or yesterday, the streak is broken
+      if (latestWorkoutDate === todayStr || latestWorkoutDate === yesterdayStr) {
+        streak = 1;
+        let currentRef = new Date(latestWorkoutDate + 'T00:00:00');
         
-        if (dayLog && (dayLog.completedWorkouts || 0) > 0) {
-          streak++;
-          cursor.setDate(cursor.getDate() - 1);
-        } else {
-          break;
+        for (let i = 1; i < uniqueWorkoutDays.length; i++) {
+          const prevDay = new Date(currentRef);
+          prevDay.setDate(prevDay.getDate() - 1);
+          const prevDayStr = getLocalDateString(prevDay);
+          
+          if (uniqueWorkoutDays[i] === prevDayStr) {
+            streak++;
+            currentRef = prevDay;
+          } else {
+            break;
+          }
         }
-        
-        if (streak > 100) break; // Hard limit for safety
       }
     }
     
@@ -1104,7 +1110,20 @@ export const ProGym = ({
     if (!log) return;
     const newWater = Math.max(0, log.water + amount);
     setLog({ ...log, water: newWater });
-    await gymService.updateDailyLog(selectedDate, { water: newWater });
+    // Note: We'll add a save button or keep it auto-save if desired, 
+    // but the user specifically asked for a save button for hydration/steps.
+    // I will implement a "Sync" button for these sections.
+  };
+
+  const saveHydration = async () => {
+    if (!log) return;
+    await gymService.updateDailyLog(selectedDate, { water: log.water });
+    refreshGlobalStats();
+  };
+
+  const saveSteps = async () => {
+    if (!log) return;
+    await gymService.updateDailyLog(selectedDate, { steps: log.steps });
     refreshGlobalStats();
   };
 
@@ -1112,8 +1131,6 @@ export const ProGym = ({
     if (!log) return;
     const newSteps = Math.max(0, log.steps + amount);
     setLog({ ...log, steps: newSteps });
-    await gymService.updateDailyLog(selectedDate, { steps: newSteps });
-    refreshGlobalStats();
   };
 
   const toggleHabit = async (habit: string) => {
@@ -1701,7 +1718,6 @@ export const ProGym = ({
                                   onChange={(e) => {
                                     const val = parseInt(e.target.value) || 0;
                                     setLog({ ...log, water: val });
-                                    gymService.updateDailyLog(selectedDate, { water: val });
                                   }}
                                   className="w-16 bg-white/5 border border-white/10 rounded px-2 py-0.5 text-right font-mono text-sm text-gray-200 focus:border-blue-500 outline-none transition-colors"
                                 />
@@ -1761,10 +1777,20 @@ export const ProGym = ({
                                       onChange={(e) => {
                                         const val = parseInt(e.target.value);
                                         setLog({ ...log, water: val });
-                                        gymService.updateDailyLog(selectedDate, { water: val });
                                       }}
                                       className="w-full h-1.5 bg-white/5 rounded-lg appearance-none cursor-pointer accent-blue-500"
                                     />
+                                  </div>
+
+                                  <div className="flex justify-end pt-2">
+                                    <Button 
+                                      size="sm"
+                                      onClick={saveHydration}
+                                      className="bg-blue-500 hover:bg-blue-600 text-white gap-2 font-black text-[10px] uppercase h-8 px-4"
+                                    >
+                                      <Save className="w-3 h-3" />
+                                      Save Water
+                                    </Button>
                                   </div>
                                 </div>
                                 
@@ -1808,7 +1834,6 @@ export const ProGym = ({
                                 onChange={(e) => {
                                   const val = parseInt(e.target.value) || 0;
                                   setLog({ ...log, steps: val });
-                                  gymService.updateDailyLog(selectedDate, { steps: val });
                                 }}
                                 className="w-20 bg-white/5 border border-white/10 rounded px-2 py-0.5 text-right font-mono text-sm text-gray-200 focus:border-emerald-500 outline-none transition-colors"
                               />
@@ -1853,6 +1878,17 @@ export const ProGym = ({
                                     </div>
                                   </div>
 
+                                  <div className="flex justify-end pt-2">
+                                    <Button 
+                                      size="sm"
+                                      onClick={saveSteps}
+                                      className="bg-emerald-500 hover:bg-emerald-600 text-white gap-2 font-black text-[10px] uppercase h-8 px-4"
+                                    >
+                                      <Save className="w-3 h-3" />
+                                      Save Steps
+                                    </Button>
+                                  </div>
+
                                   <div className="px-1 pt-2">
                                     <input 
                                       type="range"
@@ -1863,7 +1899,6 @@ export const ProGym = ({
                                       onChange={(e) => {
                                         const val = parseInt(e.target.value);
                                         setLog({ ...log, steps: val });
-                                        gymService.updateDailyLog(selectedDate, { steps: val });
                                       }}
                                       className="w-full h-1.5 bg-white/5 rounded-lg appearance-none cursor-pointer accent-emerald-500"
                                     />
