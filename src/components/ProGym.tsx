@@ -665,29 +665,46 @@ export const ProGym = ({
       logData.water = Number(logData.water) || 0;
       logData.stepGoal = Number(logData.stepGoal) || (latestReport ? Math.max(10000, parseInt(latestReport.report.stepGoals.replace(/\D/g, '')) || 10000) : 10000);
       
-      if (!logData.waterUnit) {
-        logData.waterUnit = 'ml';
-        hasChanges = true;
-      }
-      
-      if (!logData.waterGoal || logData.waterGoal <= 0) {
-        const waterTarget = latestReport?.report.hydrationTargets.toLowerCase() || '3000ml';
-        let wg = 3000;
-        if (waterTarget.includes('oz')) {
-          wg = parseInt(waterTarget.match(/\d+/)?.[0] || '100');
-        } else if (waterTarget.includes('l')) {
-          wg = (parseFloat(waterTarget.match(/[\d.]+/)?.[0] || '3') * 1000);
-        }
+      // Sync water goal with report if available
+      if (latestReport) {
+        const waterTarget = latestReport.report.hydrationTargets.toLowerCase() || '3000ml';
+        let reportGoalMl = 3000;
         
-        // If the target from the report was in ML but we are in OZ, convert it
-        if (logData.waterUnit === 'oz' && !waterTarget.includes('oz')) {
-          wg = Math.round(wg / 29.5735);
+        // Parse report target (usually in ml/liters or oz)
+        if (waterTarget.includes('oz')) {
+          const ozValue = parseInt(waterTarget.match(/\d+/)?.[0] || '100');
+          reportGoalMl = Math.round(ozValue * 29.5735);
+        } else if (waterTarget.includes('l')) {
+          const literMatch = waterTarget.match(/[\d.]+/);
+          reportGoalMl = Math.round((parseFloat(literMatch?.[0] || '3')) * 1000);
+        } else {
+          reportGoalMl = parseInt(waterTarget.match(/\d+/)?.[0] || '3000');
         }
-        logData.waterGoal = wg;
+
+        // Determine current goal in ML for comparison
+        const currentGoalMl = logData.waterUnit === 'oz' 
+          ? Math.round((logData.waterGoal || 0) * 29.5735) 
+          : (logData.waterGoal || 0);
+
+        // If goal is missing, or looks like a major mismatch (e.g. was stored in wrong unit)
+        // or just to ensure sync with report if it's the source of truth
+        if (!logData.waterGoal || logData.waterGoal <= 0 || Math.abs(currentGoalMl - reportGoalMl) > 10) {
+          if (logData.waterUnit === 'oz') {
+            logData.waterGoal = Math.round(reportGoalMl / 29.5735);
+          } else {
+            logData.waterGoal = reportGoalMl;
+            logData.waterUnit = 'ml'; // Default to ml if syncing and no unit explicitly set
+          }
+          hasChanges = true;
+        }
+      }
+
+      // Final safeguard for "extremely high" values (e.g. 3000oz is always wrong for a human)
+      if (logData.waterUnit === 'oz' && (logData.waterGoal || 0) > 400) {
+        logData.waterGoal = Math.round((logData.waterGoal || 3000) / 29.5735);
         hasChanges = true;
-      } else if (logData.waterUnit === 'oz' && logData.waterGoal > 500) {
-        // If goal is extremely high for OZ (likely stuck ML value), convert it
-        logData.waterGoal = Math.round(logData.waterGoal / 29.5735);
+      } else if (logData.waterUnit === 'ml' && (logData.waterGoal || 0) > 10000) {
+        logData.waterGoal = 3000; // Reset to a sane default if it's over 10L
         hasChanges = true;
       }
       
