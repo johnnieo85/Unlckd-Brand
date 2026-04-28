@@ -339,21 +339,22 @@ export const ProGym = ({
 
   const getTrainingTotals = () => {
     const workout = getWorkoutForSelectedDate() as any;
-    if (!workout) return 0;
+    if (!workout) return { completed: 0, total: 0 };
     
-    // In manual mode, keys are mainWork, warmUp. In plan mode, keys are usually mainWorkout, warmUpSequence etc. 
-    // Need to check the actual returned structure from getWorkoutForSelectedDate
-    const warmUp = workout.warmUp || workout.warmUpSequence || [];
-    const mainWork = workout.mainWork || workout.mainWorkout || [];
-    const coolDown = workout.coolDown || workout.coolDownStretch || [];
+    const warmUp = (workout.warmUp || workout.warmUpSequence || '').split(/,|\n/).filter((l: string) => l.trim());
+    const mainWork = (workout.mainWork || workout.mainWorkout || '').split('\n').filter((l: string) => l.trim());
     
-    const parseList = (val: any) => {
-      if (Array.isArray(val)) return val.length;
-      if (typeof val === 'string' && val.trim()) return val.split('\n').length;
-      return 0;
-    };
+    const total = warmUp.length + mainWork.length;
+    let completed = 0;
 
-    return parseList(warmUp) + parseList(mainWork) + parseList(coolDown);
+    warmUp.forEach((_, i) => {
+      if (log?.workoutData?.[`warmup-${i}`]?.completed) completed++;
+    });
+    mainWork.forEach((_, i) => {
+      if (log?.workoutData?.[`main-${i}`]?.completed) completed++;
+    });
+
+    return { completed, total };
   };
 
   const dailyMessage = motivationalMessages[dayOfWeek] || "Consistency is the key to transformation.";
@@ -579,10 +580,10 @@ export const ProGym = ({
     loadData(selectedDate);
   }, [latestReport, selectedDate]);
 
-  const handleTrainingUpdate = (exerciseId: string, field: 'weight' | 'sets' | 'reps' | 'notes' | 'time', value: string) => {
+  const handleTrainingUpdate = (exerciseId: string, field: 'weight' | 'sets' | 'reps' | 'notes' | 'time' | 'completed', value: string | boolean) => {
     if (!log) return;
     const currentData = log.workoutData || {};
-    const exerciseData = currentData[exerciseId] || { weight: '', sets: '', reps: '', notes: '', time: '' };
+    const exerciseData = currentData[exerciseId] || { weight: '', sets: '', reps: '', notes: '', time: '', completed: false };
     
     const updatedWorkoutData = {
       ...currentData,
@@ -594,6 +595,14 @@ export const ProGym = ({
     
     setLog({ ...log, workoutData: updatedWorkoutData });
     gymService.updateDailyLog(selectedDate, { workoutData: updatedWorkoutData });
+  };
+
+  const handleExerciseToggle = (exerciseId: string) => {
+    if (!log) return;
+    const currentData = log.workoutData || {};
+    const exerciseData = currentData[exerciseId] || { weight: '', sets: '', reps: '', notes: '', time: '', completed: false };
+    const isCompleted = !exerciseData.completed;
+    handleTrainingUpdate(exerciseId, 'completed', isCompleted);
   };
 
   const handleGeneralNotesUpdate = (notes: string) => {
@@ -651,6 +660,25 @@ export const ProGym = ({
       const updatedHabits: Record<string, boolean> = {};
       let hasChanges = false;
       
+      // Ensure goals and current values are numbers
+      logData.steps = Number(logData.steps) || 0;
+      logData.water = Number(logData.water) || 0;
+      logData.stepGoal = Number(logData.stepGoal) || (latestReport ? Math.max(10000, parseInt(latestReport.report.stepGoals.replace(/\D/g, '')) || 10000) : 10000);
+      
+      if (!logData.waterGoal || logData.waterGoal <= 0) {
+        const waterTarget = latestReport?.report.hydrationTargets.toLowerCase() || '3000ml';
+        let wg = 3000;
+        if (waterTarget.includes('oz')) {
+          wg = parseInt(waterTarget.match(/\d+/)?.[0] || '100');
+        } else if (waterTarget.includes('l')) {
+          wg = (parseFloat(waterTarget.match(/[\d.]+/)?.[0] || '3') * 1000);
+        }
+        logData.waterGoal = wg;
+        hasChanges = true;
+      }
+      
+      logData.waterGoal = Number(logData.waterGoal) || 3000;
+
       masterHabits.forEach(h => {
         if (currentHabits[h] !== undefined) {
           updatedHabits[h] = currentHabits[h];
@@ -857,9 +885,18 @@ export const ProGym = ({
   const calculateXP = () => {
     if (!log) return 0;
     let xp = 0;
-    xp += Math.min(log.steps / log.stepGoal, 1) * 500;
-    xp += Math.min(log.water / log.waterGoal, 1) * 300;
-    xp += log.completedWorkouts * 1000;
+    const stepProg = Math.min((Number(log.steps) || 0) / (Number(log.stepGoal) || 10000), 1);
+    const waterProg = Math.min((Number(log.water) || 0) / (Number(log.waterGoal) || 3000), 1);
+    
+    xp += stepProg * 500;
+    xp += waterProg * 300;
+    xp += (Number(log.completedWorkouts) || 0) * 1000;
+    
+    // Add XP for completed individual exercises
+    const workoutData = log.workoutData || {};
+    const completedExCount = Object.values(workoutData).filter(ex => ex.completed).length;
+    xp += completedExCount * 50;
+
     const completedMeals = (log.meals || []).filter(m => m.completed).length;
     xp += completedMeals * 100;
     const completedHabits = habitList.filter(habit => log.habits?.[habit]).length;
@@ -1481,44 +1518,62 @@ export const ProGym = ({
                           </div>
                         </div>
                         
-                        <div className="space-y-3">
-                          <div className="flex gap-2">
-                            {(() => {
-                              const increments = log.waterUnit === 'oz' ? [8, 16, 24] : [250, 500, 750];
-                              const baseMinus = log.waterUnit === 'oz' ? -8 : -250;
-                              return (
-                                <>
-                                  <Button 
-                                    variant="outline"
-                                    className="flex-none w-10 border-white/5 hover:border-red-500/30 hover:bg-red-500/5 transition-all p-0"
-                                    onClick={() => updateWater(baseMinus)}
-                                  >
-                                    <Minus className="w-3 h-3 text-red-400" />
-                                  </Button>
-                                  <div className="flex-1 flex gap-2">
-                                    {increments.map((amount) => (
-                                      <Button 
-                                        key={amount}
-                                        variant="outline"
-                                        className="flex-1 border-white/5 hover:border-blue-500/30 hover:bg-blue-500/5 transition-all text-xs"
-                                        onClick={() => updateWater(amount)}
-                                      >
-                                        +{amount}
-                                      </Button>
-                                    ))}
-                                  </div>
-                                </>
-                              );
-                            })()}
+                        <div className="space-y-4">
+                          <div className="space-y-3">
+                            <div className="flex gap-2">
+                              {(() => {
+                                const increments = log.waterUnit === 'oz' ? [8, 16, 24] : [250, 500, 750];
+                                const baseMinus = log.waterUnit === 'oz' ? -8 : -250;
+                                return (
+                                  <>
+                                    <Button 
+                                      variant="outline"
+                                      className="flex-none w-10 border-white/5 hover:border-red-500/30 hover:bg-red-500/5 transition-all p-0"
+                                      onClick={() => updateWater(baseMinus)}
+                                    >
+                                      <Minus className="w-3 h-3 text-red-400" />
+                                    </Button>
+                                    <div className="flex-1 flex gap-2">
+                                      {increments.map((amount) => (
+                                        <Button 
+                                          key={amount}
+                                          variant="outline"
+                                          className="flex-1 border-white/5 hover:border-blue-500/30 hover:bg-blue-500/5 transition-all text-xs"
+                                          onClick={() => updateWater(amount)}
+                                        >
+                                          +{amount}
+                                        </Button>
+                                      ))}
+                                    </div>
+                                  </>
+                                );
+                              })()}
+                            </div>
+
+                            <div className="px-1 pt-2">
+                              <input 
+                                type="range"
+                                min="0"
+                                max={log.waterGoal * 1.5}
+                                step={log.waterUnit === 'oz' ? 1 : 50}
+                                value={log.water}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value);
+                                  setLog({ ...log, water: val });
+                                  gymService.updateDailyLog(selectedDate, { water: val });
+                                }}
+                                className="w-full h-1.5 bg-white/5 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                              />
+                            </div>
                           </div>
-                        </div>
-                        
-                        <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-                          <motion.div 
-                            className="h-full bg-blue-500"
-                            initial={{ width: 0 }}
-                            animate={{ width: `${Math.min((log.water / log.waterGoal) * 100, 100)}%` }}
-                          />
+                          
+                          <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                            <motion.div 
+                              className="h-full bg-blue-500"
+                              initial={{ width: 0 }}
+                              animate={{ width: `${Math.min((log.water / log.waterGoal) * 100, 100)}%` }}
+                            />
+                          </div>
                         </div>
                       </Card>
                     ) : (
@@ -1533,38 +1588,56 @@ export const ProGym = ({
                           <span className="font-mono text-sm text-gray-400">{log.steps}/{log.stepGoal}</span>
                         </div>
                         
-                        <div className="flex gap-2">
-                          <Button 
-                            variant="outline" 
-                            className="flex-none w-10 border-white/5 hover:border-red-500/30 p-0"
-                            onClick={() => updateSteps(-1000)}
-                          >
-                            <Minus className="w-3 h-3 text-red-400" />
-                          </Button>
-                          <div className="flex-1 flex gap-2">
+                        <div className="space-y-4">
+                          <div className="flex gap-2">
                             <Button 
                               variant="outline" 
-                              className="flex-1 border-white/5 text-xs"
-                              onClick={() => updateSteps(1000)}
+                              className="flex-none w-10 border-white/5 hover:border-red-500/30 p-0"
+                              onClick={() => updateSteps(-1000)}
                             >
-                              +1k Steps
+                              <Minus className="w-3 h-3 text-red-400" />
                             </Button>
-                            <Button 
-                              variant="outline" 
-                              className="flex-1 border-white/5 text-xs"
-                              onClick={() => updateSteps(5000)}
-                            >
-                              +5k Steps
-                            </Button>
+                            <div className="flex-1 flex gap-2">
+                              <Button 
+                                variant="outline" 
+                                className="flex-1 border-white/5 text-xs"
+                                onClick={() => updateSteps(1000)}
+                              >
+                                +1k Steps
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                className="flex-1 border-white/5 text-xs"
+                                onClick={() => updateSteps(5000)}
+                              >
+                                +5k Steps
+                              </Button>
+                            </div>
                           </div>
-                        </div>
 
-                        <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-                          <motion.div 
-                            className="h-full bg-emerald-500"
-                            initial={{ width: 0 }}
-                            animate={{ width: `${Math.min((log.steps / log.stepGoal) * 100, 100)}%` }}
-                          />
+                          <div className="px-1 pt-2">
+                            <input 
+                              type="range"
+                              min="0"
+                              max={log.stepGoal * 2}
+                              step="500"
+                              value={log.steps}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value);
+                                setLog({ ...log, steps: val });
+                                gymService.updateDailyLog(selectedDate, { steps: val });
+                              }}
+                              className="w-full h-1.5 bg-white/5 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                            />
+                          </div>
+
+                          <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                            <motion.div 
+                              className="h-full bg-emerald-500"
+                              initial={{ width: 0 }}
+                              animate={{ width: `${Math.min((log.steps / log.stepGoal) * 100, 100)}%` }}
+                            />
+                          </div>
                         </div>
                       </Card>
                     )}
@@ -1587,7 +1660,12 @@ export const ProGym = ({
                   </h3>
                   {isTrainingCollapsed && (
                     <div className="flex items-center gap-3 mt-1">
-                      <span className="text-[10px] font-mono text-brand-primary font-bold">{getTrainingTotals()} EXERCISES</span>
+                      {(() => {
+                        const { completed, total } = getTrainingTotals();
+                        return (
+                          <span className="text-[10px] font-mono text-brand-primary font-bold">{completed} / {total} EXERCISES DONE</span>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>
@@ -1733,6 +1811,7 @@ export const ProGym = ({
                       <table className="w-full text-left min-w-[500px]">
                         <thead className="text-[10px] uppercase tracking-widest text-gray-600 border-b border-white/5">
                           <tr>
+                            <th className="pb-2 font-bold w-[40px] text-center px-0"></th>
                             <th className="pb-2 font-bold w-1/3">Exercise</th>
                             <th className="pb-2 font-bold px-2 text-center">Sets</th>
                             <th className="pb-2 font-bold px-2 text-center">Reps</th>
@@ -1744,8 +1823,24 @@ export const ProGym = ({
                           {(workoutDay?.warmUp || 'Dynamic mobility flow, Walking lunges').split(/,|\n/).filter(line => line.trim()).map((ex, i) => {
                             const { name, sets, reps, url } = parseExercise(ex);
                             const exerciseId = `warmup-${i}`;
+                            const isCompleted = log?.workoutData?.[exerciseId]?.completed || false;
+                            
                             return (
-                              <tr key={i} className="border-b border-white/[0.02] last:border-0 hover:bg-white/[0.01]">
+                              <tr key={i} className={cn(
+                                "border-b border-white/[0.02] last:border-0 hover:bg-white/[0.01] transition-all",
+                                isCompleted && "opacity-40"
+                              )}>
+                                <td className="py-3 px-0 text-center">
+                                  <button 
+                                    onClick={() => handleExerciseToggle(exerciseId)}
+                                    className={cn(
+                                      "w-5 h-5 rounded-full border flex items-center justify-center transition-all",
+                                      isCompleted ? "bg-brand-primary border-brand-primary text-brand-dark" : "border-white/10 hover:border-brand-primary/50"
+                                    )}
+                                  >
+                                    {isCompleted && <Check className="w-3 h-3" />}
+                                  </button>
+                                </td>
                                 <td className="py-3 text-brand-primary font-bold">
                                   {(log?.useManualWorkout || !latestReport) ? (
                                     <div className="flex items-center gap-2">
@@ -1833,6 +1928,7 @@ export const ProGym = ({
                     <table className="w-full text-left min-w-[500px]">
                       <thead className="text-[10px] uppercase tracking-widest text-gray-600 border-b border-brand-primary/10">
                         <tr>
+                          <th className="pb-2 font-bold w-[40px] text-center px-0"></th>
                           <th className="pb-2 font-bold w-1/3">Exercise Pattern</th>
                           <th className="pb-2 font-bold px-2 text-center">Sets</th>
                           <th className="pb-2 font-bold px-2 text-center">Reps</th>
@@ -1842,11 +1938,26 @@ export const ProGym = ({
                       </thead>
                       <tbody className="text-sm">
                         {(workoutDay?.mainWork || '').split('\n').filter(line => line.trim()).map((ex, i) => {
-                          const { name, sets, reps, url } = parseExercise(ex);
                           const exerciseId = `main-${i}`;
+                          const isCompleted = log?.workoutData?.[exerciseId]?.completed || false;
+                          const { name, sets, reps, url } = parseExercise(ex);
                           
                           return (
-                            <tr key={i} className="border-b border-white/[0.02] last:border-0 hover:bg-brand-primary/[0.02] transition-colors group">
+                            <tr key={i} className={cn(
+                              "border-b border-white/[0.02] last:border-0 hover:bg-brand-primary/[0.02] transition-all group",
+                              isCompleted && "opacity-40"
+                            )}>
+                               <td className="py-4 px-0 text-center">
+                                  <button 
+                                    onClick={() => handleExerciseToggle(exerciseId)}
+                                    className={cn(
+                                      "w-5 h-5 rounded-full border flex items-center justify-center transition-all",
+                                      isCompleted ? "bg-brand-primary border-brand-primary text-brand-dark" : "border-white/10 hover:border-brand-primary/50"
+                                    )}
+                                  >
+                                    {isCompleted && <Check className="w-3 h-3" />}
+                                  </button>
+                               </td>
                                <td className="py-4 text-brand-primary font-bold">
                                   {(log?.useManualWorkout || !latestReport) ? (
                                     <div className="flex items-center gap-2">
@@ -1951,7 +2062,7 @@ export const ProGym = ({
                 </div>
                 <div className="flex flex-col">
                   <h3 className="font-bold text-gray-100">Daily Nutrition Log</h3>
-                  {isNutritionCollapsed && log?.meals && log.meals.length > 0 && (
+                  {isNutritionCollapsed && log?.meals && (
                     <div className="flex items-center gap-3 mt-1">
                       {(() => {
                         const totals = getNutritionTotals();
@@ -1959,6 +2070,7 @@ export const ProGym = ({
                           <>
                             <span className="text-[10px] font-mono text-brand-primary font-bold">{totals.calories} CAL</span>
                             <span className="text-[10px] font-mono text-gray-500">{totals.protein}P / {totals.fat}F / {totals.carbs}C</span>
+                            <span className="text-[10px] font-mono text-blue-400 font-bold ml-2">WATER: {log.water}{log.waterUnit}</span>
                           </>
                         );
                       })()}
