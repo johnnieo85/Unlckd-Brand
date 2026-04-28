@@ -603,8 +603,17 @@ export const ProGym = ({
       }
     };
     
+    const isManual = log.useManualWorkout || !latestReport;
     const { completed, total } = getTrainingTotals(updatedWorkoutData);
-    const completedWorkouts = (total > 0 && completed === total) ? 1 : 0;
+    
+    let completedWorkouts = 0;
+    if (isManual) {
+      // For manual sessions, completing at least one exercise counts as a successful workout day
+      completedWorkouts = completed > 0 ? 1 : 0;
+    } else {
+      // For guided sessions, only fully completing the prescribed plan counts
+      completedWorkouts = (total > 0 && completed === total) ? 1 : 0;
+    }
     
     const newLog = { ...log, workoutData: updatedWorkoutData, completedWorkouts };
     setLog(newLog);
@@ -615,11 +624,20 @@ export const ProGym = ({
     gymService.updateDailyLog(selectedDate, { workoutData: updatedWorkoutData, completedWorkouts });
   };
 
+  const getLocalDateString = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const refreshGlobalStats = async () => {
     // Calculate streak and XP from available logs
     const now = new Date();
-    const ninetyDaysAgo = new Date(now.getTime() - (90 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
-    const logs = await gymService.getLogsInRange(ninetyDaysAgo, now.toISOString().split('T')[0]);
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 90);
+    
+    const logs = await gymService.getLogsInRange(getLocalDateString(startDate), getLocalDateString(now));
     
     // XP Calculation
     let calculatedTotalXP = 0;
@@ -630,10 +648,12 @@ export const ProGym = ({
       let dayXp = 0;
       dayXp += stepProg * 500;
       dayXp += waterProg * 300;
+      
+      // A day counts as "completed workout" if the flag is 1
       dayXp += (Number(l.completedWorkouts) || 0) * 1000;
       
       const workoutData = l.workoutData || {};
-      const completedExCount = Object.values(workoutData).filter(ex => ex.completed).length;
+      const completedExCount = Object.values(workoutData).filter(ex => (ex as any).completed).length;
       dayXp += completedExCount * 50;
 
       const completedMeals = (l.meals || []).filter(m => m.completed).length;
@@ -648,24 +668,26 @@ export const ProGym = ({
     // Streak Calculation (Consecutive Workout Days)
     const sortedLogs = [...logs].sort((a, b) => b.date.localeCompare(a.date));
     let streak = 0;
-    let checkDate = new Date();
-    checkDate.setHours(0, 0, 0, 0);
-
-    const todayStr = checkDate.toISOString().split('T')[0];
-    const yesterday = new Date(checkDate);
+    
+    const todayStr = getLocalDateString(new Date());
+    const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    const yesterdayStr = getLocalDateString(yesterday);
 
-    const todayLog = sortedLogs.find(l => l.date === todayStr);
-    const yesterdayLog = sortedLogs.find(l => l.date === yesterdayStr);
+    const hasToday = sortedLogs.some(l => l.date === todayStr && (l.completedWorkouts || 0) > 0);
+    const hasYesterday = sortedLogs.some(l => l.date === yesterdayStr && (l.completedWorkouts || 0) > 0);
 
-    if ((todayLog && (todayLog.completedWorkouts || 0) > 0) || 
-        (yesterdayLog && (yesterdayLog.completedWorkouts || 0) > 0)) {
+    if (hasToday || hasYesterday) {
+      let cursor = new Date();
+      cursor.setHours(0, 0, 0, 0);
       
-      let cursor = (todayLog && (todayLog.completedWorkouts || 0) > 0) ? checkDate : yesterday;
-      
+      // If today is not done, start checking from yesterday for the streak chain
+      if (!hasToday) {
+        cursor.setDate(cursor.getDate() - 1);
+      }
+
       while (true) {
-        const dateStr = cursor.toISOString().split('T')[0];
+        const dateStr = getLocalDateString(cursor);
         const dayLog = sortedLogs.find(l => l.date === dateStr);
         
         if (dayLog && (dayLog.completedWorkouts || 0) > 0) {
@@ -674,8 +696,11 @@ export const ProGym = ({
         } else {
           break;
         }
+        
+        if (streak > 100) break; // Hard limit for safety
       }
     }
+    
     setCurrentStreak(streak);
     updateProfileXPAndStreak(calculatedTotalXP, streak);
   };

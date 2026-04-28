@@ -48,6 +48,7 @@ import { Card, Badge } from './components/ui/Card';
 import { cn, downloadFile } from './lib/utils';
 import { Path, UserData, Photos, ProgressPhotos, AssessmentResult, Rating, SavedReport, UserProfile } from './types';
 import { generateTransformationReport } from './services/gemini';
+import { getLevelInfo } from './lib/levels';
 import { auth } from './lib/firebase';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { historyService } from './services/historyService';
@@ -693,6 +694,11 @@ export default function App() {
                 <div className="flex items-center gap-3 pl-4 border-l border-white/10">
                   <div className="text-right hidden sm:block">
                     <div className="flex items-center gap-2 justify-end mb-0.5">
+                      {userProfile && (
+                        <Badge className="text-[8px] h-3.5 px-1 py-0 border-brand-primary/20 bg-brand-primary/10 text-brand-primary uppercase font-black leading-none mr-1">
+                          Lvl {getLevelInfo(userProfile.xp || 0).level}
+                        </Badge>
+                      )}
                       {hasAccess ? (
                         <Badge className="text-[8px] h-3.5 px-1 py-0 border-brand-primary/20 bg-brand-primary/10 text-brand-primary uppercase font-black leading-none">Pro</Badge>
                       ) : (
