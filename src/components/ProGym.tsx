@@ -665,6 +665,11 @@ export const ProGym = ({
       logData.water = Number(logData.water) || 0;
       logData.stepGoal = Number(logData.stepGoal) || (latestReport ? Math.max(10000, parseInt(latestReport.report.stepGoals.replace(/\D/g, '')) || 10000) : 10000);
       
+      if (!logData.waterUnit) {
+        logData.waterUnit = 'ml';
+        hasChanges = true;
+      }
+      
       if (!logData.waterGoal || logData.waterGoal <= 0) {
         const waterTarget = latestReport?.report.hydrationTargets.toLowerCase() || '3000ml';
         let wg = 3000;
@@ -673,7 +678,16 @@ export const ProGym = ({
         } else if (waterTarget.includes('l')) {
           wg = (parseFloat(waterTarget.match(/[\d.]+/)?.[0] || '3') * 1000);
         }
+        
+        // If the target from the report was in ML but we are in OZ, convert it
+        if (logData.waterUnit === 'oz' && !waterTarget.includes('oz')) {
+          wg = Math.round(wg / 29.5735);
+        }
         logData.waterGoal = wg;
+        hasChanges = true;
+      } else if (logData.waterUnit === 'oz' && logData.waterGoal > 500) {
+        // If goal is extremely high for OZ (likely stuck ML value), convert it
+        logData.waterGoal = Math.round(logData.waterGoal / 29.5735);
         hasChanges = true;
       }
       
@@ -695,7 +709,12 @@ export const ProGym = ({
 
       if (hasChanges) {
         logData.habits = updatedHabits;
-        gymService.updateDailyLog(date, { habits: updatedHabits });
+        gymService.updateDailyLog(date, { 
+          habits: updatedHabits, 
+          waterGoal: logData.waterGoal, 
+          stepGoal: logData.stepGoal, 
+          waterUnit: logData.waterUnit 
+        });
       }
 
       // Ensure meals are initialized if missing or empty in old logs
@@ -945,28 +964,28 @@ export const ProGym = ({
     }
     const updated = { ...log, waterUnit: newUnit, water: newWater, waterGoal: newGoal };
     setLog(updated);
-    await gymService.updateDailyLog(today, updated);
+    await gymService.updateDailyLog(selectedDate, updated);
   };
 
   const updateWater = async (amount: number) => {
     if (!log) return;
     const newWater = Math.max(0, log.water + amount);
     setLog({ ...log, water: newWater });
-    await gymService.updateDailyLog(today, { water: newWater });
+    await gymService.updateDailyLog(selectedDate, { water: newWater });
   };
 
   const updateSteps = async (amount: number) => {
     if (!log) return;
     const newSteps = Math.max(0, log.steps + amount);
     setLog({ ...log, steps: newSteps });
-    await gymService.updateDailyLog(today, { steps: newSteps });
+    await gymService.updateDailyLog(selectedDate, { steps: newSteps });
   };
 
   const toggleHabit = async (habit: string) => {
     if (!log) return;
     const newHabits = { ...log.habits, [habit]: !log.habits?.[habit] };
     setLog({ ...log, habits: newHabits });
-    await gymService.updateDailyLog(today, { habits: newHabits });
+    await gymService.updateDailyLog(selectedDate, { habits: newHabits });
   };
 
   const handlePinSubmit = () => {
@@ -1514,7 +1533,19 @@ export const ProGym = ({
                             >
                               {log.waterUnit}
                             </button>
-                            <span className="font-mono text-sm text-gray-400">{log.water}/{log.waterGoal} {log.waterUnit}</span>
+                            <div className="flex items-center gap-1">
+                              <input 
+                                type="number"
+                                value={log.water}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value) || 0;
+                                  setLog({ ...log, water: val });
+                                  gymService.updateDailyLog(selectedDate, { water: val });
+                                }}
+                                className="w-16 bg-white/5 border border-white/10 rounded px-2 py-0.5 text-right font-mono text-sm text-gray-200 focus:border-blue-500 outline-none transition-colors"
+                              />
+                              <span className="text-sm text-gray-500 font-mono">/ {log.waterGoal} {log.waterUnit}</span>
+                            </div>
                           </div>
                         </div>
                         
@@ -1555,7 +1586,7 @@ export const ProGym = ({
                                 type="range"
                                 min="0"
                                 max={log.waterGoal * 1.5}
-                                step={log.waterUnit === 'oz' ? 1 : 50}
+                                step={log.waterUnit === 'oz' ? 1 : 10}
                                 value={log.water}
                                 onChange={(e) => {
                                   const val = parseInt(e.target.value);
@@ -1585,7 +1616,19 @@ export const ProGym = ({
                             </div>
                             <h3 className="font-bold text-gray-200">Movement</h3>
                           </div>
-                          <span className="font-mono text-sm text-gray-400">{log.steps}/{log.stepGoal}</span>
+                          <div className="flex items-center gap-1">
+                            <input 
+                              type="number"
+                              value={log.steps}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value) || 0;
+                                setLog({ ...log, steps: val });
+                                gymService.updateDailyLog(selectedDate, { steps: val });
+                              }}
+                              className="w-20 bg-white/5 border border-white/10 rounded px-2 py-0.5 text-right font-mono text-sm text-gray-200 focus:border-emerald-500 outline-none transition-colors"
+                            />
+                            <span className="text-sm text-gray-500 font-mono">/ {log.stepGoal}</span>
+                          </div>
                         </div>
                         
                         <div className="space-y-4">
@@ -1620,7 +1663,7 @@ export const ProGym = ({
                               type="range"
                               min="0"
                               max={log.stepGoal * 2}
-                              step="500"
+                              step="100"
                               value={log.steps}
                               onChange={(e) => {
                                 const val = parseInt(e.target.value);
