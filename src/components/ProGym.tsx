@@ -195,6 +195,8 @@ export const ProGym = ({
   const [isStepsCollapsed, setIsStepsCollapsed] = useState(false);
   const [isWeightCollapsed, setIsWeightCollapsed] = useState(false);
   const [isHubUnlocked, setIsHubUnlocked] = useState(false);
+  const [isSavingHydration, setIsSavingHydration] = useState(false);
+  const [isSavingSteps, setIsSavingSteps] = useState(false);
   const [pinEntry, setPinEntry] = useState('');
   const [pinSetup, setPinSetup] = useState({ pin: '', confirm: '' });
   const [error, setError] = useState('');
@@ -676,30 +678,33 @@ export const ProGym = ({
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = getLocalDateString(yesterday);
 
-    // Filter logs that actually have completed workouts
-    const workoutDays = logs
-      .filter(l => (Number(l.completedWorkouts) || 0) > 0)
-      .map(l => l.date);
-    
-    // Sort unique dates descending
-    const uniqueWorkoutDays = Array.from(new Set(workoutDays)).sort((a, b) => b.localeCompare(a));
+    // Filter logs that actually have activity (workout, steps, water, or habits)
+    // This makes the streak more representative of daily commitment
+    const activeDays = Array.from(new Set(
+      logs.filter(l => {
+        const hasWorkout = (Number(l.completedWorkouts) || 0) > 0;
+        const hasSteps = (Number(l.steps) || 0) >= (Number(l.stepGoal) || 10000) && (Number(l.steps) || 0) > 0;
+        const hasWater = (Number(l.water) || 0) >= (Number(l.waterGoal) || 2000) && (Number(l.water) || 0) > 0;
+        const hasHabits = l.habits ? Object.values(l.habits).some(v => v === true) : false;
+        return hasWorkout || hasSteps || hasWater || hasHabits;
+      }).map(l => l.date)
+    )).sort((a, b) => b.localeCompare(a));
 
-    if (uniqueWorkoutDays.length > 0) {
-      const latestWorkoutDate = uniqueWorkoutDays[0];
+    if (activeDays.length > 0) {
+      const latestActiveDate = activeDays[0];
       
-      // If the latest workout is not today or yesterday, the streak is broken
-      if (latestWorkoutDate === todayStr || latestWorkoutDate === yesterdayStr) {
+      // If the latest activity is not today or yesterday, the streak is broken
+      if (latestActiveDate === todayStr || latestActiveDate === yesterdayStr) {
         streak = 1;
-        let currentRef = new Date(latestWorkoutDate + 'T00:00:00');
         
-        for (let i = 1; i < uniqueWorkoutDays.length; i++) {
-          const prevDay = new Date(currentRef);
-          prevDay.setDate(prevDay.getDate() - 1);
-          const prevDayStr = getLocalDateString(prevDay);
+        for (let i = 1; i < activeDays.length; i++) {
+          // Compare consecutive items in the sorted list
+          const d1 = new Date(activeDays[i-1] + 'T12:00:00');
+          const d2 = new Date(activeDays[i] + 'T12:00:00');
+          const diffDays = Math.round((d1.getTime() - d2.getTime()) / (1000 * 60 * 60 * 24));
           
-          if (uniqueWorkoutDays[i] === prevDayStr) {
+          if (diffDays === 1) {
             streak++;
-            currentRef = prevDay;
           } else {
             break;
           }
@@ -1117,14 +1122,26 @@ export const ProGym = ({
 
   const saveHydration = async () => {
     if (!log) return;
-    await gymService.updateDailyLog(selectedDate, { water: log.water });
-    refreshGlobalStats();
+    setIsSavingHydration(true);
+    try {
+      await gymService.updateDailyLog(selectedDate, { water: log.water });
+      await refreshGlobalStats();
+      setTimeout(() => setIsSavingHydration(false), 2000);
+    } catch (e) {
+      setIsSavingHydration(false);
+    }
   };
 
   const saveSteps = async () => {
     if (!log) return;
-    await gymService.updateDailyLog(selectedDate, { steps: log.steps });
-    refreshGlobalStats();
+    setIsSavingSteps(true);
+    try {
+      await gymService.updateDailyLog(selectedDate, { steps: log.steps });
+      await refreshGlobalStats();
+      setTimeout(() => setIsSavingSteps(false), 2000);
+    } catch (e) {
+      setIsSavingSteps(false);
+    }
   };
 
   const updateSteps = async (amount: number) => {
@@ -1786,10 +1803,24 @@ export const ProGym = ({
                                     <Button 
                                       size="sm"
                                       onClick={saveHydration}
-                                      className="bg-blue-500 hover:bg-blue-600 text-white gap-2 font-black text-[10px] uppercase h-8 px-4"
+                                      className={cn(
+                                        "gap-2 font-black text-[10px] uppercase h-8 px-4 transition-all duration-300",
+                                        isSavingHydration 
+                                          ? "bg-green-500 hover:bg-green-600 text-brand-dark" 
+                                          : "bg-blue-500 hover:bg-blue-600 text-white"
+                                      )}
                                     >
-                                      <Save className="w-3 h-3" />
-                                      Save Water
+                                      {isSavingHydration ? (
+                                        <>
+                                          <Check className="w-3 h-3" />
+                                          Synced
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Save className="w-3 h-3" />
+                                          Save Water
+                                        </>
+                                      )}
                                     </Button>
                                   </div>
                                 </div>
@@ -1882,10 +1913,24 @@ export const ProGym = ({
                                     <Button 
                                       size="sm"
                                       onClick={saveSteps}
-                                      className="bg-emerald-500 hover:bg-emerald-600 text-white gap-2 font-black text-[10px] uppercase h-8 px-4"
+                                      className={cn(
+                                        "gap-2 font-black text-[10px] uppercase h-8 px-4 transition-all duration-300",
+                                        isSavingSteps 
+                                          ? "bg-green-500 hover:bg-green-600 text-brand-dark" 
+                                          : "bg-emerald-500 hover:bg-emerald-600 text-white"
+                                      )}
                                     >
-                                      <Save className="w-3 h-3" />
-                                      Save Steps
+                                      {isSavingSteps ? (
+                                        <>
+                                          <Check className="w-3 h-3" />
+                                          Synced
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Save className="w-3 h-3" />
+                                          Save Steps
+                                        </>
+                                      )}
                                     </Button>
                                   </div>
 
