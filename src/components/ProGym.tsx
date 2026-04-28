@@ -339,7 +339,7 @@ export const ProGym = ({
     }), { calories: 0, protein: 0, fat: 0, carbs: 0 });
   };
 
-  const getTrainingTotals = () => {
+  const getTrainingTotals = (overrideData?: any) => {
     const workout = getWorkoutForSelectedDate() as any;
     if (!workout) return { completed: 0, total: 0 };
     
@@ -348,12 +348,13 @@ export const ProGym = ({
     
     const total = warmUp.length + mainWork.length;
     let completed = 0;
+    const data = overrideData || log?.workoutData || {};
 
     warmUp.forEach((_, i) => {
-      if (log?.workoutData?.[`warmup-${i}`]?.completed) completed++;
+      if (data[`warmup-${i}`]?.completed) completed++;
     });
     mainWork.forEach((_, i) => {
-      if (log?.workoutData?.[`main-${i}`]?.completed) completed++;
+      if (data[`main-${i}`]?.completed) completed++;
     });
 
     return { completed, total };
@@ -595,8 +596,11 @@ export const ProGym = ({
       }
     };
     
-    setLog({ ...log, workoutData: updatedWorkoutData });
-    gymService.updateDailyLog(selectedDate, { workoutData: updatedWorkoutData });
+    const { completed, total } = getTrainingTotals(updatedWorkoutData);
+    const completedWorkouts = (total > 0 && completed === total) ? 1 : 0;
+    
+    setLog({ ...log, workoutData: updatedWorkoutData, completedWorkouts });
+    gymService.updateDailyLog(selectedDate, { workoutData: updatedWorkoutData, completedWorkouts });
   };
 
   const handleExerciseToggle = (exerciseId: string) => {
@@ -1473,7 +1477,7 @@ export const ProGym = ({
               <div className="grid grid-cols-3 gap-4 md:flex md:gap-8 w-full md:w-auto">
                 <div className="flex justify-center">
                   <Ring 
-                    progress={log.steps / log.stepGoal} 
+                    progress={log ? (log.steps / (log.stepGoal || 10000)) : 0} 
                     color="#10b981" 
                     icon={Footprints} 
                     label="Steps" 
@@ -1481,7 +1485,7 @@ export const ProGym = ({
                 </div>
                 <div className="flex justify-center">
                   <Ring 
-                    progress={log.water / log.waterGoal} 
+                    progress={log ? (log.water / (log.waterGoal || 3000)) : 0} 
                     color="#3b82f6" 
                     icon={Droplets} 
                     label="Hydration" 
@@ -1489,7 +1493,10 @@ export const ProGym = ({
                 </div>
                 <div className="flex justify-center">
                   <Ring 
-                    progress={log.completedWorkouts > 0 ? 1 : 0} 
+                    progress={log ? (() => {
+                      const { completed, total } = getTrainingTotals();
+                      return total > 0 ? completed / total : ((log.completedWorkouts || 0) > 0 ? 1 : 0);
+                    })() : 0} 
                     color="#fbbf24" 
                     icon={Dumbbell} 
                     label="Workout" 
@@ -3057,6 +3064,35 @@ export const ProGym = ({
                                       </div>
                                     );
                                   })}
+
+                                  {(() => {
+                                    const workoutCompletions = reportLogs.filter(l => (l.completedWorkouts || 0) > 0).length;
+                                    const workoutPercentage = Math.round((workoutCompletions / Math.max(1, daysToConsider)) * 100);
+                                    return (
+                                      <>
+                                        <div className="sticky left-0 z-20 bg-brand-surface flex items-center justify-between gap-3 pl-3 pr-4 min-w-0 h-10 border-r border-white/10 shadow-[4px_0_12px_rgba(0,0,0,0.4)]">
+                                          <span className="text-xs font-bold text-gray-100 truncate flex-1">Workout Sessions</span>
+                                          <span className="text-[10px] font-mono font-black text-amber-500 shrink-0 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">{workoutPercentage}%</span>
+                                        </div>
+                                        {Array.from({ length: daysInMonth }).map((_, i) => {
+                                          const day = i + 1;
+                                          const dateStr = `${reportDate.getFullYear()}-${String(reportDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                                          const logAtDate = reportLogs.find(l => l.date === dateStr);
+                                          const isDone = logAtDate && (logAtDate.completedWorkouts || 0) > 0;
+                                          const isFuture = new Date(dateStr) > new Date();
+
+                                          return (
+                                            <div key={i} className="flex justify-center h-10 items-center bg-white/[0.01] border-b border-white/[0.02]">
+                                              {isFuture ? <div className="w-2 h-2 rounded-full bg-white/[0.03]" /> :
+                                               isDone ? <div className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(251,191,36,0.4)]" /> :
+                                               <div className="w-2 h-2 rounded-full border border-white/10" />
+                                              }
+                                            </div>
+                                          );
+                                        })}
+                                      </>
+                                    );
+                                  })()}
                                 </>
                               );
                             })()}
