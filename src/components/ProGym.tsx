@@ -49,14 +49,16 @@ import {
   GripVertical,
   Edit2,
   Trash2,
-  Shield
+  Shield,
+  Download,
+  ExternalLink
 } from 'lucide-react';
 import { Card, Badge } from './ui/Card';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { gymService } from '../services/gymService';
 import { DailyLog, SavedReport, Measurement, UserProfile, Badge as UserBadge } from '../types';
-import { cn } from '../lib/utils';
+import { cn, downloadFile } from '../lib/utils';
 import { updateGymPin, updateUserProfile } from '../services/accessService';
 import { 
   LineChart, 
@@ -1591,6 +1593,47 @@ export const ProGym = ({
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                {!isTrainingCollapsed && !log?.useManualWorkout && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    className="text-brand-primary hover:bg-brand-primary/10 transition-all flex items-center gap-2"
+                    onClick={() => {
+                      if (!workoutDay) return;
+                      const dayName = new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long' });
+                      let content = `UNLCKD PRO TRAINING - ${dayName.toUpperCase()}\n`;
+                      content += `==========================================\n\n`;
+                      content += `FOCUS: ${workoutDay.focus || 'N/A'}\n\n`;
+                      
+                      content += `WARM-UP SEQUENCE:\n`;
+                      content += `-----------------\n`;
+                      const warmUpLines = (workoutDay.warmUp || '').split(/,|\n/).filter((l: string) => l.trim());
+                      warmUpLines.forEach((l: string) => {
+                        const { name, sets, reps } = parseExercise(l);
+                        content += `- ${name} (${sets} x ${reps})\n`;
+                      });
+                      
+                      content += `\nMAIN WORKOUT:\n`;
+                      content += `-------------\n`;
+                      const mainWorkLines = (workoutDay.mainWork || '').split(/,|\n/).filter((l: string) => l.trim());
+                      mainWorkLines.forEach((l: string) => {
+                        const { name, sets, reps } = parseExercise(l);
+                        content += `- ${name} (${sets} x ${reps})\n`;
+                      });
+
+                      if (workoutDay.notes) {
+                        content += `\nCOACH NOTES:\n`;
+                        content += `------------\n`;
+                        content += workoutDay.notes;
+                      }
+                      
+                      downloadFile(`unlckd-workout-${selectedDate}.txt`, content);
+                    }}
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Download</span>
+                  </Button>
+                )}
                 <Button 
                   variant="ghost" 
                   size="sm" 

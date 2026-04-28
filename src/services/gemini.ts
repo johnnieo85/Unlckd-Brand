@@ -104,7 +104,7 @@ function safeParseJson(text: string): any {
 /**
  * AI CALL RETRY HELPER
  */
-async function withRetry<T>(fn: () => Promise<T>, retries = 5, delay = 4000): Promise<T> {
+async function withRetry<T>(fn: () => Promise<T>, retries = 8, delay = 10000): Promise<T> {
   try {
     return await fn();
   } catch (error: any) {
@@ -126,10 +126,11 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 5, delay = 4000): Pr
       errorMsg.includes('fetch failed');
 
     if (retries > 0 && isRetryable) {
-      const waitTime = isRateLimit ? delay * 3 : delay;
-      console.warn(`Gemini busy, rate limited, or network error. Retrying in ${waitTime}ms... (${retries} attempts left)`);
+      // Very aggressive wait for rate limits (15-30s start, then exponential)
+      const waitTime = isRateLimit ? Math.max(delay, 15000) : delay;
+      console.warn(`Gemini busy, rate limited, or network error. Wait ${waitTime}ms... (${retries} left). Msg: ${error.message}`);
       await new Promise(resolve => setTimeout(resolve, waitTime));
-      return withRetry(fn, retries - 1, delay * 2); // Exponential backoff
+      return withRetry(fn, retries - 1, Math.min(delay * 2, 60000)); // Max wait 60s
     }
     throw error;
   }
@@ -422,8 +423,10 @@ async function generateWorkoutPlan(
       Current Range: Weeks ${startWeek}-${endWeek}.
       
       CRITICAL: You MUST use the search tool to find and verify active, non-broken YouTube video links.
-      ONLY use videos from established, high-authority fitness channels: "Renaissance Periodization", "Jeff Nippard", "Squat University", "Athlean-X", "ScottHermanFitness", "Mind Pump TV", "Buff Dudes", "Alan Thrall". 
+      ONLY use videos from established, high-authority fitness channels: "Renaissance Periodization", "Jeff Nippard", "Squat University", "Athlean-X", "ScottHermanFitness", "Mind Pump TV", "Buff Dudes", "Alan Thrall", "Bodybuilding.com". 
       Avoid "Shorts", deleted videos, or private clips. Every videoUrl MUST be a high-accuracy, reliable tutorial.
+      If a specific video is hard to verify, provide a high-quality link from a major fitness publication (e.g., Men's Health, Muscle & Fitness).
+      Every videoUrl MUST be a direct, working link.
       
       EVERY exercise MUST be formatted as "[Name (Sets x Reps)](YouTube Link)".
       CRITICAL: Use a NEW LINE (\n) for EACH exercise in the "mainWork" and "warmUp" strings. 
@@ -437,8 +440,9 @@ async function generateWorkoutPlan(
         contents: prompt,
         config: {
           systemInstruction: `Expert S&C Coach. JSON only. 
-          CRITICAL: Every videoUrl MUST be a verified, active YouTube tutorial from one of these channels: "Renaissance Periodization", "Jeff Nippard", "Squat University", "Athlean-X", "ScottHermanFitness".
-          Use the search tool for EVERY exercise to ensure the link works and is NOT a short.
+          CRITICAL: Every videoUrl MUST be a verified, active YouTube tutorial from high-authority sources (e.g., "Renaissance Periodization", "Jeff Nippard", "Squat University", "Athlean-X", "ScottHermanFitness").
+          Use the search tool for EVERY exercise to ensure the link works and is NOT a short or private video.
+          If no perfect video exists, use a reputable fitness article with a clear demonstration.
           Ensure exact requested weeks are provided.`,
           responseMimeType: "application/json",
           tools: [{ googleSearch: {} }],
@@ -486,14 +490,14 @@ async function generateWorkoutPlan(
     }
   };
 
-  // Process in smaller batches of 2 weeks for higher reliability and less chance of client-side throttling
-  const batches = [[1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12]];
+  // Process in 3 batches of 4 weeks to reduce request count and stay within search tool quotas
+  const batches = [[1, 4], [5, 8], [9, 12]];
   
   for (const [start, end] of batches) {
     const batch = await fetchBatch(start, end);
     workoutPlan.push(...batch);
-    // Significant delay to avoid rate limiting with heavy tool usage
-    await new Promise(resolve => setTimeout(resolve, 4000));
+    // Significant cooling delay between search-heavy batches
+    await new Promise(resolve => setTimeout(resolve, 8000));
   }
 
   return { workoutPlan: workoutPlan.sort((a, b) => a.week - b.week) };
@@ -513,10 +517,10 @@ async function generateMealPlan(
       Generate Weeks ${startWeek} through ${endWeek} of a personalized 12-week meal plan for UNLCKD Pro Trainer.
       User: ${userData.name}, Preferences: ${userData.caloriePreference}, Allergies: ${userData.allergies}.
       
-      CRITICAL: You MUST use the search tool to find and verify direct, active Pinterest recipe links.
-      Prefer pins from verified recipe developers: "Skinnytaste", "Minimalist Baker", "EatingWell", "AllRecipes", "Food Network".
-      Every meal URL MUST be a direct Pinterest recipe pin (format: https://www.pinterest.com/pin/XXXXXXXXXXXX/). 
-      Check that the Pin ID is still active. No dead links.
+      CRITICAL: You MUST use the search tool to find and verify direct, active recipe links.
+      Prefer links from verified recipe developers: "Skinnytaste", "Minimalist Baker", "EatingWell", "AllRecipes", "Food Network", "Simply Recipes", "Serious Eats".
+      While Pinterest pins are okay, direct website links (e.g., https://www.skinnytaste.com/xyz) are STRONGLY PREFERRED as they are more stable.
+      Avoid login-walled sites or dead Pinterest IDs. Every meal URL MUST lead to a live, readable recipe.
       
       Current Range: Weeks ${startWeek}-${endWeek}.
       Return exactly ${endWeek - startWeek + 1} week objects in the mealPlan array.
@@ -528,9 +532,9 @@ async function generateMealPlan(
         contents: prompt,
         config: {
           systemInstruction: `Elite Nutritionist. JSON only. 
-          CRITICAL: Every URL MUST be a direct, active Pinterest recipe pin. 
-          Use the search tool to verify every link leads to a live recipe. NO broken links.
-          NEVER guess a Pin ID.
+          CRITICAL: Every URL MUST be a direct, active recipe link (Direct website URLs are preferred over Pinterest).
+          Use the search tool to verify every link leads to a live recipe. NO broken links, NO login walls.
+          NEVER guess a URL or Pin ID.
           The grocery list (generated separately) will be cross-referenced, so ensure these recipes are standard and realistic.
           Ensure exact requested weeks are provided.`,
           responseMimeType: "application/json",
@@ -585,13 +589,14 @@ async function generateMealPlan(
     }
   };
 
-  const batches = [[1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12]];
+  // Process in 3 batches of 4 weeks to reduce request count
+  const batches = [[1, 4], [5, 8], [9, 12]];
 
   for (const [start, end] of batches) {
     const batch = await fetchBatch(start, end);
     mealPlan.push(...batch);
-    // Significant delay to avoid rate limiting with heavy tool usage
-    await new Promise(resolve => setTimeout(resolve, 4000));
+    // Significant cooling delay between search-heavy batches
+    await new Promise(resolve => setTimeout(resolve, 8000));
   }
 
   return { mealPlan: mealPlan.sort((a, b) => a.week - b.week) };
@@ -630,6 +635,8 @@ export async function generateTransformationReport(
     if (['full', 'workout'].includes(path)) {
       try {
         console.log("Generating 12-week workout plan...");
+        // Cooldown after previous search-heavy steps
+        await new Promise(resolve => setTimeout(resolve, 5000));
         const workout = await generateWorkoutPlan(cleanUserData, isResubmit);
         result = { ...result, ...workout };
       } catch (e) {
@@ -642,6 +649,8 @@ export async function generateTransformationReport(
     if (['full', 'meal'].includes(path)) {
       try {
         console.log("Generating 12-week meal plan...");
+        // Cooldown after previous search-heavy steps
+        await new Promise(resolve => setTimeout(resolve, 5000));
         const meal = await generateMealPlan(cleanUserData, isResubmit);
         result = { ...result, ...meal };
       } catch (e) {
