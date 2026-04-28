@@ -184,6 +184,8 @@ export const ProGym = ({
   const [isNutritionCollapsed, setIsNutritionCollapsed] = useState(false);
   const [isTrainingCollapsed, setIsTrainingCollapsed] = useState(false);
   const [isHabitsCollapsed, setIsHabitsCollapsed] = useState(false);
+  const [isWaterCollapsed, setIsWaterCollapsed] = useState(false);
+  const [isStepsCollapsed, setIsStepsCollapsed] = useState(false);
   const [isWeightCollapsed, setIsWeightCollapsed] = useState(false);
   const [isHubUnlocked, setIsHubUnlocked] = useState(false);
   const [pinEntry, setPinEntry] = useState('');
@@ -1535,170 +1537,220 @@ export const ProGym = ({
                 {trackerOrder.map((id) => (
                   <SortableTracker key={id} id={id}>
                     {id === 'hydration' ? (
-                      <Card className="p-8 space-y-6 bg-brand-surface border-white/5 h-full">
+                      <Card className="p-8 bg-brand-surface border-white/5 h-full">
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="p-2 bg-blue-500/10 rounded-lg">
+                          <div 
+                            className="flex items-center gap-3 cursor-pointer group"
+                            onClick={() => setIsWaterCollapsed(!isWaterCollapsed)}
+                          >
+                            <div className="p-2 bg-blue-500/10 rounded-lg group-hover:bg-blue-500/20 transition-colors">
                               <Droplets className="w-5 h-5 text-blue-500" />
                             </div>
-                            <h3 className="font-bold text-gray-200">Hydration</h3>
+                            <div className="flex flex-col">
+                              <h3 className="font-bold text-gray-200">Hydration</h3>
+                              <div className="flex items-center gap-2">
+                                <span className={cn("text-[10px] font-black uppercase tracking-widest", isWaterCollapsed ? "text-blue-400" : "text-gray-500")}>
+                                  {isWaterCollapsed ? `${log.water} / ${log.waterGoal} ${log.waterUnit}` : "Track Intake"}
+                                </span>
+                                {isWaterCollapsed ? <ChevronDown className="w-3 h-3 text-gray-600" /> : <ChevronUp className="w-3 h-3 text-gray-600" />}
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-4">
-                            <button 
-                              onClick={toggleWaterUnit}
-                              className="text-[10px] font-black uppercase tracking-widest px-2 py-1 bg-white/5 rounded-md hover:bg-white/10 active:scale-95 transition-all text-gray-500 hover:text-blue-400"
+                          {!isWaterCollapsed && (
+                            <div className="flex items-center gap-4">
+                              <button 
+                                onClick={toggleWaterUnit}
+                                className="text-[10px] font-black uppercase tracking-widest px-2 py-1 bg-white/5 rounded-md hover:bg-white/10 active:scale-95 transition-all text-gray-500 hover:text-blue-400"
+                              >
+                                {log.waterUnit}
+                              </button>
+                              <div className="flex items-center gap-1">
+                                <input 
+                                  type="number"
+                                  value={log.water}
+                                  onChange={(e) => {
+                                    const val = parseInt(e.target.value) || 0;
+                                    setLog({ ...log, water: val });
+                                    gymService.updateDailyLog(selectedDate, { water: val });
+                                  }}
+                                  className="w-16 bg-white/5 border border-white/10 rounded px-2 py-0.5 text-right font-mono text-sm text-gray-200 focus:border-blue-500 outline-none transition-colors"
+                                />
+                                <span className="text-sm text-gray-500 font-mono">/ {log.waterGoal} {log.waterUnit}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <AnimatePresence>
+                          {!isWaterCollapsed && (
+                            <motion.div 
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              className="overflow-hidden"
                             >
-                              {log.waterUnit}
-                            </button>
+                              <div className="space-y-4 pt-6">
+                                <div className="space-y-3">
+                                  <div className="flex gap-2">
+                                    {(() => {
+                                      const increments = log.waterUnit === 'oz' ? [8, 16, 24] : [250, 500, 750];
+                                      const baseMinus = log.waterUnit === 'oz' ? -8 : -250;
+                                      return (
+                                        <>
+                                          <Button 
+                                            variant="outline"
+                                            className="flex-none w-10 border-white/5 hover:border-red-500/30 hover:bg-red-500/5 transition-all p-0"
+                                            onClick={() => updateWater(baseMinus)}
+                                          >
+                                            <Minus className="w-3 h-3 text-red-400" />
+                                          </Button>
+                                          <div className="flex-1 flex gap-2">
+                                            {increments.map((amount) => (
+                                              <Button 
+                                                key={amount}
+                                                variant="outline"
+                                                className="flex-1 border-white/5 hover:border-blue-500/30 hover:bg-blue-500/5 transition-all text-xs"
+                                                onClick={() => updateWater(amount)}
+                                              >
+                                                +{amount}
+                                              </Button>
+                                            ))}
+                                          </div>
+                                        </>
+                                      );
+                                    })()}
+                                  </div>
+
+                                  <div className="px-1 pt-2">
+                                    <input 
+                                      type="range"
+                                      min="0"
+                                      max={log.waterGoal * 1.5}
+                                      step={log.waterUnit === 'oz' ? 1 : 10}
+                                      value={log.water}
+                                      onChange={(e) => {
+                                        const val = parseInt(e.target.value);
+                                        setLog({ ...log, water: val });
+                                        gymService.updateDailyLog(selectedDate, { water: val });
+                                      }}
+                                      className="w-full h-1.5 bg-white/5 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                    />
+                                  </div>
+                                </div>
+                                
+                                <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                                  <motion.div 
+                                    className="h-full bg-blue-500"
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${Math.min((log.water / log.waterGoal) * 100, 100)}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </Card>
+                    ) : (
+                      <Card className="p-8 bg-brand-surface border-white/5 h-full">
+                        <div className="flex items-center justify-between">
+                          <div 
+                            className="flex items-center gap-3 cursor-pointer group"
+                            onClick={() => setIsStepsCollapsed(!isStepsCollapsed)}
+                          >
+                            <div className="p-2 bg-emerald-500/10 rounded-lg group-hover:bg-emerald-500/20 transition-colors">
+                              <Footprints className="w-5 h-5 text-emerald-500" />
+                            </div>
+                            <div className="flex flex-col">
+                              <h3 className="font-bold text-gray-200">Movement</h3>
+                              <div className="flex items-center gap-2">
+                                <span className={cn("text-[10px] font-black uppercase tracking-widest", isStepsCollapsed ? "text-emerald-400" : "text-gray-500")}>
+                                  {isStepsCollapsed ? `${log.steps.toLocaleString()} / ${log.stepGoal.toLocaleString()}` : "Daily Progress"}
+                                </span>
+                                {isStepsCollapsed ? <ChevronDown className="w-3 h-3 text-gray-600" /> : <ChevronUp className="w-3 h-3 text-gray-600" />}
+                              </div>
+                            </div>
+                          </div>
+                          {!isStepsCollapsed && (
                             <div className="flex items-center gap-1">
                               <input 
                                 type="number"
-                                value={log.water}
+                                value={log.steps}
                                 onChange={(e) => {
                                   const val = parseInt(e.target.value) || 0;
-                                  setLog({ ...log, water: val });
-                                  gymService.updateDailyLog(selectedDate, { water: val });
+                                  setLog({ ...log, steps: val });
+                                  gymService.updateDailyLog(selectedDate, { steps: val });
                                 }}
-                                className="w-16 bg-white/5 border border-white/10 rounded px-2 py-0.5 text-right font-mono text-sm text-gray-200 focus:border-blue-500 outline-none transition-colors"
+                                className="w-20 bg-white/5 border border-white/10 rounded px-2 py-0.5 text-right font-mono text-sm text-gray-200 focus:border-emerald-500 outline-none transition-colors"
                               />
-                              <span className="text-sm text-gray-500 font-mono">/ {log.waterGoal} {log.waterUnit}</span>
+                              <span className="text-sm text-gray-500 font-mono">/ {log.stepGoal}</span>
                             </div>
-                          </div>
+                          )}
                         </div>
                         
-                        <div className="space-y-4">
-                          <div className="space-y-3">
-                            <div className="flex gap-2">
-                              {(() => {
-                                const increments = log.waterUnit === 'oz' ? [8, 16, 24] : [250, 500, 750];
-                                const baseMinus = log.waterUnit === 'oz' ? -8 : -250;
-                                return (
-                                  <>
+                        <AnimatePresence>
+                          {!isStepsCollapsed && (
+                            <motion.div 
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              className="overflow-hidden"
+                            >
+                              <div className="space-y-4 pt-6">
+                                <div className="space-y-4">
+                                  <div className="flex gap-2">
                                     <Button 
-                                      variant="outline"
-                                      className="flex-none w-10 border-white/5 hover:border-red-500/30 hover:bg-red-500/5 transition-all p-0"
-                                      onClick={() => updateWater(baseMinus)}
+                                      variant="outline" 
+                                      className="flex-none w-10 border-white/5 hover:border-red-500/30 p-0"
+                                      onClick={() => updateSteps(-1000)}
                                     >
                                       <Minus className="w-3 h-3 text-red-400" />
                                     </Button>
                                     <div className="flex-1 flex gap-2">
-                                      {increments.map((amount) => (
-                                        <Button 
-                                          key={amount}
-                                          variant="outline"
-                                          className="flex-1 border-white/5 hover:border-blue-500/30 hover:bg-blue-500/5 transition-all text-xs"
-                                          onClick={() => updateWater(amount)}
-                                        >
-                                          +{amount}
-                                        </Button>
-                                      ))}
+                                      <Button 
+                                        variant="outline" 
+                                        className="flex-1 border-white/5 text-xs"
+                                        onClick={() => updateSteps(1000)}
+                                      >
+                                        +1k Steps
+                                      </Button>
+                                      <Button 
+                                        variant="outline" 
+                                        className="flex-1 border-white/5 text-xs"
+                                        onClick={() => updateSteps(5000)}
+                                      >
+                                        +5k Steps
+                                      </Button>
                                     </div>
-                                  </>
-                                );
-                              })()}
-                            </div>
+                                  </div>
 
-                            <div className="px-1 pt-2">
-                              <input 
-                                type="range"
-                                min="0"
-                                max={log.waterGoal * 1.5}
-                                step={log.waterUnit === 'oz' ? 1 : 10}
-                                value={log.water}
-                                onChange={(e) => {
-                                  const val = parseInt(e.target.value);
-                                  setLog({ ...log, water: val });
-                                  gymService.updateDailyLog(selectedDate, { water: val });
-                                }}
-                                className="w-full h-1.5 bg-white/5 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                              />
-                            </div>
-                          </div>
-                          
-                          <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-                            <motion.div 
-                              className="h-full bg-blue-500"
-                              initial={{ width: 0 }}
-                              animate={{ width: `${Math.min((log.water / log.waterGoal) * 100, 100)}%` }}
-                            />
-                          </div>
-                        </div>
-                      </Card>
-                    ) : (
-                      <Card className="p-8 space-y-6 bg-brand-surface border-white/5 h-full">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="p-2 bg-emerald-500/10 rounded-lg">
-                              <Footprints className="w-5 h-5 text-emerald-500" />
-                            </div>
-                            <h3 className="font-bold text-gray-200">Movement</h3>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <input 
-                              type="number"
-                              value={log.steps}
-                              onChange={(e) => {
-                                const val = parseInt(e.target.value) || 0;
-                                setLog({ ...log, steps: val });
-                                gymService.updateDailyLog(selectedDate, { steps: val });
-                              }}
-                              className="w-20 bg-white/5 border border-white/10 rounded px-2 py-0.5 text-right font-mono text-sm text-gray-200 focus:border-emerald-500 outline-none transition-colors"
-                            />
-                            <span className="text-sm text-gray-500 font-mono">/ {log.stepGoal}</span>
-                          </div>
-                        </div>
-                        
-                        <div className="space-y-4">
-                          <div className="flex gap-2">
-                            <Button 
-                              variant="outline" 
-                              className="flex-none w-10 border-white/5 hover:border-red-500/30 p-0"
-                              onClick={() => updateSteps(-1000)}
-                            >
-                              <Minus className="w-3 h-3 text-red-400" />
-                            </Button>
-                            <div className="flex-1 flex gap-2">
-                              <Button 
-                                variant="outline" 
-                                className="flex-1 border-white/5 text-xs"
-                                onClick={() => updateSteps(1000)}
-                              >
-                                +1k Steps
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                className="flex-1 border-white/5 text-xs"
-                                onClick={() => updateSteps(5000)}
-                              >
-                                +5k Steps
-                              </Button>
-                            </div>
-                          </div>
+                                  <div className="px-1 pt-2">
+                                    <input 
+                                      type="range"
+                                      min="0"
+                                      max={log.stepGoal * 2}
+                                      step="100"
+                                      value={log.steps}
+                                      onChange={(e) => {
+                                        const val = parseInt(e.target.value);
+                                        setLog({ ...log, steps: val });
+                                        gymService.updateDailyLog(selectedDate, { steps: val });
+                                      }}
+                                      className="w-full h-1.5 bg-white/5 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                                    />
+                                  </div>
+                                </div>
 
-                          <div className="px-1 pt-2">
-                            <input 
-                              type="range"
-                              min="0"
-                              max={log.stepGoal * 2}
-                              step="100"
-                              value={log.steps}
-                              onChange={(e) => {
-                                const val = parseInt(e.target.value);
-                                setLog({ ...log, steps: val });
-                                gymService.updateDailyLog(selectedDate, { steps: val });
-                              }}
-                              className="w-full h-1.5 bg-white/5 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                            />
-                          </div>
-
-                          <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-                            <motion.div 
-                              className="h-full bg-emerald-500"
-                              initial={{ width: 0 }}
-                              animate={{ width: `${Math.min((log.steps / log.stepGoal) * 100, 100)}%` }}
-                            />
-                          </div>
-                        </div>
+                                <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                                  <motion.div 
+                                    className="h-full bg-emerald-500"
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${Math.min((log.steps / log.stepGoal) * 100, 100)}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </Card>
                     )}
                   </SortableTracker>
@@ -2519,92 +2571,116 @@ export const ProGym = ({
         <div className="space-y-8">
           <Card className="p-8 bg-brand-surface border-white/5">
             <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-brand-primary/10 rounded-lg">
+              <div 
+                className="flex items-center gap-3 cursor-pointer group"
+                onClick={() => setIsHabitsCollapsed(!isHabitsCollapsed)}
+              >
+                <div className="p-2 bg-brand-primary/10 rounded-lg group-hover:bg-brand-primary/20 transition-colors">
                   <CheckCircle2 className="w-5 h-5 text-brand-primary" />
                 </div>
-                <h3 className="font-bold text-gray-100">Daily Habits</h3>
-              </div>
-              <button 
-                onClick={() => {
-                  if (isEditingHabits) {
-                    handleUpdateHabitList();
-                  } else {
-                    setEditingHabits(habitList);
-                    setIsEditingHabits(true);
-                  }
-                }}
-                className="text-[10px] font-black uppercase tracking-widest text-brand-primary hover:text-brand-primary/80 transition-colors"
-              >
-                {isEditingHabits ? 'Save Changes' : 'Manage Habits'}
-              </button>
-            </div>
-            
-            <div className="space-y-4">
-              {isEditingHabits ? (
-                <div className="space-y-3">
-                  {editingHabits.map((h, idx) => (
-                    <div key={idx} className="flex gap-2">
-                       <Input 
-                        value={h}
-                        onChange={(e) => {
-                          const newList = [...editingHabits];
-                          newList[idx] = e.target.value;
-                          setEditingHabits(newList);
-                        }}
-                        className="bg-white/5 border-white/10"
-                       />
-                       <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="text-red-500/50 hover:text-red-500"
-                        onClick={() => setEditingHabits(editingHabits.filter((_, i) => i !== idx))}
-                       >
-                         <Minus className="w-4 h-4" />
-                       </Button>
-                    </div>
-                  ))}
-                  <Button 
-                    variant="outline" 
-                    className="w-full border-dashed border-white/10 text-gray-500 hover:text-brand-primary hover:border-brand-primary/30"
-                    onClick={() => setEditingHabits([...editingHabits, ''])}
-                  >
-                    <Plus className="w-4 h-4 mr-2" /> Add Habit
-                  </Button>
+                <div className="flex flex-col">
+                  <h3 className="font-bold text-gray-100">Daily Habits</h3>
+                  <div className="flex items-center gap-2">
+                    <span className={cn("text-[10px] font-black uppercase tracking-widest", isHabitsCollapsed ? "text-brand-primary" : "text-gray-500")}>
+                      {isHabitsCollapsed ? `${habitList.filter(h => log.habits?.[h]).length}/${habitList.length} Completed` : "Daily Checklist"}
+                    </span>
+                    {isHabitsCollapsed ? <ChevronDown className="w-3 h-3 text-gray-600" /> : <ChevronUp className="w-3 h-3 text-gray-600" />}
+                  </div>
                 </div>
-              ) : (
-                habitList.map((habit) => {
-                  const completed = log.habits?.[habit] || false;
-                  return (
-                    <button
-                      key={habit}
-                      onClick={() => toggleHabit(habit)}
-                      className={cn(
-                        "w-full flex items-center justify-between p-4 rounded-xl border transition-all",
-                        completed 
-                          ? "bg-brand-primary/10 border-brand-primary/20 text-brand-primary" 
-                          : "bg-white/5 border-white/5 text-gray-400 hover:border-white/10"
-                      )}
-                    >
-                      <div className="flex items-center gap-3 text-left">
-                        {(habit.toLowerCase().includes('nutrition') || habit.toLowerCase().includes('diet')) && <Utensils className="w-4 h-4" />}
-                        {(habit.toLowerCase().includes('recovery') || habit.toLowerCase().includes('sleep')) && <Moon className="w-4 h-4" />}
-                        {habit.toLowerCase().includes('step') && <Footprints className="w-4 h-4" />}
-                        {(habit.toLowerCase().includes('stretching') || habit.toLowerCase().includes('mobility')) && <Zap className="w-4 h-4" />}
-                        {habit.toLowerCase().includes('water') && <Droplets className="w-4 h-4" />}
-                        <span className="text-sm font-medium">{habit}</span>
-                      </div>
-                      <div className={cn(
-                        "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0",
-                        completed ? "bg-brand-primary border-brand-primary" : "border-white/10"
-                      )}>
-                        {completed && <Check className="w-3 h-3 text-brand-surface" />}
-                      </div>
-                    </button>
-                  );
-                })
+              </div>
+              {!isHabitsCollapsed && (
+                <button 
+                  onClick={() => {
+                    if (isEditingHabits) {
+                      handleUpdateHabitList();
+                    } else {
+                      setEditingHabits(habitList);
+                      setIsEditingHabits(true);
+                    }
+                  }}
+                  className="text-[10px] font-black uppercase tracking-widest text-brand-primary hover:text-brand-primary/80 transition-colors"
+                >
+                  {isEditingHabits ? 'Save Changes' : 'Manage Habits'}
+                </button>
               )}
             </div>
+            
+            <AnimatePresence>
+              {!isHabitsCollapsed && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="space-y-4">
+                    {isEditingHabits ? (
+                      <div className="space-y-3">
+                        {editingHabits.map((h, idx) => (
+                          <div key={idx} className="flex gap-2">
+                             <Input 
+                              value={h}
+                              onChange={(e) => {
+                                const newList = [...editingHabits];
+                                newList[idx] = e.target.value;
+                                setEditingHabits(newList);
+                              }}
+                              className="bg-white/5 border-white/10"
+                             />
+                             <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="text-red-500/50 hover:text-red-500"
+                              onClick={() => setEditingHabits(editingHabits.filter((_, i) => i !== idx))}
+                             >
+                               <Minus className="w-4 h-4" />
+                             </Button>
+                          </div>
+                        ))}
+                        <Button 
+                          variant="outline" 
+                          className="w-full border-dashed border-white/10 text-gray-500 hover:text-brand-primary hover:border-brand-primary/30"
+                          onClick={() => setEditingHabits([...editingHabits, ''])}
+                        >
+                          <Plus className="w-4 h-4 mr-2" /> Add Habit
+                        </Button>
+                      </div>
+                    ) : (
+                      habitList.map((habit) => {
+                        const completed = log.habits?.[habit] || false;
+                        return (
+                          <button
+                            key={habit}
+                            onClick={() => toggleHabit(habit)}
+                            className={cn(
+                              "w-full flex items-center justify-between p-4 rounded-xl border transition-all",
+                              completed 
+                                ? "bg-brand-primary/10 border-brand-primary/20 text-brand-primary" 
+                                : "bg-white/5 border-white/5 text-gray-400 hover:border-white/10"
+                            )}
+                          >
+                            <div className="flex items-center gap-3 text-left">
+                              {(habit.toLowerCase().includes('nutrition') || habit.toLowerCase().includes('diet')) && <Utensils className="w-4 h-4" />}
+                              {(habit.toLowerCase().includes('recovery') || habit.toLowerCase().includes('sleep')) && <Moon className="w-4 h-4" />}
+                              {habit.toLowerCase().includes('step') && <Footprints className="w-4 h-4" />}
+                              {(habit.toLowerCase().includes('stretching') || habit.toLowerCase().includes('mobility')) && <Zap className="w-4 h-4" />}
+                              {habit.toLowerCase().includes('water') && <Droplets className="w-4 h-4" />}
+                              <span className="text-sm font-medium">{habit}</span>
+                            </div>
+                            <div className={cn(
+                              "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0",
+                              completed ? "bg-brand-primary border-brand-primary" : "border-white/10"
+                            )}>
+                              {completed && <Check className="w-3 h-3 text-brand-surface" />}
+                            </div>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </Card>
 
           <Card className="p-8 bg-brand-primary border-none text-brand-dark">
