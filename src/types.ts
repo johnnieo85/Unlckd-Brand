@@ -181,6 +181,8 @@ export interface UserProfile {
   badges: Badge[];
   gymPin?: string;
   habitList?: string[];
+  xp?: number;
+  streak?: number;
   monthlyGoal?: {
     title: string;
     description: string;
