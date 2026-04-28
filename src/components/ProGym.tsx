@@ -20,7 +20,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { 
   Activity, 
   Droplets, 
-  Zap,
+  Zap as ZapIcon,
   Check,
   Footprints, 
   CheckCircle2, 
@@ -73,6 +73,9 @@ import {
   ScatterChart,
   ZAxis
 } from 'recharts';
+
+import { getLevelInfo } from '../lib/levels';
+import { LevelInfoModal } from './LevelInfoModal';
 
 const SortableTracker = ({ id, children }: { id: string; children: React.ReactNode }) => {
   const {
@@ -185,6 +188,9 @@ export const ProGym = ({
   const [isTrainingCollapsed, setIsTrainingCollapsed] = useState(false);
   const [isHabitsCollapsed, setIsHabitsCollapsed] = useState(false);
   const [isWaterCollapsed, setIsWaterCollapsed] = useState(false);
+  const [isLevelModalOpen, setIsLevelModalOpen] = useState(false);
+  const [totalXP, setTotalXP] = useState(0);
+  const [currentStreak, setCurrentStreak] = useState(0);
   const [isStepsCollapsed, setIsStepsCollapsed] = useState(false);
   const [isWeightCollapsed, setIsWeightCollapsed] = useState(false);
   const [isHubUnlocked, setIsHubUnlocked] = useState(false);
@@ -581,6 +587,7 @@ export const ProGym = ({
 
   useEffect(() => {
     loadData(selectedDate);
+    refreshGlobalStats();
   }, [latestReport, selectedDate]);
 
   const handleTrainingUpdate = (exerciseId: string, field: 'weight' | 'sets' | 'reps' | 'notes' | 'time' | 'completed', value: string | boolean) => {
@@ -599,8 +606,85 @@ export const ProGym = ({
     const { completed, total } = getTrainingTotals(updatedWorkoutData);
     const completedWorkouts = (total > 0 && completed === total) ? 1 : 0;
     
-    setLog({ ...log, workoutData: updatedWorkoutData, completedWorkouts });
+    const newLog = { ...log, workoutData: updatedWorkoutData, completedWorkouts };
+    setLog(newLog);
+    
+    // Update local XP and streak immediately
+    refreshGlobalStats();
+    
     gymService.updateDailyLog(selectedDate, { workoutData: updatedWorkoutData, completedWorkouts });
+  };
+
+  const refreshGlobalStats = async () => {
+    // Calculate streak and XP from available logs
+    const now = new Date();
+    const ninetyDaysAgo = new Date(now.getTime() - (90 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
+    const logs = await gymService.getLogsInRange(ninetyDaysAgo, now.toISOString().split('T')[0]);
+    
+    // XP Calculation
+    let calculatedTotalXP = 0;
+    logs.forEach(l => {
+      const stepProg = Math.min((Number(l.steps) || 0) / (Number(l.stepGoal) || 10000), 1);
+      const waterProg = Math.min((Number(l.water) || 0) / (Number(l.waterGoal) || 3000), 1);
+      
+      let dayXp = 0;
+      dayXp += stepProg * 500;
+      dayXp += waterProg * 300;
+      dayXp += (Number(l.completedWorkouts) || 0) * 1000;
+      
+      const workoutData = l.workoutData || {};
+      const completedExCount = Object.values(workoutData).filter(ex => ex.completed).length;
+      dayXp += completedExCount * 50;
+
+      const completedMeals = (l.meals || []).filter(m => m.completed).length;
+      dayXp += completedMeals * 100;
+      const completedHabits = (l.habits ? Object.values(l.habits).filter(h => h).length : 0);
+      dayXp += completedHabits * 200;
+      
+      calculatedTotalXP += Math.round(dayXp);
+    });
+    setTotalXP(calculatedTotalXP);
+    
+    // Streak Calculation (Consecutive Workout Days)
+    const sortedLogs = [...logs].sort((a, b) => b.date.localeCompare(a.date));
+    let streak = 0;
+    let checkDate = new Date();
+    checkDate.setHours(0, 0, 0, 0);
+
+    const todayStr = checkDate.toISOString().split('T')[0];
+    const yesterday = new Date(checkDate);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    const todayLog = sortedLogs.find(l => l.date === todayStr);
+    const yesterdayLog = sortedLogs.find(l => l.date === yesterdayStr);
+
+    if ((todayLog && (todayLog.completedWorkouts || 0) > 0) || 
+        (yesterdayLog && (yesterdayLog.completedWorkouts || 0) > 0)) {
+      
+      let cursor = (todayLog && (todayLog.completedWorkouts || 0) > 0) ? checkDate : yesterday;
+      
+      while (true) {
+        const dateStr = cursor.toISOString().split('T')[0];
+        const dayLog = sortedLogs.find(l => l.date === dateStr);
+        
+        if (dayLog && (dayLog.completedWorkouts || 0) > 0) {
+          streak++;
+          cursor.setDate(cursor.getDate() - 1);
+        } else {
+          break;
+        }
+      }
+    }
+    setCurrentStreak(streak);
+    updateProfileXPAndStreak(calculatedTotalXP, streak);
+  };
+
+  const updateProfileXPAndStreak = async (xp: number, streak: number) => {
+    if (userProfile?.userId) {
+      await updateUserProfile(userProfile.userId, { xp, streak });
+      if (onProfileUpdate) onProfileUpdate();
+    }
   };
 
   const handleExerciseToggle = (exerciseId: string) => {
@@ -988,6 +1072,7 @@ export const ProGym = ({
     const updated = { ...log, waterUnit: newUnit, water: newWater, waterGoal: newGoal };
     setLog(updated);
     await gymService.updateDailyLog(selectedDate, updated);
+    refreshGlobalStats();
   };
 
   const updateWater = async (amount: number) => {
@@ -995,6 +1080,7 @@ export const ProGym = ({
     const newWater = Math.max(0, log.water + amount);
     setLog({ ...log, water: newWater });
     await gymService.updateDailyLog(selectedDate, { water: newWater });
+    refreshGlobalStats();
   };
 
   const updateSteps = async (amount: number) => {
@@ -1002,6 +1088,7 @@ export const ProGym = ({
     const newSteps = Math.max(0, log.steps + amount);
     setLog({ ...log, steps: newSteps });
     await gymService.updateDailyLog(selectedDate, { steps: newSteps });
+    refreshGlobalStats();
   };
 
   const toggleHabit = async (habit: string) => {
@@ -1009,6 +1096,7 @@ export const ProGym = ({
     const newHabits = { ...log.habits, [habit]: !log.habits?.[habit] };
     setLog({ ...log, habits: newHabits });
     await gymService.updateDailyLog(selectedDate, { habits: newHabits });
+    refreshGlobalStats();
   };
 
   const handlePinSubmit = () => {
@@ -1243,6 +1331,13 @@ export const ProGym = ({
 
   return (
     <div className="space-y-6 md:space-y-8 pb-20">
+      {/* Level Info Modal */}
+      <LevelInfoModal 
+        isOpen={isLevelModalOpen} 
+        onClose={() => setIsLevelModalOpen(false)} 
+        xp={totalXP} 
+      />
+
       {/* Hero Header - Refined for mobile */}
       <div className="relative min-h-[140px] md:h-48 rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden group">
         <div className="absolute inset-0 bg-brand-primary opacity-10" />
@@ -1259,6 +1354,9 @@ export const ProGym = ({
             >
               UNLCKD <span className="text-brand-primary">PRO GYM</span>
             </h1>
+            <div className="text-[10px] md:text-xs font-black uppercase tracking-[0.2em] text-brand-primary/60 mt-1 md:mt-2 text-center md:text-left">
+              {getLevelInfo(totalXP).title} • {currentStreak} Day Workout Streak
+            </div>
             <div className="flex items-center justify-center md:justify-start gap-4 mt-3">
               <button 
                 onClick={() => setActiveView('hub')}
@@ -2670,7 +2768,7 @@ export const ProGym = ({
                               {(habit.toLowerCase().includes('nutrition') || habit.toLowerCase().includes('diet')) && <Utensils className="w-4 h-4" />}
                               {(habit.toLowerCase().includes('recovery') || habit.toLowerCase().includes('sleep')) && <Moon className="w-4 h-4" />}
                               {habit.toLowerCase().includes('step') && <Footprints className="w-4 h-4" />}
-                              {(habit.toLowerCase().includes('stretching') || habit.toLowerCase().includes('mobility')) && <Zap className="w-4 h-4" />}
+                              {(habit.toLowerCase().includes('stretching') || habit.toLowerCase().includes('mobility')) && <ZapIcon className="w-4 h-4" />}
                               {habit.toLowerCase().includes('water') && <Droplets className="w-4 h-4" />}
                               <span className="text-sm font-medium">{habit}</span>
                             </div>
@@ -2690,29 +2788,50 @@ export const ProGym = ({
             </AnimatePresence>
           </Card>
 
-          <Card className="p-8 bg-brand-primary border-none text-brand-dark">
-            <div className="flex justify-between items-start mb-6">
-              <div className="space-y-1">
-                <h4 className="text-xs font-black uppercase tracking-[0.2em] opacity-60">Level 4</h4>
-                <h3 className="text-2xl font-display font-black tracking-tighter">ELITE ATHLETE</h3>
-              </div>
-              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
-                <Target className="w-6 h-6" />
-              </div>
+          <Card 
+            className="p-8 bg-brand-primary border-none text-brand-dark cursor-pointer group hover:scale-[1.02] transition-all relative overflow-hidden"
+            onClick={() => setIsLevelModalOpen(true)}
+          >
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
+              <ZapIcon className="w-24 h-24" />
             </div>
             
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
-                  <span>Progress to Level 5</span>
-                  <span>75%</span>
-                </div>
-                <div className="h-2 bg-brand-dark/10 rounded-full overflow-hidden">
-                  <div className="h-full bg-brand-dark w-3/4" />
-                </div>
-              </div>
-              <p className="text-[10px] uppercase font-bold opacity-70">Unlock "Legendary Physique" Badge at Level 10</p>
-            </div>
+            {(() => {
+              const info = getLevelInfo(totalXP);
+              return (
+                <>
+                  <div className="flex justify-between items-start mb-6 relative z-10">
+                    <div className="space-y-1">
+                      <h4 className="text-xs font-black uppercase tracking-[0.2em] opacity-60">Level {info.level}</h4>
+                      <h3 className="text-2xl font-display font-black tracking-tighter uppercase">{info.title}</h3>
+                    </div>
+                    <div className="text-4xl filter drop-shadow-lg group-hover:bounce transition-all">
+                      {info.badge}
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4 relative z-10">
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
+                        <span>Progress to Level {info.level + 1}</span>
+                        <span>{info.progress}%</span>
+                      </div>
+                      <div className="h-2.5 bg-brand-dark/10 rounded-full overflow-hidden border border-brand-dark/5">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${info.progress}%` }}
+                          className="h-full bg-brand-dark shadow-[0_0_12px_rgba(0,0,0,0.2)]"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px] uppercase font-black opacity-70">
+                      <Sparkles className="w-3 h-3" />
+                      <span>Click to view level rewards</span>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </Card>
         </div>
       </div>
