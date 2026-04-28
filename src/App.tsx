@@ -2028,7 +2028,41 @@ export default function App() {
                     </div>
                   </div>
 
-                  <h2 className="text-3xl font-display font-bold text-brand-primary">Workout Plan</h2>
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <h2 className="text-3xl font-display font-bold text-brand-primary">Workout Plan</h2>
+                    {report.workoutPlan && (
+                      <button 
+                        onClick={() => {
+                          let content = `UNLCKD PRO TRAINER - 12-WEEK TRAINING PLAN\n`;
+                          content += `==========================================\n\n`;
+                          
+                          report.workoutPlan.forEach(week => {
+                            content += `WEEK ${week.week} - ${(week.phase || '').toUpperCase()}\n`;
+                            content += `------------------------------------------\n`;
+                            
+                            week.days.forEach(day => {
+                              content += `${(day.day || '').toUpperCase()} (${day.focus || ''})\n`;
+                              // Strip markdown links for text file: [Name](URL) -> Name
+                              const cleanWarmup = (day.warmUp || '').replace(/\[(.*?)\]\(.*?\)/g, '$1');
+                              const cleanMainWork = (day.mainWork || '').replace(/\[(.*?)\]\(.*?\)/g, '$1');
+                              
+                              content += `Warm-up:\n${cleanWarmup}\n`;
+                              content += `Main Work:\n${cleanMainWork}\n`;
+                              if (day.notes) content += `Notes: ${day.notes}\n`;
+                              content += `\n`;
+                            });
+                            content += `\n`;
+                          });
+                          
+                          downloadFile('unlckd-training-plan.txt', content);
+                        }}
+                        className="flex items-center gap-2 px-6 py-3 bg-brand-primary hover:bg-brand-primary/90 text-black rounded-lg text-sm font-bold transition-all transform hover:scale-105 shadow-lg shadow-brand-primary/20 active:scale-95 outline-none"
+                      >
+                        <Download className="w-4 h-4" />
+                        Download Plan (.txt)
+                      </button>
+                    )}
+                  </div>
                   {report.workoutPlan?.map((week, weekIdx) => (
                     <div key={weekIdx} className="space-y-4">
                       <div className="flex items-center gap-4">
@@ -2052,14 +2086,34 @@ export default function App() {
                                 <td className="px-4 py-4 font-bold text-brand-primary border-r border-gray-800">{day.day}</td>
                                 <td className="px-4 py-4 border-r border-gray-800 text-gray-200">{day.focus}</td>
                                 <td className="px-4 py-4 border-r border-gray-800 text-gray-400 text-xs">
-                                  <ReactMarkdown components={{ a: ({node, ...props}) => <a {...props} className="text-brand-primary hover:underline" target="_blank" rel="noopener noreferrer" /> }}>
-                                    {day.warmUp}
-                                  </ReactMarkdown>
+                                  <div className="space-y-2">
+                                    <ReactMarkdown components={{ a: ({node, ...props}) => <a {...props} className="text-brand-primary hover:underline" target="_blank" rel="noopener noreferrer" /> }}>
+                                      {day.warmUp}
+                                    </ReactMarkdown>
+                                    <a 
+                                      href={`https://www.youtube.com/results?search_query=${encodeURIComponent(day.warmUp.replace(/\[.*?\]\(.*?\)/g, '').trim() + ' demonstration')}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-[9px] text-gray-500 hover:text-brand-primary flex items-center gap-1 mt-1 opacity-60 hover:opacity-100"
+                                    >
+                                      <Search className="w-2.5 h-2.5" /> Search Alternative
+                                    </a>
+                                  </div>
                                 </td>
                                 <td className="px-4 py-4 border-r border-gray-800 text-gray-300 font-medium">
-                                  <ReactMarkdown components={{ a: ({node, ...props}) => <a {...props} className="text-brand-primary hover:underline" target="_blank" rel="noopener noreferrer" /> }}>
-                                    {day.mainWork}
-                                  </ReactMarkdown>
+                                  <div className="space-y-2">
+                                    <ReactMarkdown components={{ a: ({node, ...props}) => <a {...props} className="text-brand-primary hover:underline" target="_blank" rel="noopener noreferrer" /> }}>
+                                      {day.mainWork}
+                                    </ReactMarkdown>
+                                    <a 
+                                      href={`https://www.youtube.com/results?search_query=${encodeURIComponent(day.mainWork.replace(/\[.*?\]\(.*?\)/g, '').trim() + ' exercise tutorial')}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-[9px] text-gray-500 hover:text-brand-primary flex items-center gap-1 mt-1 opacity-60 hover:opacity-100"
+                                    >
+                                      <Search className="w-2.5 h-2.5" /> Search Alternative
+                                    </a>
+                                  </div>
                                 </td>
                                 <td className="px-4 py-4 text-gray-400 text-xs italic">{day.notes}</td>
                               </tr>
@@ -2076,7 +2130,38 @@ export default function App() {
               {/* Nutrition & Meal Plan */}
               {(path === 'meal' || path === 'full') && (
                 <section className="space-y-8 pt-16 border-t border-gray-800">
-                  <h2 className="text-3xl font-display font-bold text-brand-primary">Nutrition Strategy</h2>
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <h2 className="text-3xl font-display font-bold text-brand-primary">Nutrition Strategy</h2>
+                    {report.mealPlan && (
+                      <button 
+                        onClick={() => {
+                          let content = `UNLCKD PRO TRAINER - 12-WEEK MEAL PLAN\n`;
+                          content += `======================================\n\n`;
+                          
+                          report.mealPlan.forEach(week => {
+                            content += `WEEK ${week.week}\n`;
+                            content += `-----------------\n`;
+                            
+                            week.days.forEach(day => {
+                              content += `${(day.day || '').toUpperCase()}\n`;
+                              content += `Breakfast: ${day.breakfast || 'N/A'}${day.breakfastUrl ? ` (${day.breakfastUrl})` : ''}\n`;
+                              content += `Lunch: ${day.lunch || 'N/A'}${day.lunchUrl ? ` (${day.lunchUrl})` : ''}\n`;
+                              content += `Dinner: ${day.dinner || 'N/A'}${day.dinnerUrl ? ` (${day.dinnerUrl})` : ''}\n`;
+                              content += `Snack: ${day.snack || 'N/A'}${day.snackUrl ? ` (${day.snackUrl})` : ''}\n`;
+                              content += `\n`;
+                            });
+                            content += `\n`;
+                          });
+                          
+                          downloadFile('unlckd-meal-plan.txt', content);
+                        }}
+                        className="flex items-center gap-2 px-6 py-3 bg-brand-primary hover:bg-brand-primary/90 text-black rounded-lg text-sm font-bold transition-all transform hover:scale-105 shadow-lg shadow-brand-primary/20 active:scale-95 outline-none"
+                      >
+                        <Download className="w-4 h-4" />
+                        Download Meal Plan (.txt)
+                      </button>
+                    )}
+                  </div>
                   <div className="p-6 bg-brand-surface border border-gray-800 rounded-xl text-gray-300 leading-relaxed">
                     {report.nutritionStrategy}
                   </div>
@@ -2107,41 +2192,81 @@ export default function App() {
                                 <td className="px-4 py-4 border-r border-gray-800 text-gray-300">
                                   <div className="flex flex-col gap-1">
                                     <span>{day.breakfast}</span>
-                                    {day.breakfastUrl && (
-                                      <a href={day.breakfastUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-primary hover:underline flex items-center gap-1">
-                                        Recipe <ExternalLink className="w-2 h-2" />
+                                    <div className="flex items-center gap-2">
+                                      {day.breakfastUrl && (
+                                        <a href={day.breakfastUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-primary hover:underline flex items-center gap-1">
+                                          Recipe <ExternalLink className="w-2 h-2" />
+                                        </a>
+                                      )}
+                                      <a 
+                                        href={`https://www.google.com/search?q=${encodeURIComponent(day.breakfast + ' recipe healthy')}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-[9px] text-gray-500 hover:text-brand-primary flex items-center gap-1"
+                                      >
+                                        Search <Search className="w-2 h-2" />
                                       </a>
-                                    )}
+                                    </div>
                                   </div>
                                 </td>
                                 <td className="px-4 py-4 border-r border-gray-800 text-gray-300">
                                   <div className="flex flex-col gap-1">
                                     <span>{day.lunch}</span>
-                                    {day.lunchUrl && (
-                                      <a href={day.lunchUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-primary hover:underline flex items-center gap-1">
-                                        Recipe <ExternalLink className="w-2 h-2" />
+                                    <div className="flex items-center gap-2">
+                                      {day.lunchUrl && (
+                                        <a href={day.lunchUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-primary hover:underline flex items-center gap-1">
+                                          Recipe <ExternalLink className="w-2 h-2" />
+                                        </a>
+                                      )}
+                                      <a 
+                                        href={`https://www.google.com/search?q=${encodeURIComponent(day.lunch + ' recipe healthy')}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-[9px] text-gray-500 hover:text-brand-primary flex items-center gap-1"
+                                      >
+                                        Search <Search className="w-2 h-2" />
                                       </a>
-                                    )}
+                                    </div>
                                   </div>
                                 </td>
                                 <td className="px-4 py-4 border-r border-gray-800 text-gray-300">
                                   <div className="flex flex-col gap-1">
                                     <span>{day.dinner}</span>
-                                    {day.dinnerUrl && (
-                                      <a href={day.dinnerUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-primary hover:underline flex items-center gap-1">
-                                        Recipe <ExternalLink className="w-2 h-2" />
+                                    <div className="flex items-center gap-2">
+                                      {day.dinnerUrl && (
+                                        <a href={day.dinnerUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-primary hover:underline flex items-center gap-1">
+                                          Recipe <ExternalLink className="w-2 h-2" />
+                                        </a>
+                                      )}
+                                      <a 
+                                        href={`https://www.google.com/search?q=${encodeURIComponent(day.dinner + ' recipe healthy')}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-[9px] text-gray-500 hover:text-brand-primary flex items-center gap-1"
+                                      >
+                                        Search <Search className="w-2 h-2" />
                                       </a>
-                                    )}
+                                    </div>
                                   </div>
                                 </td>
                                 <td className="px-4 py-4 text-gray-300">
                                   <div className="flex flex-col gap-1">
                                     <span>{day.snack}</span>
-                                    {day.snackUrl && (
-                                      <a href={day.snackUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-primary hover:underline flex items-center gap-1">
-                                        Recipe <ExternalLink className="w-2 h-2" />
+                                    <div className="flex items-center gap-2">
+                                      {day.snackUrl && (
+                                        <a href={day.snackUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-primary hover:underline flex items-center gap-1">
+                                          Recipe <ExternalLink className="w-2 h-2" />
+                                        </a>
+                                      )}
+                                      <a 
+                                        href={`https://www.google.com/search?q=${encodeURIComponent(day.snack + ' healthy snack idea')}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-[9px] text-gray-500 hover:text-brand-primary flex items-center gap-1"
+                                      >
+                                        Search <Search className="w-2 h-2" />
                                       </a>
-                                    )}
+                                    </div>
                                   </div>
                                 </td>
                               </tr>
