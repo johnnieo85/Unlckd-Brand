@@ -678,15 +678,21 @@ export const ProGym = ({
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = getLocalDateString(yesterday);
 
-    // Filter logs that actually have activity (workout, steps, water, or habits)
-    // This makes the streak more representative of daily commitment
+    // Filter logs that actually have intentional activity
+    // This prevents accidental streaks from empty logs or single accidental clicks
     const activeDays = Array.from(new Set(
       logs.filter(l => {
         const hasWorkout = (Number(l.completedWorkouts) || 0) > 0;
-        const hasSteps = (Number(l.steps) || 0) >= (Number(l.stepGoal) || 10000) && (Number(l.steps) || 0) > 0;
-        const hasWater = (Number(l.water) || 0) >= (Number(l.waterGoal) || 2000) && (Number(l.water) || 0) > 0;
-        const hasHabits = l.habits ? Object.values(l.habits).some(v => v === true) : false;
-        return hasWorkout || hasSteps || hasWater || hasHabits;
+        
+        // Stricter goals: at least 10% of goal or substantial absolute amount
+        const hasSteps = (Number(l.steps) || 0) >= (Number(l.stepGoal) || 10000) * 0.1 && (Number(l.steps) || 0) > 500;
+        const hasWater = (Number(l.water) || 0) >= (Number(l.waterGoal) || 2000) * 0.1 && (Number(l.water) || 0) > 250;
+        
+        // Count as active if at least 2 habits are done, or a major physical activity
+        const habitsDone = l.habits ? Object.values(l.habits).filter(v => v === true).length : 0;
+        const hasSignificantHabits = habitsDone >= 2;
+        
+        return hasWorkout || hasSteps || hasWater || hasSignificantHabits;
       }).map(l => l.date)
     )).sort((a, b) => b.localeCompare(a));
 
@@ -994,7 +1000,7 @@ export const ProGym = ({
         useManualWorkout: !latestReport
       };
       setLog(initialLog);
-      await gymService.updateDailyLog(selectedDate, initialLog);
+      // Removed auto-save of initial log to avoid counting "viewed" days as active
     }
     setLoading(false);
   };
