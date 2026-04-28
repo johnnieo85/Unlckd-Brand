@@ -212,7 +212,7 @@ export interface DailyLog {
     [key: string]: boolean;
   };
   completedWorkouts: number;
-  workoutData?: Record<string, { weight: string; sets: string; reps: string; notes: string; time?: string }>;
+  workoutData?: Record<string, { weight: string; sets: string; reps: string; notes: string; time?: string; completed?: boolean }>;
   generalNotes?: string;
   lastUpdated?: any;
   useManualWorkout?: boolean;
