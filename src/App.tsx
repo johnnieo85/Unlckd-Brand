@@ -35,7 +35,11 @@ import {
   Moon,
   Instagram,
   RotateCcw,
-  RefreshCw
+  RefreshCw,
+  Zap,
+  Youtube,
+  LineChart,
+  Trophy
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Button } from './components/ui/Button';
@@ -2497,8 +2501,27 @@ export default function App() {
             <div className="w-16 h-16 bg-brand-primary/10 rounded-2xl flex items-center justify-center mb-6">
               <Lock className="w-8 h-8 text-brand-primary" />
             </div>
-            <h3 className="text-2xl font-display font-black text-white mb-2 uppercase tracking-tight">Access Pro Gym Hub</h3>
-            <p className="text-gray-400 text-sm mb-8">This section requires secondary authorization. Please enter your 4-digit activation PIN.</p>
+            <h3 className="text-2xl font-display font-black text-white mb-2 uppercase tracking-tight text-center">Access Pro Gym Hub</h3>
+            <p className="text-gray-400 text-sm mb-8 text-center max-w-md">Your professional performance optimization center. Enter your 4-digit activation PIN to unlock elite training tools.</p>
+            
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8 w-full max-w-2xl">
+              {[
+                { icon: Zap, label: '12-Week Programming', desc: 'Periodized S&C cycles' },
+                { icon: Youtube, label: 'Form Tutorials', desc: 'High-authority guidance' },
+                { icon: Activity, label: 'Precision Logging', desc: 'Sets, reps, weight & time' },
+                { icon: LineChart, label: 'Visual Analytics', desc: 'Chart your progression' },
+                { icon: Trophy, label: 'Achievement System', desc: 'Consistency rewards' },
+                { icon: FileText, label: 'Plan Exporting', desc: 'Offline training portability' }
+              ].map((f, i) => (
+                <div key={i} className="p-4 bg-white/5 border border-white/10 rounded-xl flex flex-col items-center text-center gap-2 group hover:border-brand-primary/30 transition-colors">
+                  <f.icon className="w-5 h-5 text-brand-primary group-hover:scale-110 transition-transform" />
+                  <div>
+                    <div className="text-[10px] font-black text-white uppercase tracking-wider mb-1">{f.label}</div>
+                    <div className="text-[9px] text-gray-500 leading-tight">{f.desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
             
             <div className="w-full space-y-4">
               <div className="space-y-1.5 text-left">
