@@ -110,6 +110,7 @@ export interface AssessmentResult {
     }[];
   }[];
   groceryList: {
+    phase: string;
     category: string;
     items: string;
   }[];

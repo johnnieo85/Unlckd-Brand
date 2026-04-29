@@ -2387,13 +2387,22 @@ export default function App() {
                             let content = `UNLCKD PRO TRAINER - GROCERY CHECKLIST\n`;
                             content += `==========================================\n\n`;
                             
-                            report.groceryList.forEach(g => {
-                              content += `${g.category.toUpperCase()}\n`;
-                              content += `-----------------\n`;
-                              // Split items by comma and clean them up
-                              const items = g.items.split(',').map(i => i.trim()).filter(i => i !== '');
-                              items.forEach(item => {
-                                content += `[ ] ${item}\n`;
+                            const groceryItems = report.groceryList || [];
+                            const phases = [...new Set(groceryItems.map(g => g.phase || 'General'))];
+                            
+                            phases.forEach(phase => {
+                              content += `PHASE: ${phase.toUpperCase()}\n`;
+                              content += `=========================\n\n`;
+                              
+                              const itemsInPhase = groceryItems.filter(g => (g.phase || 'General') === phase);
+                              itemsInPhase.forEach(g => {
+                                content += `${(g.category || 'Items').toUpperCase()}\n`;
+                                content += `-----------------\n`;
+                                const items = g.items.split(',').map(i => i.trim()).filter(i => i !== '');
+                                items.forEach(item => {
+                                  content += `[ ] ${item}\n`;
+                                });
+                                content += `\n`;
                               });
                               content += `\n`;
                             });
