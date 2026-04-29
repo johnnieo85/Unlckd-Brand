@@ -129,6 +129,7 @@ export interface AssessmentResult {
     estimatedBodyFat: string;
     healthStatus: string;
     focus: string;
+    heightWeightAnalysis?: string;
     recommendedCalorieLevel: 'maintain' | 'deficit' | 'surplus';
     dailyCalorieTarget: string;
   };

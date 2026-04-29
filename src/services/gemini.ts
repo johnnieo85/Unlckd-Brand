@@ -166,12 +166,18 @@ async function generatePhysiqueAnalysis(
     User Data:
     ${JSON.stringify(userData, null, 2)}
     
+    Height: ${userData.height} ${userData.heightUnit}
+    Weight: ${userData.weight} ${userData.weightUnit}
+    
     ${isResubmit ? "RESUBMIT MODE: Ensure maximum accuracy." : ""}
     Requested Path: ${path}
     ${progressContext}
 
-    FOCUS: Detailed Ratings & Summaries for ALL views (Front, Back, Left, Right).
+    1. Height/Weight Assessment: Analyze the user's weight relative to their height. Determine if their current weight is optimal, overweight, or underweight for their frame and fitness goals.
+    2. Detailed Ratings & Summaries for ALL views (Front, Back, Left, Right).
     Note: The goal is ${userData.goals}.
+    
+    STRICT EXCLUSION: Do NOT include any grocery lists or meal plan details in this specific analysis.
   `;
 
   const response = await withRetry(() => ai.models.generateContent({
@@ -255,9 +261,12 @@ async function generatePhysiqueAnalysis(
  */
 async function generateHealthAndSupport(
   userData: UserData,
-  isResubmit: boolean
+  isResubmit: boolean,
+  path: string
 ): Promise<any> {
   const model = "gemini-flash-latest";
+
+  const includeGrocery = path === 'full' || path === 'meal';
 
   const prompt = `
     Generate health metrics and supportive guidance for "UNLCKD Pro Trainer".
@@ -267,8 +276,8 @@ async function generateHealthAndSupport(
     
     FOCUS: 
     1. Health Metrics (BMI, Body Fat, Calorie Targets).
-    2. Daily Life (Sleep, Grocery store recommendation, Water, Steps).
-    3. Motivation and Nutrition strategies.
+    2. Daily Life (Sleep, Water, Steps).
+    ${includeGrocery ? "3. Nutrition strategy and specific Grocery store recommendation with checklist." : "3. Motivation and general Nutrition strategies (No grocery list needed)."}
   `;
 
   const response = await withRetry(() => ai.models.generateContent({
@@ -298,10 +307,11 @@ async function generateHealthAndSupport(
               estimatedBodyFat: { type: Type.STRING },
               healthStatus: { type: Type.STRING },
               focus: { type: Type.STRING },
+              heightWeightAnalysis: { type: Type.STRING },
               recommendedCalorieLevel: { type: Type.STRING },
               dailyCalorieTarget: { type: Type.STRING },
             },
-            required: ["bmi", "bmiCategory", "estimatedBodyFat", "healthStatus", "focus", "recommendedCalorieLevel", "dailyCalorieTarget"],
+            required: ["bmi", "bmiCategory", "estimatedBodyFat", "healthStatus", "focus", "heightWeightAnalysis", "recommendedCalorieLevel", "dailyCalorieTarget"],
           },
           motivationalQuote: {
             type: Type.OBJECT,
@@ -631,7 +641,7 @@ export async function generateTransformationReport(
         console.log("Generating physique analysis...");
         const physique = await generatePhysiqueAnalysis(cleanUserData, photos, path, isResubmit);
         console.log("Generating health and support...");
-        const lifestyle = await generateHealthAndSupport(cleanUserData, isResubmit);
+        const lifestyle = await generateHealthAndSupport(cleanUserData, isResubmit, path);
         result = { ...result, ...physique, ...lifestyle };
       } catch (e) {
         console.error("Analysis step failed:", e);
@@ -670,6 +680,12 @@ export async function generateTransformationReport(
     // Final Validation & Cleanup
     const finalResult = result as AssessmentResult;
     
+    // Add report type metadata
+    (finalResult as any).reportType = path === 'progress' ? 'Progress Comparison' : 
+                                    path === 'assessment' ? 'Initial Assessment' :
+                                    path === 'workout' ? 'Training Split' :
+                                    path === 'meal' ? 'Meal Plan' : 'Full Transformation';
+    
     // Ensure all required fields exist to avoid UI crashes
     finalResult.toplineSummary = finalResult.toplineSummary || "Assessment incoming...";
     finalResult.toplineRatings = finalResult.toplineRatings || [];
@@ -701,6 +717,7 @@ export async function generateTransformationReport(
       estimatedBodyFat: "TBD",
       healthStatus: "Assessment Pending",
       focus: "General Fitness",
+      heightWeightAnalysis: "TBD",
       recommendedCalorieLevel: "maintain",
       dailyCalorieTarget: "Calculated post-analysis"
     };
