@@ -277,7 +277,7 @@ async function generateHealthAndSupport(
     FOCUS: 
     1. Health Metrics (BMI, Body Fat, Calorie Targets).
     2. Daily Life (Sleep, Water, Steps).
-    ${includeGrocery ? "3. Nutrition strategy and specific Grocery store recommendation with checklist." : "3. Motivation and general Nutrition strategies (No grocery list needed)."}
+    ${includeGrocery ? "3. Nutrition strategy and specific Grocery store recommendation with checklist. CRITICAL: Address the grocery list in 2-week blocks (e.g., Weeks 1-2, Weeks 3-4, etc.) for the entire 12-week duration." : "3. Motivation and general Nutrition strategies (No grocery list needed)."}
   `;
 
   const response = await withRetry(() => ai.models.generateContent({
@@ -336,10 +336,11 @@ async function generateHealthAndSupport(
             items: {
               type: Type.OBJECT,
               properties: {
+                phase: { type: Type.STRING },
                 category: { type: Type.STRING },
                 items: { type: Type.STRING },
               },
-              required: ["category", "items"],
+              required: ["phase", "category", "items"],
             },
           },
           hydrationTargets: { type: Type.STRING },
