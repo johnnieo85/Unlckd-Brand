@@ -307,13 +307,10 @@ export default function App() {
 
   useEffect(() => {
     if (user && savedReports.length > 0) {
-      // Only import data from the user's last "Full Transformation Report"
-      const report = savedReports.find(r => r.path === 'full');
-      if (report) {
-        setLatestReport(report);
-      } else {
-        setLatestReport(null);
-      }
+      // Use the absolute latest report regardless of path
+      setLatestReport(savedReports[0]);
+    } else {
+      setLatestReport(null);
     }
   }, [user, savedReports]);
 
