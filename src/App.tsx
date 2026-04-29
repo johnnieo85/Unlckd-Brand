@@ -46,6 +46,7 @@ import { Button } from './components/ui/Button';
 import { Input, Select } from './components/ui/Input';
 import { Card, Badge } from './components/ui/Card';
 import { cn, downloadFile } from './lib/utils';
+import { SecurityGuard } from './components/SecurityGuard';
 import { Path, UserData, Photos, ProgressPhotos, AssessmentResult, Rating, SavedReport, UserProfile } from './types';
 import { generateTransformationReport } from './services/gemini';
 import { getLevelInfo } from './lib/levels';
@@ -636,6 +637,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-brand-dark text-gray-100 selection:bg-brand-primary selection:text-white relative overflow-x-hidden">
+      <SecurityGuard />
       {/* Background decorative elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-brand-primary/10 blur-[120px] rounded-full" />
