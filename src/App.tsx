@@ -1744,15 +1744,19 @@ export default function App() {
                     className="text-4xl font-display font-bold text-brand-primary cursor-pointer hover:brightness-110 transition-all"
                     onClick={() => setStep('landing')}
                   >
-                    {path === 'meal' ? 'UNLCKD Meal Plan' : 
-                     path === 'workout' ? 'UNLCKD Workout Plan' : 
-                     path === 'progress' ? 'UNLCKD Weekly Comparison Report' :
-                     'UNLCKD 12-Week Transformation Report'}
+                    {(report as any).reportType || (
+                      path === 'meal' ? 'UNLCKD Meal Plan' : 
+                      path === 'workout' ? 'UNLCKD Workout Plan' : 
+                      path === 'progress' ? 'UNLCKD Weekly Comparison Report' :
+                      path === 'assessment' ? 'UNLCKD Physique Assessment' :
+                      'UNLCKD 12-Week Transformation Report'
+                    )}
                   </h1>
                   <p className="text-gray-500">
                     {path === 'meal' ? 'Nutrition Strategy, Meal Plan, and Grocery List' :
                      path === 'workout' ? 'Training Plan, Recovery, and Hydration Strategy' :
-                     '12-Week Baseline Assessment, Training Plan, and Nutrition Strategy'}
+                     path === 'assessment' ? 'Physique Analysis and Body Composition Assessment' :
+                     'Complete 12-Week Transformation Blueprint'}
                   </p>
                 </div>
 
@@ -1932,6 +1936,12 @@ export default function App() {
                               <span className="text-xs font-bold text-gray-500 uppercase block mb-1">Recommended Focus</span>
                               <p className="text-sm text-gray-300 leading-relaxed font-medium text-brand-primary">{report.healthMetrics.focus}</p>
                             </div>
+                            {report.healthMetrics.heightWeightAnalysis && (
+                              <div className="md:col-span-2 pt-4 border-t border-gray-800">
+                                <span className="text-xs font-bold text-gray-500 uppercase block mb-1 tracking-wider text-brand-primary">Height-to-Weight Relationship Analysis</span>
+                                <p className="text-sm text-gray-300 leading-relaxed italic">{report.healthMetrics.heightWeightAnalysis}</p>
+                              </div>
+                            )}
                           </div>
                         </Card>
                       </div>
@@ -2358,7 +2368,7 @@ export default function App() {
               )}
 
               {/* Grocery List */}
-              {(path !== 'workout' && path !== 'progress') && (
+              {(path !== 'workout' && path !== 'progress' && path !== 'assessment') && (
                 <section className="space-y-8 pt-16 border-t border-gray-800">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                       <div className="space-y-1">
