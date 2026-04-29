@@ -148,6 +148,18 @@ async function generatePhysiqueAnalysis(
   const model = "gemini-flash-latest";
   const photoParts = getPhotoParts(path, photos);
 
+  let progressContext = "";
+  if (path === 'progress') {
+    const p = photos as ProgressPhotos;
+    progressContext = `
+    PROGRESS PHOTO ENGINE MODE:
+    Compare current photos with previous ones. Identify changes in muscle density, body fat, and posture.
+    Before Weight: ${p.beforeWeight} ${userData.weightUnit} (Date: ${p.beforeDate})
+    After Weight: ${p.afterWeight} ${userData.weightUnit} (Date: ${p.afterDate})
+    Evaluate the weight change in relation to the physique changes seen.
+    `;
+  }
+
   const prompt = `
     Perform a professional physique assessment for "UNLCKD Pro Trainer".
     
@@ -156,11 +168,7 @@ async function generatePhysiqueAnalysis(
     
     ${isResubmit ? "RESUBMIT MODE: Ensure maximum accuracy." : ""}
     Requested Path: ${path}
-    
-    ${path === 'progress' ? `
-    PROGRESS PHOTO ENGINE MODE:
-    Compare current photos with previous ones. Identify changes in muscle density, body fat, and posture.
-    ` : ''}
+    ${progressContext}
 
     FOCUS: Detailed Ratings & Summaries for ALL views (Front, Back, Left, Right).
     Note: The goal is ${userData.goals}.

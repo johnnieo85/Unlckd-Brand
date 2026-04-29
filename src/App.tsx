@@ -121,7 +121,7 @@ const RatingTable = ({ title, ratings = [], summary, photo }: { title: string; r
   </div>
 );
 
-const ProgressComparison = ({ title, ratings = [], summary, beforePhoto, afterPhoto, beforeDate, afterDate }: { 
+const ProgressComparison = ({ title, ratings = [], summary, beforePhoto, afterPhoto, beforeDate, afterDate, beforeWeight, afterWeight, weightUnit }: { 
   title: string; 
   ratings?: Rating[]; 
   summary?: string; 
@@ -129,6 +129,9 @@ const ProgressComparison = ({ title, ratings = [], summary, beforePhoto, afterPh
   afterPhoto: string | null;
   beforeDate: string;
   afterDate: string;
+  beforeWeight?: string;
+  afterWeight?: string;
+  weightUnit?: string;
 }) => (
   <div className="space-y-6">
     <h2 className="text-3xl font-display font-bold text-brand-primary tracking-tight flex items-center gap-3 print:text-black">
@@ -144,13 +147,23 @@ const ProgressComparison = ({ title, ratings = [], summary, beforePhoto, afterPh
             <div className="aspect-[3/4] rounded-2xl overflow-hidden border border-white/5 shadow-xl print:border-gray-200">
               <img src={beforePhoto!} alt="Before" className="w-full h-full object-cover" />
             </div>
-            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest print:text-gray-600">Before ({beforeDate})</span>
+            <div className="flex flex-col gap-1 items-center">
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest print:text-gray-600">Before ({beforeDate})</span>
+              {beforeWeight && (
+                <span className="text-xs font-mono text-gray-400 font-bold bg-white/5 px-2 py-0.5 rounded-full">{beforeWeight} {weightUnit}</span>
+              )}
+            </div>
           </div>
           <div className="space-y-3 text-center">
             <div className="aspect-[3/4] rounded-2xl overflow-hidden border border-brand-primary/20 shadow-xl shadow-brand-primary/5 print:border-gray-200">
               <img src={afterPhoto!} alt="After" className="w-full h-full object-cover" />
             </div>
-            <span className="text-[10px] font-bold text-brand-primary uppercase tracking-widest print:text-black">After ({afterDate})</span>
+            <div className="flex flex-col gap-1 items-center">
+              <span className="text-[10px] font-bold text-brand-primary uppercase tracking-widest print:text-black">After ({afterDate})</span>
+              {afterWeight && (
+                <span className="text-xs font-mono text-brand-primary font-bold bg-brand-primary/10 px-2 py-0.5 rounded-full">{afterWeight} {weightUnit}</span>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -1948,6 +1961,9 @@ export default function App() {
                           afterPhoto={progressPhotos.after.front}
                           beforeDate={progressPhotos.beforeDate}
                           afterDate={progressPhotos.afterDate}
+                          beforeWeight={progressPhotos.beforeWeight}
+                          afterWeight={progressPhotos.afterWeight}
+                          weightUnit={userData.weightUnit}
                         />
                         <ProgressComparison 
                           title="Left Side Comparison" 
@@ -1957,6 +1973,9 @@ export default function App() {
                           afterPhoto={progressPhotos.after.left}
                           beforeDate={progressPhotos.beforeDate}
                           afterDate={progressPhotos.afterDate}
+                          beforeWeight={progressPhotos.beforeWeight}
+                          afterWeight={progressPhotos.afterWeight}
+                          weightUnit={userData.weightUnit}
                         />
                         <ProgressComparison 
                           title="Back View Comparison" 
@@ -1966,6 +1985,9 @@ export default function App() {
                           afterPhoto={progressPhotos.after.back}
                           beforeDate={progressPhotos.beforeDate}
                           afterDate={progressPhotos.afterDate}
+                          beforeWeight={progressPhotos.beforeWeight}
+                          afterWeight={progressPhotos.afterWeight}
+                          weightUnit={userData.weightUnit}
                         />
                         <ProgressComparison 
                           title="Right Side Comparison" 
@@ -1975,6 +1997,9 @@ export default function App() {
                           afterPhoto={progressPhotos.after.right}
                           beforeDate={progressPhotos.beforeDate}
                           afterDate={progressPhotos.afterDate}
+                          beforeWeight={progressPhotos.beforeWeight}
+                          afterWeight={progressPhotos.afterWeight}
+                          weightUnit={userData.weightUnit}
                         />
                       </>
                     )}
