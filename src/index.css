@@ -34,6 +34,21 @@
     animation: pulse-border 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
 
+  @keyframes gold-glow {
+    0%, 100% {
+      box-shadow: 0 0 10px rgba(212, 175, 55, 0.3);
+      border-color: rgba(212, 175, 55, 0.4);
+    }
+    50% {
+      box-shadow: 0 0 20px rgba(212, 175, 55, 0.6);
+      border-color: rgba(212, 175, 55, 0.8);
+    }
+  }
+
+  .animate-gold-glow {
+    animation: gold-glow 4s ease-in-out infinite;
+  }
+
   @media print {
     .no-print {
       display: none !important;

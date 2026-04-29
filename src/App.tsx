@@ -913,7 +913,7 @@ export default function App() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 gap-6 pt-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
                 <a 
                   href="https://unlckdbrand.com/unlckd-pro-trainer" 
                   target="_blank" 
@@ -925,11 +925,26 @@ export default function App() {
                   </div>
                   <div className="space-y-2 relative z-10">
                     <h3 className="text-2xl font-display font-bold uppercase italic">Purchase Pro Access</h3>
-                    <p className="font-medium opacity-80">One-time payment for lifetime coaching & analysis</p>
+                    <p className="font-medium opacity-80 text-sm">Full Training & Transformation Reports</p>
                   </div>
                 </a>
 
-                <div className="grid grid-cols-2 gap-4">
+                <a 
+                  href="https://unlckdbrand.com/unlckd-pro-trainer-premium" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="p-8 bg-transparent border-2 border-[#D4AF37]/30 text-[#D4AF37] rounded-3xl group relative overflow-hidden transition-all hover:scale-[1.02] animate-gold-glow"
+                >
+                  <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <Trophy className="w-20 h-20" />
+                  </div>
+                  <div className="space-y-2 relative z-10">
+                    <h3 className="text-2xl font-display font-bold uppercase italic">Unlock Premium Hub</h3>
+                    <p className="font-medium opacity-80 text-sm">Elite Gym Hub & High-Performance Access</p>
+                  </div>
+                </a>
+
+                <div className="grid grid-cols-2 gap-4 md:col-span-2">
                   <Button 
                     variant="outline" 
                     className="h-20 rounded-3xl border-white/5 hover:bg-white/5 gap-2"
@@ -972,7 +987,7 @@ export default function App() {
                 <p className="text-gray-400 text-xl max-w-2xl mx-auto font-light leading-relaxed">
                   The elite digital coach that turns your data and photos into a structured, professional transformation plan.
                 </p>
-                <div className="pt-4">
+                <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
                   <a 
                     href="https://unlckdbrand.com/unlckd-pro-trainer" 
                     target="_blank" 
@@ -981,6 +996,15 @@ export default function App() {
                   >
                     <Sparkles className="w-5 h-5" />
                     Purchase Pro Access
+                  </a>
+                  <a 
+                    href="https://unlckdbrand.com/unlckd-pro-trainer-premium" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-8 py-4 bg-transparent border-2 border-[#D4AF37]/40 text-[#D4AF37] font-bold rounded-full hover:bg-[#D4AF37]/10 transition-all hover:scale-105 animate-gold-glow group"
+                  >
+                    <Trophy className="w-5 h-5 text-[#D4AF37] group-hover:rotate-12 transition-transform" />
+                    Upgrade to Premium
                   </a>
                 </div>
               </div>
@@ -1017,6 +1041,12 @@ export default function App() {
                       <div className="max-w-md mx-auto">
                         <h3 className="font-display font-bold text-2xl tracking-tight text-white mb-2">Pro Gym Hub</h3>
                         <p className="text-sm text-gray-400 leading-relaxed italic">"Your private high-performance optimization center. Access professional training environments."</p>
+                        {!isPremium && (
+                          <div className="mt-4 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">
+                            <Zap className="w-3 h-3 fill-[#D4AF37]" />
+                            Premium Access Required
+                          </div>
+                        )}
                       </div>
                     </div>
                   </Card>
@@ -2656,6 +2686,19 @@ export default function App() {
               >
                 Cancel Request
               </button>
+
+              <div className="pt-4 border-t border-white/5">
+                <p className="text-[10px] text-gray-400 mb-3 uppercase tracking-widest font-bold">Don't have a PIN yet?</p>
+                <a 
+                  href="https://unlckdbrand.com/unlckd-pro-trainer-premium" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 w-full py-3 px-4 border border-[#D4AF37]/30 bg-[#D4AF37]/5 text-[#D4AF37] rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#D4AF37]/10 transition-all animate-gold-glow"
+                >
+                  <Trophy className="w-3.5 h-3.5" />
+                  Get Premium Access
+                </a>
+              </div>
             </div>
           </div>
         </motion.div>
