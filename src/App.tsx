@@ -1507,6 +1507,22 @@ export default function App() {
                             "aspect-[3/4] rounded-xl border-2 border-dashed border-gray-800 bg-brand-surface flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-brand-primary/50 transition-all relative group overflow-hidden",
                             progressPhotos.before[view] && "border-brand-primary/50"
                           )}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            e.currentTarget.classList.add('border-brand-primary');
+                          }}
+                          onDragLeave={(e) => {
+                            e.preventDefault();
+                            e.currentTarget.classList.remove('border-brand-primary');
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            e.currentTarget.classList.remove('border-brand-primary');
+                            const file = e.dataTransfer.files?.[0];
+                            if (file && file.type.startsWith('image/')) {
+                              handlePhotoUpload(view, file, 'before');
+                            }
+                          }}
                           onClick={() => document.getElementById(`before-${view}`)?.click()}
                         >
                           {progressPhotos.before[view] ? (
@@ -1527,7 +1543,12 @@ export default function App() {
                               </div>
                             </>
                           ) : (
-                            <Camera className="w-6 h-6 text-gray-600 group-hover:text-brand-primary transition-colors" />
+                            <>
+                              <Camera className="w-6 h-6 text-gray-600 group-hover:text-brand-primary transition-colors" />
+                              <div className="text-center px-4">
+                                <span className="text-[10px] text-gray-500 block">Drag to upload</span>
+                              </div>
+                            </>
                           )}
                           <input 
                             id={`before-${view}`}
@@ -1560,6 +1581,22 @@ export default function App() {
                             "aspect-[3/4] rounded-xl border-2 border-dashed border-gray-800 bg-brand-surface flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-brand-primary/50 transition-all relative group overflow-hidden",
                             progressPhotos.after[view] && "border-brand-primary/50"
                           )}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            e.currentTarget.classList.add('border-brand-primary');
+                          }}
+                          onDragLeave={(e) => {
+                            e.preventDefault();
+                            e.currentTarget.classList.remove('border-brand-primary');
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            e.currentTarget.classList.remove('border-brand-primary');
+                            const file = e.dataTransfer.files?.[0];
+                            if (file && file.type.startsWith('image/')) {
+                              handlePhotoUpload(view, file, 'after');
+                            }
+                          }}
                           onClick={() => document.getElementById(`after-${view}`)?.click()}
                         >
                           {progressPhotos.after[view] ? (
@@ -1580,7 +1617,12 @@ export default function App() {
                               </div>
                             </>
                           ) : (
-                            <Camera className="w-6 h-6 text-gray-600 group-hover:text-brand-primary transition-colors" />
+                            <>
+                              <Camera className="w-6 h-6 text-gray-600 group-hover:text-brand-primary transition-colors" />
+                              <div className="text-center px-4">
+                                <span className="text-[10px] text-gray-500 block">Drag to upload</span>
+                              </div>
+                            </>
                           )}
                           <input 
                             id={`after-${view}`}
