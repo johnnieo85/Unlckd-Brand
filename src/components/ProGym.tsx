@@ -207,11 +207,25 @@ export const ProGym = ({
 
   const parseStepGoal = (goalStr: string) => {
     if (!goalStr) return 10000;
-    const cleaned = goalStr.replace(/,/g, '');
-    const matches = cleaned.match(/\d+/g);
+    
+    // Convert 'k' or 'K' to '000'
+    const normalized = goalStr.toLowerCase().replace(/(\d+)k/g, '$1000').replace(/,/g, '');
+    const matches = normalized.match(/\d+/g);
+    
     if (!matches) return 10000;
-    if (matches.length >= 2) return parseInt(matches[1]); // Take second number in range (high target)
-    return parseInt(matches[0]);
+    
+    let value = 10000;
+    if (matches.length >= 2) {
+      value = parseInt(matches[1]); // Take second number in range (high target)
+    } else {
+      value = parseInt(matches[0]);
+    }
+
+    // Sanity check: if the AI output "8-10" instead of "8k-10k"
+    if (value < 100) return value * 1000;
+    if (value < 1000) return 10000; // Unlikely goal, default to 10k
+    
+    return value;
   };
 
   useEffect(() => {
@@ -651,11 +665,13 @@ export const ProGym = ({
     
     const logs = await gymService.getLogsInRange(getLocalDateString(startDate), getLocalDateString(now));
     
+    const reportStepGoal = latestReport ? parseStepGoal(latestReport.report.stepGoals) : 10000;
+    
     // XP Calculation
     let calculatedTotalXP = 0;
     logs.forEach(l => {
-      let sGoal = Number(l.stepGoal) || 10000;
-      if (sGoal > 50000) sGoal = 10000; // Sanity check for corrupted range parsing
+      let sGoal = Number(l.stepGoal) || reportStepGoal;
+      if (sGoal > 50000) sGoal = reportStepGoal; // Sanity check for corrupted range parsing
       
       const stepProg = Math.min((Number(l.steps) || 0) / sGoal, 1);
       const waterProg = Math.min((Number(l.water) || 0) / (Number(l.waterGoal) || 3000), 1);
@@ -697,7 +713,8 @@ export const ProGym = ({
         const hasWorkout = (Number(l.completedWorkouts) || 0) > 0;
         
         // Stricter goals: at least 10% of goal or substantial absolute amount
-        const hasSteps = (Number(l.steps) || 0) >= (Number(l.stepGoal) || 10000) * 0.1 && (Number(l.steps) || 0) > 500;
+        const sGoal = Number(l.stepGoal) || reportStepGoal;
+        const hasSteps = (Number(l.steps) || 0) >= sGoal * 0.1 && (Number(l.steps) || 0) > 500;
         const hasWater = (Number(l.water) || 0) >= (Number(l.waterGoal) || 2000) * 0.1 && (Number(l.water) || 0) > 250;
         
         // Count as active if at least 2 habits are done, or a major physical activity
@@ -808,10 +825,9 @@ export const ProGym = ({
       logData.steps = Number(logData.steps) || 0;
       logData.water = Number(logData.water) || 0;
       
+      // Sync step goal with latest report if available
       const reportStepGoal = latestReport ? parseStepGoal(latestReport.report.stepGoals) : 10000;
-      
-      // If goal is missing or looks like corrupted data (huge value from bad parsing)
-      if (!logData.stepGoal || Number(logData.stepGoal) > 50000) {
+      if (!logData.stepGoal || Number(logData.stepGoal) > 50000 || (logData.stepGoal !== reportStepGoal && latestReport)) {
         logData.stepGoal = reportStepGoal;
         hasChanges = true;
       } else {
@@ -3014,7 +3030,7 @@ export const ProGym = ({
              <div>
                 <p className="text-[10px] text-brand-primary font-black uppercase tracking-widest">Victory Reward</p>
                 <h5 className="text-lg font-display font-bold text-white tracking-tight">The "Stepper" Elite Badge</h5>
-                <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mt-1">Achieve 10,000 steps daily for at least 75% of the month</p>
+                <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mt-1">Achieve {log.stepGoal.toLocaleString()} steps daily for at least 75% of the month</p>
              </div>
           </div>
         </Card>
@@ -3037,7 +3053,7 @@ export const ProGym = ({
                 userProfile?.badges?.find(b => b.id === 'stepper') 
                   ? "bg-brand-primary/10 border-brand-primary/40" 
                   : "bg-white/5 border-white/5 opacity-40 grayscale"
-              )} title="Complete 10,000 steps for 75% of the month">
+              )} title={`Complete ${log.stepGoal.toLocaleString()} steps for 75% of the month`}>
                  <div className="w-12 h-12 rounded-full bg-brand-primary/20 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
                     <Footprints className="w-6 h-6 text-brand-primary" />
                  </div>
@@ -3119,7 +3135,8 @@ export const ProGym = ({
               const isCurrentMonth = reportDate.getMonth() === new Date().getMonth() && reportDate.getFullYear() === new Date().getFullYear();
               const daysToConsider = isCurrentMonth ? new Date().getDate() : daysInMonth;
               
-              const stepCompliance = reportLogs.filter(l => l.steps >= l.stepGoal).length;
+              const defaultStepGoal = latestReport ? parseStepGoal(latestReport.report.stepGoals) : 10000;
+              const stepCompliance = reportLogs.filter(l => l.steps >= (l.stepGoal || defaultStepGoal)).length;
               const waterCompliance = reportLogs.reduce((acc, l) => acc + (l.water >= l.waterGoal ? 1 : 0), 0);
               const habitCompletionTotal = reportLogs.reduce((acc, l) => acc + (Object.values(l.habits || {}).filter(Boolean).length / (Object.keys(l.habits || {}).length || 1)), 0);
 
@@ -3266,7 +3283,8 @@ export const ProGym = ({
                               const isCurrentMonth = reportDate.getMonth() === new Date().getMonth() && reportDate.getFullYear() === new Date().getFullYear();
                               const daysToConsider = isCurrentMonth ? new Date().getDate() : daysInMonth;
                               
-                              const stepCompletions = reportLogs.filter(l => l.steps >= l.stepGoal).length;
+                              const reportStepGoal = latestReport ? parseStepGoal(latestReport.report.stepGoals) : 10000;
+                              const stepCompletions = reportLogs.filter(l => l.steps >= (l.stepGoal || reportStepGoal)).length;
                               const stepPercentage = Math.round((stepCompletions / Math.max(1, daysToConsider)) * 100);
                               
                               const waterCompletions = reportLogs.filter(l => l.water >= l.waterGoal).length;
@@ -3275,14 +3293,15 @@ export const ProGym = ({
                               return (
                                 <>
                                   <div className="sticky left-0 z-20 bg-brand-surface flex items-center justify-between gap-3 pl-3 pr-4 min-w-0 h-10 border-r border-white/10 shadow-[4px_0_12px_rgba(0,0,0,0.4)]">
-                                    <span className="text-xs font-bold text-gray-100 truncate flex-1">10K Step Goal</span>
+                                    <span className="text-xs font-bold text-gray-100 truncate flex-1">{Math.round((log.stepGoal || 10000) / 1000)}K Step Goal</span>
                                     <span className="text-[10px] font-mono font-black text-emerald-500 shrink-0 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">{stepPercentage}%</span>
                                   </div>
                                   {Array.from({ length: daysInMonth }).map((_, i) => {
                                     const day = i + 1;
                                     const dateStr = `${reportDate.getFullYear()}-${String(reportDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                                     const logAtDate = reportLogs.find(l => l.date === dateStr);
-                                    const isDone = logAtDate && logAtDate.steps >= logAtDate.stepGoal;
+                                    const effectiveStepGoal = logAtDate?.stepGoal || reportStepGoal;
+                                    const isDone = logAtDate && logAtDate.steps >= effectiveStepGoal;
                                     const isFuture = new Date(dateStr) > new Date();
 
                                     return (
