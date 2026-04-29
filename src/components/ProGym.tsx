@@ -205,6 +205,15 @@ export const ProGym = ({
   const [activeView, setActiveView] = useState<'hub' | 'report'>('hub');
   const [trackerOrder, setTrackerOrder] = useState<string[]>(['hydration', 'movement']);
 
+  const parseStepGoal = (goalStr: string) => {
+    if (!goalStr) return 10000;
+    const cleaned = goalStr.replace(/,/g, '');
+    const matches = cleaned.match(/\d+/g);
+    if (!matches) return 10000;
+    if (matches.length >= 2) return parseInt(matches[1]); // Take second number in range (high target)
+    return parseInt(matches[0]);
+  };
+
   useEffect(() => {
     if (userProfile?.userId) {
       const unlocked = sessionStorage.getItem(`gym_hub_unlocked_${userProfile.userId}`) === 'true';
@@ -645,7 +654,10 @@ export const ProGym = ({
     // XP Calculation
     let calculatedTotalXP = 0;
     logs.forEach(l => {
-      const stepProg = Math.min((Number(l.steps) || 0) / (Number(l.stepGoal) || 10000), 1);
+      let sGoal = Number(l.stepGoal) || 10000;
+      if (sGoal > 50000) sGoal = 10000; // Sanity check for corrupted range parsing
+      
+      const stepProg = Math.min((Number(l.steps) || 0) / sGoal, 1);
       const waterProg = Math.min((Number(l.water) || 0) / (Number(l.waterGoal) || 3000), 1);
       
       let dayXp = 0;
@@ -795,7 +807,16 @@ export const ProGym = ({
       // Ensure goals and current values are numbers
       logData.steps = Number(logData.steps) || 0;
       logData.water = Number(logData.water) || 0;
-      logData.stepGoal = Number(logData.stepGoal) || (latestReport ? Math.max(10000, parseInt(latestReport.report.stepGoals.replace(/\D/g, '')) || 10000) : 10000);
+      
+      const reportStepGoal = latestReport ? parseStepGoal(latestReport.report.stepGoals) : 10000;
+      
+      // If goal is missing or looks like corrupted data (huge value from bad parsing)
+      if (!logData.stepGoal || Number(logData.stepGoal) > 50000) {
+        logData.stepGoal = reportStepGoal;
+        hasChanges = true;
+      } else {
+        logData.stepGoal = Number(logData.stepGoal);
+      }
       
       // Sync water goal with report if available
       if (latestReport) {
@@ -917,7 +938,7 @@ export const ProGym = ({
       setLog(logData);
     } else {
       // Initialize with defaults if no log and no report, or from report if available
-      const stepGoal = latestReport ? Math.max(10000, parseInt(latestReport.report.stepGoals.replace(/\D/g, '')) || 10000) : 10000;
+      const stepGoal = latestReport ? parseStepGoal(latestReport.report.stepGoals) : 10000;
       const waterTarget = latestReport?.report.hydrationTargets.toLowerCase() || '3000ml';
       let waterGoal = 3000; // default ml
       let waterUnit: 'ml' | 'oz' = 'ml';
