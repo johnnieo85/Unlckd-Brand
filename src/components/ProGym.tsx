@@ -208,24 +208,24 @@ export const ProGym = ({
   const parseStepGoal = (goalStr: string) => {
     if (!goalStr) return 10000;
     
-    // Convert 'k' or 'K' to '000'
-    const normalized = goalStr.toLowerCase().replace(/(\d+)k/g, '$1000').replace(/,/g, '');
-    const matches = normalized.match(/\d+/g);
+    // Normalize string: lower case, handle 'k', remove commas
+    const normalized = goalStr.toLowerCase()
+      .replace(/(\d+[,.]\d+)k/g, (_, p1) => String(parseFloat(p1.replace(',', '.')) * 1000))
+      .replace(/(\d+)k/g, (_, p1) => String(parseInt(p1) * 1000))
+      .replace(/,/g, '');
     
+    const matches = normalized.match(/\d+(\.\d+)?/g);
     if (!matches) return 10000;
     
-    let value = 10000;
-    if (matches.length >= 2) {
-      value = parseInt(matches[1]); // Take second number in range (high target)
-    } else {
-      value = parseInt(matches[0]);
-    }
+    const numbers = matches.map(m => parseFloat(m));
+    let value = Math.max(...numbers);
 
-    // Sanity check: if the AI output "8-10" instead of "8k-10k"
-    if (value < 100) return value * 1000;
-    if (value < 1000) return 10000; // Unlikely goal, default to 10k
+    // Sanity checks
+    if (value < 50) return value * 1000; // Case: "10" meaning 10k
+    if (value < 3000) return 10000;      // Case: too low, default to 10k
+    if (value > 50000) return 10000;     // Case: too high
     
-    return value;
+    return Math.round(value);
   };
 
   useEffect(() => {
@@ -827,7 +827,7 @@ export const ProGym = ({
       
       // Sync step goal with latest report if available
       const reportStepGoal = latestReport ? parseStepGoal(latestReport.report.stepGoals) : 10000;
-      if (!logData.stepGoal || Number(logData.stepGoal) > 50000 || (logData.stepGoal !== reportStepGoal && latestReport)) {
+      if (!logData.stepGoal || Number(logData.stepGoal) > 50000 || Number(logData.stepGoal) < 3000 || (logData.stepGoal !== reportStepGoal && latestReport)) {
         logData.stepGoal = reportStepGoal;
         hasChanges = true;
       } else {
@@ -1911,7 +1911,7 @@ export const ProGym = ({
                                 }}
                                 className="w-20 bg-white/5 border border-white/10 rounded px-2 py-0.5 text-right font-mono text-sm text-gray-200 focus:border-emerald-500 outline-none transition-colors"
                               />
-                              <span className="text-sm text-gray-500 font-mono">/ {log.stepGoal}</span>
+                              <span className="text-sm text-gray-500 font-mono">/ {log.stepGoal.toLocaleString()}</span>
                             </div>
                           )}
                         </div>
