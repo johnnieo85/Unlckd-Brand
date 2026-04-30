@@ -76,8 +76,16 @@ import {
   ZAxis
 } from 'recharts';
 
+import { auth } from '../lib/firebase';
 import { getLevelInfo } from '../lib/levels';
 import { LevelInfoModal } from './LevelInfoModal';
+
+const getLocalDateString = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 const SortableTracker = ({ id, children }: { id: string; children: React.ReactNode }) => {
   const {
@@ -184,8 +192,8 @@ export const ProGym = ({
   const [isAddingMeasurement, setIsAddingMeasurement] = useState(false);
   const [hasDayMeasurement, setHasDayMeasurement] = useState(false);
   const [isMeasurementsExpanded, setIsMeasurementsExpanded] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [unlockedDates, setUnlockedDates] = useState<Set<string>>(new Set([new Date().toISOString().split('T')[0]]));
+  const [selectedDate, setSelectedDate] = useState(getLocalDateString(new Date()));
+  const [unlockedDates, setUnlockedDates] = useState<Set<string>>(new Set([getLocalDateString(new Date())]));
   const [isNutritionCollapsed, setIsNutritionCollapsed] = useState(false);
   const [isTrainingCollapsed, setIsTrainingCollapsed] = useState(false);
   const [isHabitsCollapsed, setIsHabitsCollapsed] = useState(false);
@@ -194,6 +202,7 @@ export const ProGym = ({
   const [totalXP, setTotalXP] = useState(0);
   const [currentStreak, setCurrentStreak] = useState(0);
   const [isStepsCollapsed, setIsStepsCollapsed] = useState(false);
+  const [chartMetric, setChartMetric] = useState<'weight' | 'bodyFat'>('weight');
   const [isWeightCollapsed, setIsWeightCollapsed] = useState(false);
   const [isHubUnlocked, setIsHubUnlocked] = useState(false);
   const [isSavingHydration, setIsSavingHydration] = useState(false);
@@ -649,13 +658,6 @@ export const ProGym = ({
     refreshGlobalStats();
     
     gymService.updateDailyLog(selectedDate, { workoutData: updatedWorkoutData, completedWorkouts });
-  };
-
-  const getLocalDateString = (date: Date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
   };
 
   const refreshGlobalStats = async () => {
@@ -1129,17 +1131,34 @@ export const ProGym = ({
       neck: Number(newMeasurement.neck),
       units: measurementUnits
     };
-    await gymService.addMeasurement(measurement);
     
-    // Sync with DailyLog consistency tracker
-    await gymService.updateDailyLog(selectedDate, { 
-      weight: Number(newMeasurement.weight),
-      weightUnit: measurementUnits.weight 
-    });
+    // Set loading state for optimistic feel
+    setLoading(true);
+    try {
+      await gymService.addMeasurement(measurement);
+      
+      // Update local state immediately for snappy feel
+      const newM: Measurement = { ...measurement, id: measurement.date, timestamp: new Date().toISOString() };
+      setMeasurements(prev => {
+        const filtered = prev.filter(m => m.date !== measurement.date);
+        return [newM, ...filtered].sort((a, b) => b.date.localeCompare(a.date));
+      });
 
-    setIsAddingMeasurement(false);
-    await refreshGlobalStats();
-    await loadData(selectedDate);
+      // Sync with DailyLog consistency tracker
+      await gymService.updateDailyLog(selectedDate, { 
+        weight: Number(newMeasurement.weight),
+        weightUnit: measurementUnits.weight 
+      });
+
+      setIsAddingMeasurement(false);
+      // Refresh to be sure
+      await refreshGlobalStats();
+      await loadData(selectedDate);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDeleteMeasurement = async (id: string, date: string) => {
@@ -2457,6 +2476,9 @@ export const ProGym = ({
                           <>
                             <span className="text-[10px] font-mono text-brand-primary font-bold">{totals.calories} CAL</span>
                             <span className="text-[10px] font-mono text-gray-500">{totals.protein}P / {totals.fat}F / {totals.carbs}C</span>
+                            {log.weight ? (
+                              <span className="text-[10px] font-mono text-emerald-400 font-bold ml-2">WEIGHT: {log.weight}{log.weightUnit || measurementUnits.weight}</span>
+                            ) : null}
                             <span className="text-[10px] font-mono text-blue-400 font-bold ml-2">WATER: {log.water}{log.waterUnit}</span>
                           </>
                         );
@@ -2804,9 +2826,13 @@ export const ProGym = ({
                       const displayLThigh = convertLen(Number(m.leftThigh), m.units?.length || 'cm');
                       const displayRThigh = convertLen(Number(m.rightThigh), m.units?.length || 'cm');
 
+                      // Safe local date parsing
+                      const parts = m.date.split('-');
+                      const displayDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])).toLocaleDateString();
+
                       return (
                         <tr key={m.id} className="border-b border-white/[0.02] last:border-0 group">
-                          <td className="py-4 text-gray-400">{new Date(m.date).toLocaleDateString()}</td>
+                          <td className="py-4 text-gray-400 font-mono text-[10px] uppercase font-bold">{displayDate}</td>
                           <td className="py-4 font-mono text-gray-200">
                             <span className="block">{displayWeight.toFixed(1)}{measurementUnits.weight}</span>
                             {m.units?.weight && m.units.weight !== measurementUnits.weight && (
@@ -3473,6 +3499,26 @@ export const ProGym = ({
                 <h3 className="font-bold text-gray-100 uppercase tracking-widest text-sm">Weight Progression</h3>
               </div>
               <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 p-1 bg-brand-dark rounded-lg scale-90">
+                  <button 
+                    onClick={() => setChartMetric('weight')}
+                    className={cn(
+                      "px-3 py-1 rounded text-[9px] uppercase font-black transition-all",
+                      chartMetric === 'weight' ? "bg-emerald-500 text-white shadow-[0_0_8px_rgba(16,185,129,0.3)]" : "text-gray-500 hover:text-gray-300"
+                    )}
+                  >
+                    Weight
+                  </button>
+                  <button 
+                    onClick={() => setChartMetric('bodyFat')}
+                    className={cn(
+                      "px-3 py-1 rounded text-[9px] uppercase font-black transition-all",
+                      chartMetric === 'bodyFat' ? "bg-purple-500 text-white shadow-[0_0_8px_rgba(168,85,247,0.3)]" : "text-gray-500 hover:text-gray-300"
+                    )}
+                  >
+                    Body Fat
+                  </button>
+                </div>
                 <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-gray-500">
                    Current: <span className="text-white ml-1">
                      {measurements.length > 0 ? (() => {
@@ -3508,26 +3554,32 @@ export const ProGym = ({
                   className="overflow-hidden"
                 >
                   <div className="h-[300px] w-full">
-              {measurements.length > 1 ? (
+              {measurements.length >= 1 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
                     data={measurements
-                      .filter(m => m.weight)
+                      .filter(m => chartMetric === 'weight' ? m.weight : m.bodyFat)
                       .map(m => {
-                        let weight = Number(m.weight);
-                        // Normalize to current selected weight unit for consistent charting
-                        if (m.units?.weight && m.units.weight !== measurementUnits.weight) {
+                        const val = chartMetric === 'weight' ? Number(m.weight) : Number(m.bodyFat);
+                        let displayVal = val;
+                        
+                        if (chartMetric === 'weight' && m.units?.weight && m.units.weight !== measurementUnits.weight) {
                           if (measurementUnits.weight === 'kg' && m.units.weight === 'lbs') {
-                            weight = weight * 0.453592;
+                            displayVal = val * 0.453592;
                           } else if (measurementUnits.weight === 'lbs' && m.units.weight === 'kg') {
-                            weight = weight / 0.453592;
+                            displayVal = val / 0.453592;
                           }
                         }
+                        
+                        // Handle UTC/Local date parsing issue
+                        const parts = m.date.split('-');
+                        const dateObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                        
                         return {
-                          date: new Date(m.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
-                          weight: parseFloat(weight.toFixed(1)),
-                          originalWeight: m.weight,
-                          originalUnit: m.units?.weight || 'kg',
+                          date: dateObj.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
+                          value: parseFloat(displayVal.toFixed(1)),
+                          originalValue: val,
+                          originalUnit: chartMetric === 'weight' ? (m.units?.weight || 'kg') : '%',
                           rawDate: m.date
                         };
                       })
@@ -3557,11 +3609,11 @@ export const ProGym = ({
                             <div className="bg-[#0A0A0A] border border-white/5 p-3 rounded-xl shadow-2xl">
                               <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">{label}</p>
                               <p className="text-sm font-black text-brand-primary">
-                                {data.weight}{measurementUnits.weight}
+                                {data.value}{chartMetric === 'weight' ? measurementUnits.weight : '%'}
                               </p>
-                              {data.originalUnit !== measurementUnits.weight && (
+                              {chartMetric === 'weight' && data.originalUnit !== measurementUnits.weight && (
                                 <p className="text-[10px] text-gray-600 font-bold mt-1">
-                                  Logged as: {data.originalWeight}{data.originalUnit}
+                                  Logged as: {data.originalValue}{data.originalUnit}
                                 </p>
                               )}
                             </div>
@@ -3572,20 +3624,20 @@ export const ProGym = ({
                     />
                     <Line 
                       type="monotone" 
-                      dataKey="weight" 
-                      stroke="#10b981" 
-                      strokeWidth={3}
-                      dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#000' }}
-                      activeDot={{ r: 6, fill: '#10b981', strokeWidth: 0 }}
-                      animationDuration={1500}
+                      dataKey="value" 
+                      stroke={chartMetric === 'weight' ? '#10b981' : '#a855f7'} 
+                      strokeWidth={4}
+                      connectNulls
+                      dot={{ r: 4, fill: chartMetric === 'weight' ? '#10b981' : '#a855f7', strokeWidth: 2, stroke: '#000' }}
+                      activeDot={{ r: 6, fill: chartMetric === 'weight' ? '#10b981' : '#a855f7', stroke: '#fff', strokeWidth: 2 }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-full flex flex-col items-center justify-center text-gray-500 gap-3 border border-dashed border-white/5 rounded-2xl">
-                  <TrendingUp className="w-8 h-8 opacity-20" />
-                  <p className="text-[10px] font-black uppercase tracking-widest">Insufficient data for chart</p>
-                  <p className="text-[10px] font-bold text-gray-600">Add at least two weight entries this month</p>
+                <div className="h-full flex flex-col items-center justify-center text-gray-500 gap-3 border border-dashed border-white/5 rounded-2xl bg-white/[0.01]">
+                  <TrendingUp className="w-8 h-8 opacity-20 mb-2" />
+                  <p className="text-[10px] font-black uppercase tracking-widest">No Measurements Found</p>
+                  <p className="text-[10px] font-bold text-gray-600">Start logging your weight to see progress</p>
                 </div>
               )}
             </div>
