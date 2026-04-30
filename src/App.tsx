@@ -45,7 +45,7 @@ import ReactMarkdown from 'react-markdown';
 import { Button } from './components/ui/Button';
 import { Input, Select, Checkbox } from './components/ui/Input';
 import { Card, Badge } from './components/ui/Card';
-import { cn, downloadFile } from './lib/utils';
+import { cn, downloadFile, getLocalDateString, parseLocalDate } from './lib/utils';
 import { SecurityGuard } from './components/SecurityGuard';
 import { Path, UserData, Photos, ProgressPhotos, AssessmentResult, Rating, SavedReport, UserProfile } from './types';
 import { generateTransformationReport } from './services/gemini';
@@ -303,6 +303,37 @@ export default function App() {
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  const getPlanDate = (weekNum: number, dayName: string) => {
+    if (!userData.planStartDate) return null;
+    const baseDate = parseLocalDate(userData.planStartDate);
+    
+    // Adjust baseDate to starting Monday
+    const day = baseDate.getDay();
+    const diff = (day === 0 ? -6 : 1 - day); 
+    baseDate.setDate(baseDate.getDate() + diff);
+    baseDate.setHours(0, 0, 0, 0);
+
+    const dayMap: { [key: string]: number } = {
+      'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3, 'friday': 4, 'saturday': 5, 'sunday': 6
+    };
+    
+    let targetDay = 0;
+    const normalizedDay = dayName.toLowerCase().trim();
+    
+    if (dayMap[normalizedDay] !== undefined) {
+      targetDay = dayMap[normalizedDay];
+    } else {
+      const match = dayName.match(/Day\s*(\d+)/i);
+      if (match) {
+        const num = parseInt(match[1]);
+        targetDay = (num - 1) % 7;
+      }
+    }
+    
+    baseDate.setDate(baseDate.getDate() + ((weekNum - 1) * 7) + targetDay);
+    return baseDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  };
   const [isSignUp, setIsSignUp] = useState(false);
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
@@ -2190,7 +2221,8 @@ export default function App() {
                             content += `------------------------------------------\n`;
                             
                             week.days.forEach(day => {
-                              content += `${(day.day || '').toUpperCase()} (${day.focus || ''})\n`;
+                              const planDate = getPlanDate(week.week, day.day);
+                              content += `${(day.day || '').toUpperCase()}${planDate ? ` [${planDate}]` : ''} (${day.focus || ''})\n`;
                               // Strip markdown links for text file: [Name](URL) -> Name
                               const cleanWarmup = (day.warmUp || '').replace(/\[(.*?)\]\(.*?\)/g, '$1');
                               const cleanMainWork = (day.mainWork || '').replace(/\[(.*?)\]\(.*?\)/g, '$1');
@@ -2222,7 +2254,7 @@ export default function App() {
                         <table className="w-full text-sm text-left border-collapse">
                           <thead className="bg-brand-secondary/20 text-gray-400 uppercase text-[10px] tracking-wider">
                             <tr>
-                              <th className="px-4 py-3 font-semibold border-r border-gray-800">Day</th>
+                              <th className="px-4 py-3 font-semibold border-r border-gray-800 w-32">Day / Date</th>
                               <th className="px-4 py-3 font-semibold border-r border-gray-800">Focus</th>
                               <th className="px-4 py-3 font-semibold border-r border-gray-800">Warm-Up</th>
                               <th className="px-4 py-3 font-semibold border-r border-gray-800">Main Work</th>
@@ -2232,7 +2264,12 @@ export default function App() {
                           <tbody className="divide-y divide-gray-800">
                             {week.days?.map((day, i) => (
                               <tr key={i} className="hover:bg-white/5 transition-colors">
-                                <td className="px-4 py-4 font-bold text-brand-primary border-r border-gray-800">{day.day}</td>
+                                <td className="px-4 py-4 border-r border-gray-800">
+                                  <div className="flex flex-col">
+                                    <span className="font-bold text-brand-primary">{day.day}</span>
+                                    <span className="text-[10px] text-gray-500 font-mono mt-0.5">{getPlanDate(week.week, day.day)}</span>
+                                  </div>
+                                </td>
                                 <td className="px-4 py-4 border-r border-gray-800 text-gray-200">{day.focus}</td>
                                 <td className="px-4 py-4 border-r border-gray-800 text-gray-400 text-xs">
                                   <div className="space-y-2">
@@ -2292,7 +2329,8 @@ export default function App() {
                             content += `-----------------\n`;
                             
                             week.days.forEach(day => {
-                              content += `${(day.day || '').toUpperCase()}\n`;
+                              const planDate = getPlanDate(week.week, day.day);
+                              content += `${(day.day || '').toUpperCase()}${planDate ? ` [${planDate}]` : ''}\n`;
                               content += `Breakfast: ${day.breakfast || 'N/A'}${day.breakfastUrl ? ` (${day.breakfastUrl})` : ''}\n`;
                               content += `Lunch: ${day.lunch || 'N/A'}${day.lunchUrl ? ` (${day.lunchUrl})` : ''}\n`;
                               content += `Dinner: ${day.dinner || 'N/A'}${day.dinnerUrl ? ` (${day.dinnerUrl})` : ''}\n`;
@@ -2320,7 +2358,7 @@ export default function App() {
                       <thead className="bg-brand-secondary/20 text-gray-400 uppercase text-[10px] tracking-wider">
                         <tr>
                           <th className="px-4 py-3 font-semibold border-r border-gray-800">Week</th>
-                          <th className="px-4 py-3 font-semibold border-r border-gray-800">Day</th>
+                          <th className="px-4 py-3 font-semibold border-r border-gray-800">Day / Date</th>
                           <th className="px-4 py-3 font-semibold border-r border-gray-800">Breakfast</th>
                           <th className="px-4 py-3 font-semibold border-r border-gray-800">Lunch</th>
                           <th className="px-4 py-3 font-semibold border-r border-gray-800">Dinner</th>
@@ -2337,7 +2375,12 @@ export default function App() {
                                     W{week.week}
                                   </td>
                                 )}
-                                <td className="px-4 py-4 font-bold text-brand-primary border-r border-gray-800">{day.day}</td>
+                                <td className="px-4 py-4 border-r border-gray-800">
+                                  <div className="flex flex-col">
+                                    <span className="font-bold text-brand-primary">{day.day}</span>
+                                    <span className="text-[10px] text-gray-500 font-mono mt-0.5">{getPlanDate(week.week, day.day)}</span>
+                                  </div>
+                                </td>
                                 <td className="px-4 py-4 border-r border-gray-800 text-gray-300">
                                   <div className="flex flex-col gap-1">
                                     <span>{day.breakfast}</span>

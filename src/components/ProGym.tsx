@@ -60,7 +60,7 @@ import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { gymService } from '../services/gymService';
 import { DailyLog, SavedReport, Measurement, UserProfile, Badge as UserBadge } from '../types';
-import { cn, downloadFile } from '../lib/utils';
+import { cn, downloadFile, getLocalDateString, parseLocalDate } from '../lib/utils';
 import { updateGymPin, updateUserProfile } from '../services/accessService';
 import { 
   LineChart, 
@@ -79,18 +79,6 @@ import {
 import { auth } from '../lib/firebase';
 import { getLevelInfo } from '../lib/levels';
 import { LevelInfoModal } from './LevelInfoModal';
-
-const getLocalDateString = (date: Date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
-const parseLocalDate = (dateStr: string) => {
-  const parts = dateStr.split('-');
-  return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-};
 
 const SortableTracker = ({ id, children }: { id: string; children: React.ReactNode }) => {
   const {
