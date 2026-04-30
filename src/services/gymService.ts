@@ -75,7 +75,7 @@ export const gymService = {
     }
   },
 
-  async getLatestMeasurements(limitCount = 5): Promise<Measurement[]> {
+  async getLatestMeasurements(limitCount = 1000): Promise<Measurement[]> {
     const user = auth.currentUser;
     if (!user) return [];
 
@@ -83,7 +83,7 @@ export const gymService = {
     try {
       const q = query(
         collection(db, 'users', user.uid, 'measurements'),
-        orderBy('timestamp', 'desc'),
+        orderBy('date', 'desc'),
         limit(limitCount)
       );
 
@@ -175,7 +175,7 @@ export const gymService = {
     try {
       const q = query(
         collection(db, 'users', user.uid, 'measurements'),
-        orderBy('timestamp', 'desc')
+        orderBy('date', 'desc')
       );
 
       const querySnapshot = await getDocs(q);
