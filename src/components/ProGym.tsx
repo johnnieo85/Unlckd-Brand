@@ -793,7 +793,9 @@ export const ProGym = ({
         rightThigh: dayMeasurement.rightThigh || 0,
         neck: dayMeasurement.neck || 0
       });
-      setMeasurementUnits(dayMeasurement.units);
+      // Don't overwrite global units preference with day-specific units
+      // as it causes confusion when browsing days. 
+      // If we really want to preserve it, we'd only do it for initial form state.
     } else {
       setHasDayMeasurement(false);
       // Reset if no measurement for this day, or maybe keep latest? 
@@ -2646,11 +2648,41 @@ export const ProGym = ({
           {/* Measurements */}
           <Card id="measurements-section" className="p-8 bg-brand-surface border-white/5">
             <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-500/10 rounded-lg">
-                  <Ruler className="w-5 h-5 text-purple-500" />
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-purple-500/10 rounded-lg">
+                    <Ruler className="w-5 h-5 text-purple-500" />
+                  </div>
+                  <h3 className="font-bold text-gray-100">Body Measurements</h3>
                 </div>
-                <h3 className="font-bold text-gray-100">Body Measurements</h3>
+                
+                <div className="flex gap-2 p-1 bg-brand-dark rounded-lg ml-0 sm:ml-4 scale-90 origin-left">
+                  {(['kg', 'lbs'] as const).map(u => (
+                    <button 
+                      key={u}
+                      onClick={() => setMeasurementUnits({...measurementUnits, weight: u})}
+                      className={cn(
+                        "px-3 py-1 rounded text-[10px] uppercase font-black tracking-widest transition-all",
+                        measurementUnits.weight === u ? "bg-brand-primary text-brand-dark shadow-[0_0_8px_rgba(16,185,129,0.3)]" : "text-gray-500 hover:text-gray-300"
+                      )}
+                    >
+                      {u}
+                    </button>
+                  ))}
+                  <div className="w-[1px] bg-white/10 mx-1 my-1" />
+                  {(['cm', 'in'] as const).map(u => (
+                    <button 
+                      key={u}
+                      onClick={() => setMeasurementUnits({...measurementUnits, length: u})}
+                      className={cn(
+                        "px-3 py-1 rounded text-[10px] uppercase font-black tracking-widest transition-all",
+                        measurementUnits.length === u ? "bg-purple-500 text-white shadow-[0_0_8px_rgba(168,85,247,0.3)]" : "text-gray-500 hover:text-gray-300"
+                      )}
+                    >
+                      {u}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="flex gap-2">
                 <Button 
@@ -2674,43 +2706,6 @@ export const ProGym = ({
 
             {isAddingMeasurement ? (
               <div className="space-y-6 p-6 bg-white/[0.02] rounded-2xl border border-white/5">
-                <div className="flex gap-4 p-4 bg-white/5 rounded-xl border border-white/5">
-                   <div className="flex-1 space-y-2">
-                     <span className="text-[10px] uppercase font-black text-gray-500 tracking-widest pl-1">Weight Unit</span>
-                     <div className="flex gap-1 p-1 bg-brand-dark rounded-lg">
-                       {(['kg', 'lbs'] as const).map(u => (
-                         <button 
-                           key={u}
-                           onClick={() => setMeasurementUnits({...measurementUnits, weight: u})}
-                           className={cn(
-                             "flex-1 py-1 rounded text-[10px] uppercase font-black tracking-widest transition-all",
-                             measurementUnits.weight === u ? "bg-brand-primary text-brand-dark" : "text-gray-500 hover:text-gray-300"
-                           )}
-                         >
-                           {u}
-                         </button>
-                       ))}
-                     </div>
-                   </div>
-                   <div className="flex-1 space-y-2">
-                     <span className="text-[10px] uppercase font-black text-gray-500 tracking-widest pl-1">Length Unit</span>
-                     <div className="flex gap-1 p-1 bg-brand-dark rounded-lg">
-                       {(['cm', 'in'] as const).map(u => (
-                         <button 
-                           key={u}
-                           onClick={() => setMeasurementUnits({...measurementUnits, length: u})}
-                           className={cn(
-                             "flex-1 py-1 rounded text-[10px] uppercase font-black tracking-widest transition-all",
-                             measurementUnits.length === u ? "bg-brand-primary text-brand-dark" : "text-gray-500 hover:text-gray-300"
-                           )}
-                         >
-                           {u}
-                         </button>
-                       ))}
-                     </div>
-                   </div>
-                </div>
-
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                   <Input 
                     label={`Weight (${measurementUnits.weight})`} 
@@ -2787,44 +2782,75 @@ export const ProGym = ({
                     </tr>
                   </thead>
                   <tbody className="text-sm">
-                    {[...measurements].sort((a, b) => b.date.localeCompare(a.date)).map((m) => (
-                      <tr key={m.id} className="border-b border-white/[0.02] last:border-0 group">
-                        <td className="py-4 text-gray-400">{new Date(m.date).toLocaleDateString()}</td>
-                        <td className="py-4 font-mono text-gray-200">{m.weight}{m.units?.weight || 'kg'}</td>
-                        <td className="py-4 font-mono text-gray-200">{m.bodyFat || 0}%</td>
-                        <td className="py-4 font-mono text-gray-200">
-                          {m.waist || '-'}{m.units?.length || 'cm'} / {m.neck || '-'}{m.units?.length || 'cm'}
-                        </td>
-                        <td className="py-4 font-mono text-gray-200">
-                          {m.leftArm || '-'}/{m.rightArm || '-'}{m.units?.length || 'cm'}
-                        </td>
-                        <td className="py-4 font-mono text-gray-200">
-                          {m.leftThigh || '-'}/{m.rightThigh || '-'}{m.units?.length || 'cm'}
-                        </td>
-                        <td className="py-4 text-right">
-                          <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button 
-                              onClick={() => {
-                                setSelectedDate(m.date);
-                                setIsAddingMeasurement(true);
-                                document.getElementById('measurements-section')?.scrollIntoView({ behavior: 'smooth' });
-                              }}
-                              className="p-1.5 hover:bg-white/5 rounded-lg text-gray-500 hover:text-brand-primary"
-                              title="Edit Entry"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                            <button 
-                              onClick={() => handleDeleteMeasurement(m.id, m.date)}
-                              className="p-1.5 hover:bg-white/5 rounded-lg text-gray-500 hover:text-red-500"
-                              title="Delete Entry"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                    {[...measurements].sort((a, b) => b.date.localeCompare(a.date)).map((m) => {
+                      const convertWeight = (w: number, from: string) => {
+                        if (from === measurementUnits.weight) return w;
+                        if (measurementUnits.weight === 'kg' && from === 'lbs') return w * 0.453592;
+                        if (measurementUnits.weight === 'lbs' && from === 'kg') return w / 0.453592;
+                        return w;
+                      };
+                      const convertLen = (l: number, from: string) => {
+                        if (from === measurementUnits.length) return l;
+                        if (measurementUnits.length === 'cm' && from === 'in') return l * 2.54;
+                        if (measurementUnits.length === 'in' && from === 'cm') return l / 2.54;
+                        return l;
+                      };
+
+                      const displayWeight = convertWeight(Number(m.weight), m.units?.weight || 'kg');
+                      const displayWaist = convertLen(Number(m.waist), m.units?.length || 'cm');
+                      const displayNeck = convertLen(Number(m.neck), m.units?.length || 'cm');
+                      const displayLArm = convertLen(Number(m.leftArm), m.units?.length || 'cm');
+                      const displayRArm = convertLen(Number(m.rightArm), m.units?.length || 'cm');
+                      const displayLThigh = convertLen(Number(m.leftThigh), m.units?.length || 'cm');
+                      const displayRThigh = convertLen(Number(m.rightThigh), m.units?.length || 'cm');
+
+                      return (
+                        <tr key={m.id} className="border-b border-white/[0.02] last:border-0 group">
+                          <td className="py-4 text-gray-400">{new Date(m.date).toLocaleDateString()}</td>
+                          <td className="py-4 font-mono text-gray-200">
+                            <span className="block">{displayWeight.toFixed(1)}{measurementUnits.weight}</span>
+                            {m.units?.weight && m.units.weight !== measurementUnits.weight && (
+                              <span className="text-[9px] text-gray-600 block">orig: {m.weight}{m.units.weight}</span>
+                            )}
+                          </td>
+                          <td className="py-4 font-mono text-gray-200">{m.bodyFat || 0}%</td>
+                          <td className="py-4 font-mono text-gray-200">
+                            <span className="block">{displayWaist.toFixed(1)} / {displayNeck.toFixed(1)}{measurementUnits.length}</span>
+                            {m.units?.length && m.units.length !== measurementUnits.length && (
+                              <span className="text-[9px] text-gray-600 block">orig: {m.waist}/{m.neck}{m.units.length}</span>
+                            )}
+                          </td>
+                          <td className="py-4 font-mono text-gray-200">
+                            <span className="block">{displayLArm.toFixed(1)}/{displayRArm.toFixed(1)}{measurementUnits.length}</span>
+                          </td>
+                          <td className="py-4 font-mono text-gray-200">
+                            <span className="block">{displayLThigh.toFixed(1)}/{displayRThigh.toFixed(1)}{measurementUnits.length}</span>
+                          </td>
+                          <td className="py-4 text-right">
+                            <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button 
+                                onClick={() => {
+                                  setSelectedDate(m.date);
+                                  setIsAddingMeasurement(true);
+                                  document.getElementById('measurements-section')?.scrollIntoView({ behavior: 'smooth' });
+                                }}
+                                className="p-1.5 hover:bg-white/5 rounded-lg text-gray-500 hover:text-brand-primary"
+                                title="Edit Entry"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteMeasurement(m.id, m.date)}
+                                className="p-1.5 hover:bg-white/5 rounded-lg text-gray-500 hover:text-red-500"
+                                title="Delete Entry"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
