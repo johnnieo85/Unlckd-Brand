@@ -198,15 +198,13 @@ export const ProGym = ({
   const [isHubUnlocked, setIsHubUnlocked] = useState(false);
   const [isSavingHydration, setIsSavingHydration] = useState(false);
   const [isSavingSteps, setIsSavingSteps] = useState(false);
-  const [isSavingWeight, setIsSavingWeight] = useState(false);
-  const [isWeightDashboardCollapsed, setIsWeightDashboardCollapsed] = useState(false);
   const [pinEntry, setPinEntry] = useState('');
   const [pinSetup, setPinSetup] = useState({ pin: '', confirm: '' });
   const [error, setError] = useState('');
   const [isSettingPin, setIsSettingPin] = useState(false);
   const [calendarDates, setCalendarDates] = useState<string[]>([]);
   const [activeView, setActiveView] = useState<'hub' | 'report'>('hub');
-  const [trackerOrder, setTrackerOrder] = useState<string[]>(['hydration', 'movement', 'weight']);
+  const [trackerOrder, setTrackerOrder] = useState<string[]>(['hydration', 'movement']);
 
   const parseStepGoal = (goalStr: string) => {
     if (!goalStr) return 10000;
@@ -661,6 +659,10 @@ export const ProGym = ({
   };
 
   const refreshGlobalStats = async () => {
+    // Also refresh measurements to be sure
+    const allM = await gymService.getLatestMeasurements(1000);
+    setMeasurements(allM);
+
     // Calculate streak and XP from available logs
     const now = new Date();
     const startDate = new Date();
@@ -716,17 +718,7 @@ export const ProGym = ({
     const activeDays = Array.from(new Set(
       logs.filter(l => {
         const hasWorkout = (Number(l.completedWorkouts) || 0) > 0;
-        
-        // Stricter goals: at least 10% of goal or substantial absolute amount
-        const sGoal = Number(l.stepGoal) || reportStepGoal;
-        const hasSteps = (Number(l.steps) || 0) >= sGoal * 0.1 && (Number(l.steps) || 0) > 500;
-        const hasWater = (Number(l.water) || 0) >= (Number(l.waterGoal) || 2000) * 0.1 && (Number(l.water) || 0) > 250;
-        
-        // Count as active if at least 2 habits are done, or a major physical activity
-        const habitsDone = l.habits ? Object.values(l.habits).filter(v => v === true).length : 0;
-        const hasSignificantHabits = habitsDone >= 2;
-        
-        return hasWorkout || hasSteps || hasWater || hasSignificantHabits;
+        return hasWorkout;
       }).map(l => l.date)
     )).sort((a, b) => b.localeCompare(a));
 
@@ -781,7 +773,7 @@ export const ProGym = ({
     setLoading(true);
     const [logData, measurementData, dayMeasurement] = await Promise.all([
       gymService.getDailyLog(date),
-      gymService.getLatestMeasurements(5),
+      gymService.getLatestMeasurements(1000),
       gymService.getMeasurement(date)
     ]);
 
@@ -820,6 +812,12 @@ export const ProGym = ({
     }
 
     if (logData) {
+      // Sync weight from measurement if available for this day
+      if (dayMeasurement && dayMeasurement.weight) {
+        logData.weight = dayMeasurement.weight;
+        logData.weightUnit = dayMeasurement.units.weight;
+      }
+      
       // Sync habits with profile master list (ensure new habits appear in old logs)
       const masterHabits = getHabitList();
       const currentHabits = logData.habits || {};
@@ -1138,7 +1136,8 @@ export const ProGym = ({
     });
 
     setIsAddingMeasurement(false);
-    loadData(selectedDate);
+    await refreshGlobalStats();
+    await loadData(selectedDate);
   };
 
   const handleDeleteMeasurement = async (id: string, date: string) => {
@@ -1148,7 +1147,8 @@ export const ProGym = ({
     // Also remove weight from daily log to keep consistency tracker in sync
     await gymService.updateDailyLog(date, { weight: 0 });
     
-    loadData(selectedDate);
+    await refreshGlobalStats();
+    await loadData(selectedDate);
   };
 
   const toggleWaterUnit = async () => {
@@ -1200,30 +1200,6 @@ export const ProGym = ({
       setTimeout(() => setIsSavingSteps(false), 2000);
     } catch (e) {
       setIsSavingSteps(false);
-    }
-  };
-
-  const saveWeight = async () => {
-    if (!log) return;
-    setIsSavingWeight(true);
-    try {
-      await gymService.updateDailyLog(selectedDate, { 
-        weight: log.weight,
-        weightUnit: log.weightUnit 
-      });
-      
-      // Also add measurement entry to keep them synced
-      const measurement: Omit<Measurement, 'id' | 'timestamp'> = {
-        date: selectedDate,
-        weight: Number(log.weight),
-        units: { weight: log.weightUnit || 'kg', length: measurementUnits.length }
-      };
-      await gymService.addMeasurement(measurement);
-      
-      await refreshGlobalStats();
-      setTimeout(() => setIsSavingWeight(false), 2000);
-    } catch (e) {
-      setIsSavingWeight(false);
     }
   };
 
@@ -1756,7 +1732,7 @@ export const ProGym = ({
                       <TrendingUp className="w-4 h-4 text-brand-primary" />
                       <span className="text-[10px] font-bold text-gray-500 uppercase">Streak</span>
                     </div>
-                    <div className="text-xl font-mono font-bold text-white">4 Days</div>
+                    <div className="text-xl font-mono font-bold text-white">{currentStreak} Days</div>
                   </div>
                   <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
                     <div className="flex items-center gap-2 mb-1">
@@ -1839,8 +1815,8 @@ export const ProGym = ({
                                 <div className="space-y-3">
                                   <div className="flex gap-2">
                                     {(() => {
-                                      const increments = log.waterUnit === 'oz' ? [8, 16, 24, 32] : [250, 500, 750, 1000];
-                                      const baseMinus = log.waterUnit === 'oz' ? -8 : -250;
+                                      const increments = log.waterUnit === 'oz' ? [16, 24, 32] : [500, 750, 1000];
+                                      const baseMinus = log.waterUnit === 'oz' ? -16 : -500;
                                       return (
                                         <>
                                           <Button 
@@ -2039,91 +2015,6 @@ export const ProGym = ({
                                     initial={{ width: 0 }}
                                     animate={{ width: `${Math.min((log.steps / log.stepGoal) * 100, 100)}%` }}
                                   />
-                                </div>
-                              </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </Card>
-                    ) : id === 'weight' ? (
-                      <Card className="p-8 bg-brand-surface border-white/5 h-full">
-                        <div className="flex items-center justify-between">
-                          <div 
-                            className="flex items-center gap-3 cursor-pointer group"
-                            onClick={() => setIsWeightDashboardCollapsed(!isWeightDashboardCollapsed)}
-                          >
-                            <div className="p-2 bg-brand-primary/10 rounded-lg group-hover:bg-brand-primary/20 transition-colors">
-                              <Scale className="w-5 h-5 text-brand-primary" />
-                            </div>
-                            <div className="flex flex-col">
-                              <h3 className="font-bold text-gray-200">Body Weight</h3>
-                              <div className="flex items-center gap-2">
-                                <span className={cn("text-[10px] font-black uppercase tracking-widest", isWeightDashboardCollapsed ? "text-brand-primary" : "text-gray-500")}>
-                                  {isWeightDashboardCollapsed ? `${log.weight || '--'} ${log.weightUnit || 'kg'}` : "Track Weight"}
-                                </span>
-                                {isWeightDashboardCollapsed ? <ChevronDown className="w-3 h-3 text-gray-600" /> : <ChevronUp className="w-3 h-3 text-gray-600" />}
-                              </div>
-                            </div>
-                          </div>
-                          {!isWeightDashboardCollapsed && (
-                            <div className="flex items-center gap-2">
-                              <input 
-                                type="number"
-                                step="0.1"
-                                value={log.weight || ''}
-                                onChange={(e) => {
-                                  const val = parseFloat(e.target.value) || 0;
-                                  setLog({ ...log, weight: val });
-                                }}
-                                className="w-20 bg-white/5 border border-white/10 rounded px-2 py-0.5 text-right font-mono text-sm text-gray-200 focus:border-brand-primary outline-none transition-colors"
-                              />
-                              <select 
-                                className="bg-white/5 border border-white/10 rounded px-1 py-0.5 text-[10px] font-black text-gray-400 outline-none focus:border-brand-primary uppercase"
-                                value={log.weightUnit || 'kg'}
-                                onChange={(e) => setLog({ ...log, weightUnit: e.target.value as 'kg' | 'lbs' })}
-                              >
-                                <option value="kg">kg</option>
-                                <option value="lbs">lbs</option>
-                              </select>
-                            </div>
-                          )}
-                        </div>
-                        
-                        <AnimatePresence>
-                          {!isWeightDashboardCollapsed && (
-                            <motion.div 
-                              initial={{ height: 0, opacity: 0 }}
-                              animate={{ height: 'auto', opacity: 1 }}
-                              exit={{ height: 0, opacity: 0 }}
-                              className="overflow-hidden"
-                            >
-                              <div className="space-y-4 pt-6">
-                                <div className="p-4 bg-brand-primary/5 rounded-xl border border-brand-primary/10">
-                                   <p className="text-[10px] text-brand-primary/80 font-medium">Regular weighing ensures data integrity and helps your coach optimize your protocol based on actual body responses.</p>
-                                </div>
-                                <div className="flex justify-end pt-2">
-                                  <Button 
-                                    size="sm"
-                                    onClick={saveWeight}
-                                    className={cn(
-                                      "gap-2 font-black text-[10px] uppercase h-8 px-4 transition-all duration-300",
-                                      isSavingWeight 
-                                        ? "bg-green-500 hover:bg-green-600 text-brand-dark" 
-                                        : "bg-brand-primary hover:bg-brand-primary/80 text-brand-dark"
-                                    )}
-                                  >
-                                    {isSavingWeight ? (
-                                      <>
-                                        <Check className="w-3 h-3" />
-                                        Synced
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Save className="w-3 h-3" />
-                                        Save Weight
-                                      </>
-                                    )}
-                                  </Button>
                                 </div>
                               </div>
                             </motion.div>
@@ -2896,7 +2787,7 @@ export const ProGym = ({
                     </tr>
                   </thead>
                   <tbody className="text-sm">
-                    {measurements.map((m) => (
+                    {[...measurements].sort((a, b) => b.date.localeCompare(a.date)).map((m) => (
                       <tr key={m.id} className="border-b border-white/[0.02] last:border-0 group">
                         <td className="py-4 text-gray-400">{new Date(m.date).toLocaleDateString()}</td>
                         <td className="py-4 font-mono text-gray-200">{m.weight}{m.units?.weight || 'kg'}</td>
@@ -3267,7 +3158,7 @@ export const ProGym = ({
               const defaultStepGoal = latestReport ? parseStepGoal(latestReport.report.stepGoals) : 10000;
               const stepCompliance = reportLogs.filter(l => l.steps >= (l.stepGoal || defaultStepGoal)).length;
               const waterCompliance = reportLogs.reduce((acc, l) => acc + (l.water >= l.waterGoal ? 1 : 0), 0);
-              const weightCompliance = reportLogs.filter(l => (l.weight || 0) > 0).length;
+              const weightCompliance = new Set(measurements.filter(m => (m.weight || 0) > 0).map(m => m.date)).size;
               const habitCompletionTotal = reportLogs.reduce((acc, l) => acc + (Object.values(l.habits || {}).filter(Boolean).length / (Object.keys(l.habits || {}).length || 1)), 0);
 
               return (
@@ -3478,8 +3369,8 @@ export const ProGym = ({
                                   })}
 
                                   {(() => {
-                                    const weightLoggingCompletions = reportLogs.filter(l => (l.weight || 0) > 0).length;
-                                    const weightPercentage = Math.round((weightLoggingCompletions / Math.max(1, daysToConsider)) * 100);
+                                    const weightLoggingDays = new Set(measurements.filter(m => (m.weight || 0) > 0).map(m => m.date));
+                                    const weightPercentage = Math.round((weightLoggingDays.size / Math.max(1, daysToConsider)) * 100);
                                     return (
                                       <>
                                         <div className="sticky left-0 z-20 bg-brand-surface flex items-center justify-between gap-3 pl-3 pr-4 min-w-0 h-10 border-r border-white/10 shadow-[4px_0_12px_rgba(0,0,0,0.4)]">
@@ -3489,14 +3380,13 @@ export const ProGym = ({
                                         {Array.from({ length: daysInMonth }).map((_, i) => {
                                           const day = i + 1;
                                           const dateStr = `${reportDate.getFullYear()}-${String(reportDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                                          const logAtDate = reportLogs.find(l => l.date === dateStr);
-                                          const isDone = logAtDate && (logAtDate.weight || 0) > 0;
+                                          const hasDayWeight = weightLoggingDays.has(dateStr);
                                           const isFuture = new Date(dateStr) > new Date();
 
                                           return (
                                             <div key={i} className="flex justify-center h-10 items-center bg-white/[0.01] border-b border-white/[0.02]">
                                               {isFuture ? <div className="w-2 h-2 rounded-full bg-white/[0.03]" /> :
-                                               isDone ? <div className="w-2.5 h-2.5 rounded-full bg-brand-primary shadow-[0_0_8px_rgba(16,185,129,0.4)]" /> :
+                                               hasDayWeight ? <div className="w-2.5 h-2.5 rounded-full bg-brand-primary shadow-[0_0_8px_rgba(16,185,129,0.4)]" /> :
                                                <div className="w-2 h-2 rounded-full border border-white/10" />
                                               }
                                             </div>
@@ -3558,7 +3448,18 @@ export const ProGym = ({
               </div>
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-gray-500">
-                   Current: <span className="text-white ml-1">{measurements.length > 0 ? `${measurements[0].weight}${measurements[0].units.weight}` : '--'}</span>
+                   Current: <span className="text-white ml-1">
+                     {measurements.length > 0 ? (() => {
+                       const sorted = [...measurements].sort((a, b) => b.date.localeCompare(a.date));
+                       const latest = sorted[0];
+                       let w = Number(latest.weight);
+                       if (latest.units?.weight && latest.units.weight !== measurementUnits.weight) {
+                         if (measurementUnits.weight === 'kg' && latest.units.weight === 'lbs') w = w * 0.453592;
+                         else if (measurementUnits.weight === 'lbs' && latest.units.weight === 'kg') w = w / 0.453592;
+                       }
+                       return `${w.toFixed(1)}${measurementUnits.weight}`;
+                     })() : '--'}
+                   </span>
                 </div>
                 <Button 
                   variant="ghost" 
@@ -3586,11 +3487,24 @@ export const ProGym = ({
                   <LineChart
                     data={measurements
                       .filter(m => m.weight)
-                      .map(m => ({
-                        date: new Date(m.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
-                        weight: m.weight,
-                        rawDate: m.date
-                      }))
+                      .map(m => {
+                        let weight = Number(m.weight);
+                        // Normalize to current selected weight unit for consistent charting
+                        if (m.units?.weight && m.units.weight !== measurementUnits.weight) {
+                          if (measurementUnits.weight === 'kg' && m.units.weight === 'lbs') {
+                            weight = weight * 0.453592;
+                          } else if (measurementUnits.weight === 'lbs' && m.units.weight === 'kg') {
+                            weight = weight / 0.453592;
+                          }
+                        }
+                        return {
+                          date: new Date(m.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
+                          weight: parseFloat(weight.toFixed(1)),
+                          originalWeight: m.weight,
+                          originalUnit: m.units?.weight || 'kg',
+                          rawDate: m.date
+                        };
+                      })
                       .sort((a, b) => a.rawDate.localeCompare(b.rawDate))
                     }
                     margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
@@ -3610,15 +3524,25 @@ export const ProGym = ({
                       domain={['auto', 'auto']}
                     />
                     <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: '#0A0A0A', 
-                        border: '1px solid rgba(255,255,255,0.05)',
-                        borderRadius: '12px',
-                        fontSize: '12px',
-                        color: '#fff'
+                      content={({ active, payload, label }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload;
+                          return (
+                            <div className="bg-[#0A0A0A] border border-white/5 p-3 rounded-xl shadow-2xl">
+                              <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">{label}</p>
+                              <p className="text-sm font-black text-brand-primary">
+                                {data.weight}{measurementUnits.weight}
+                              </p>
+                              {data.originalUnit !== measurementUnits.weight && (
+                                <p className="text-[10px] text-gray-600 font-bold mt-1">
+                                  Logged as: {data.originalWeight}{data.originalUnit}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        }
+                        return null;
                       }}
-                      itemStyle={{ color: '#10b981', fontWeight: 900 }}
-                      labelStyle={{ color: '#737373', marginBottom: '4px', fontWeight: 500 }}
                     />
                     <Line 
                       type="monotone" 
