@@ -220,6 +220,8 @@ export interface DailyLog {
   generalNotes?: string;
   lastUpdated?: any;
   useManualWorkout?: boolean;
+  weight?: number;
+  weightUnit?: 'kg' | 'lbs';
   manualWorkout?: {
     warmUp: string;
     mainWork: string;

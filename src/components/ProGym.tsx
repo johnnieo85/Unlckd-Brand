@@ -23,6 +23,7 @@ import {
   Zap as ZapIcon,
   Check,
   Save,
+  Scale,
   Footprints, 
   CheckCircle2, 
   Plus, 
@@ -197,13 +198,15 @@ export const ProGym = ({
   const [isHubUnlocked, setIsHubUnlocked] = useState(false);
   const [isSavingHydration, setIsSavingHydration] = useState(false);
   const [isSavingSteps, setIsSavingSteps] = useState(false);
+  const [isSavingWeight, setIsSavingWeight] = useState(false);
+  const [isWeightDashboardCollapsed, setIsWeightDashboardCollapsed] = useState(false);
   const [pinEntry, setPinEntry] = useState('');
   const [pinSetup, setPinSetup] = useState({ pin: '', confirm: '' });
   const [error, setError] = useState('');
   const [isSettingPin, setIsSettingPin] = useState(false);
   const [calendarDates, setCalendarDates] = useState<string[]>([]);
   const [activeView, setActiveView] = useState<'hub' | 'report'>('hub');
-  const [trackerOrder, setTrackerOrder] = useState<string[]>(['hydration', 'movement']);
+  const [trackerOrder, setTrackerOrder] = useState<string[]>(['hydration', 'movement', 'weight']);
 
   const parseStepGoal = (goalStr: string) => {
     if (!goalStr) return 10000;
@@ -691,6 +694,8 @@ export const ProGym = ({
       dayXp += completedMeals * 100;
       const completedHabits = (l.habits ? Object.values(l.habits).filter(h => h).length : 0);
       dayXp += completedHabits * 200;
+
+      if (l.weight) dayXp += 250; // XP for weight logging consistency
       
       calculatedTotalXP += Math.round(dayXp);
     });
@@ -1125,13 +1130,24 @@ export const ProGym = ({
       units: measurementUnits
     };
     await gymService.addMeasurement(measurement);
+    
+    // Sync with DailyLog consistency tracker
+    await gymService.updateDailyLog(selectedDate, { 
+      weight: Number(newMeasurement.weight),
+      weightUnit: measurementUnits.weight 
+    });
+
     setIsAddingMeasurement(false);
     loadData(selectedDate);
   };
 
-  const handleDeleteMeasurement = async (id: string) => {
+  const handleDeleteMeasurement = async (id: string, date: string) => {
     if (!window.confirm('Are you sure you want to delete this measurement?')) return;
     await gymService.deleteMeasurement(id);
+    
+    // Also remove weight from daily log to keep consistency tracker in sync
+    await gymService.updateDailyLog(date, { weight: 0 });
+    
     loadData(selectedDate);
   };
 
@@ -1184,6 +1200,30 @@ export const ProGym = ({
       setTimeout(() => setIsSavingSteps(false), 2000);
     } catch (e) {
       setIsSavingSteps(false);
+    }
+  };
+
+  const saveWeight = async () => {
+    if (!log) return;
+    setIsSavingWeight(true);
+    try {
+      await gymService.updateDailyLog(selectedDate, { 
+        weight: log.weight,
+        weightUnit: log.weightUnit 
+      });
+      
+      // Also add measurement entry to keep them synced
+      const measurement: Omit<Measurement, 'id' | 'timestamp'> = {
+        date: selectedDate,
+        weight: Number(log.weight),
+        units: { weight: log.weightUnit || 'kg', length: measurementUnits.length }
+      };
+      await gymService.addMeasurement(measurement);
+      
+      await refreshGlobalStats();
+      setTimeout(() => setIsSavingWeight(false), 2000);
+    } catch (e) {
+      setIsSavingWeight(false);
     }
   };
 
@@ -1880,7 +1920,7 @@ export const ProGym = ({
                           )}
                         </AnimatePresence>
                       </Card>
-                    ) : (
+                    ) : id === 'movement' ? (
                       <Card className="p-8 bg-brand-surface border-white/5 h-full">
                         <div className="flex items-center justify-between">
                           <div 
@@ -2004,6 +2044,95 @@ export const ProGym = ({
                             </motion.div>
                           )}
                         </AnimatePresence>
+                      </Card>
+                    ) : id === 'weight' ? (
+                      <Card className="p-8 bg-brand-surface border-white/5 h-full">
+                        <div className="flex items-center justify-between">
+                          <div 
+                            className="flex items-center gap-3 cursor-pointer group"
+                            onClick={() => setIsWeightDashboardCollapsed(!isWeightDashboardCollapsed)}
+                          >
+                            <div className="p-2 bg-brand-primary/10 rounded-lg group-hover:bg-brand-primary/20 transition-colors">
+                              <Scale className="w-5 h-5 text-brand-primary" />
+                            </div>
+                            <div className="flex flex-col">
+                              <h3 className="font-bold text-gray-200">Body Weight</h3>
+                              <div className="flex items-center gap-2">
+                                <span className={cn("text-[10px] font-black uppercase tracking-widest", isWeightDashboardCollapsed ? "text-brand-primary" : "text-gray-500")}>
+                                  {isWeightDashboardCollapsed ? `${log.weight || '--'} ${log.weightUnit || 'kg'}` : "Track Weight"}
+                                </span>
+                                {isWeightDashboardCollapsed ? <ChevronDown className="w-3 h-3 text-gray-600" /> : <ChevronUp className="w-3 h-3 text-gray-600" />}
+                              </div>
+                            </div>
+                          </div>
+                          {!isWeightDashboardCollapsed && (
+                            <div className="flex items-center gap-2">
+                              <input 
+                                type="number"
+                                step="0.1"
+                                value={log.weight || ''}
+                                onChange={(e) => {
+                                  const val = parseFloat(e.target.value) || 0;
+                                  setLog({ ...log, weight: val });
+                                }}
+                                className="w-20 bg-white/5 border border-white/10 rounded px-2 py-0.5 text-right font-mono text-sm text-gray-200 focus:border-brand-primary outline-none transition-colors"
+                              />
+                              <select 
+                                className="bg-white/5 border border-white/10 rounded px-1 py-0.5 text-[10px] font-black text-gray-400 outline-none focus:border-brand-primary uppercase"
+                                value={log.weightUnit || 'kg'}
+                                onChange={(e) => setLog({ ...log, weightUnit: e.target.value as 'kg' | 'lbs' })}
+                              >
+                                <option value="kg">kg</option>
+                                <option value="lbs">lbs</option>
+                              </select>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <AnimatePresence>
+                          {!isWeightDashboardCollapsed && (
+                            <motion.div 
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              className="overflow-hidden"
+                            >
+                              <div className="space-y-4 pt-6">
+                                <div className="p-4 bg-brand-primary/5 rounded-xl border border-brand-primary/10">
+                                   <p className="text-[10px] text-brand-primary/80 font-medium">Regular weighing ensures data integrity and helps your coach optimize your protocol based on actual body responses.</p>
+                                </div>
+                                <div className="flex justify-end pt-2">
+                                  <Button 
+                                    size="sm"
+                                    onClick={saveWeight}
+                                    className={cn(
+                                      "gap-2 font-black text-[10px] uppercase h-8 px-4 transition-all duration-300",
+                                      isSavingWeight 
+                                        ? "bg-green-500 hover:bg-green-600 text-brand-dark" 
+                                        : "bg-brand-primary hover:bg-brand-primary/80 text-brand-dark"
+                                    )}
+                                  >
+                                    {isSavingWeight ? (
+                                      <>
+                                        <Check className="w-3 h-3" />
+                                        Synced
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Save className="w-3 h-3" />
+                                        Save Weight
+                                      </>
+                                    )}
+                                  </Button>
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </Card>
+                    ) : (
+                      <Card className="p-8 bg-brand-surface border-white/5 h-full flex items-center justify-center">
+                         <span className="text-[10px] font-black uppercase text-gray-600">Unknown Tracker</span>
                       </Card>
                     )}
                   </SortableTracker>
@@ -2795,7 +2924,7 @@ export const ProGym = ({
                               <Edit2 className="w-4 h-4" />
                             </button>
                             <button 
-                              onClick={() => handleDeleteMeasurement(m.id)}
+                              onClick={() => handleDeleteMeasurement(m.id, m.date)}
                               className="p-1.5 hover:bg-white/5 rounded-lg text-gray-500 hover:text-red-500"
                               title="Delete Entry"
                             >
@@ -3129,7 +3258,7 @@ export const ProGym = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             {(() => {
               const daysInMonth = new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0).getDate();
               const isCurrentMonth = reportDate.getMonth() === new Date().getMonth() && reportDate.getFullYear() === new Date().getFullYear();
@@ -3138,6 +3267,7 @@ export const ProGym = ({
               const defaultStepGoal = latestReport ? parseStepGoal(latestReport.report.stepGoals) : 10000;
               const stepCompliance = reportLogs.filter(l => l.steps >= (l.stepGoal || defaultStepGoal)).length;
               const waterCompliance = reportLogs.reduce((acc, l) => acc + (l.water >= l.waterGoal ? 1 : 0), 0);
+              const weightCompliance = reportLogs.filter(l => (l.weight || 0) > 0).length;
               const habitCompletionTotal = reportLogs.reduce((acc, l) => acc + (Object.values(l.habits || {}).filter(Boolean).length / (Object.keys(l.habits || {}).length || 1)), 0);
 
               return (
@@ -3175,6 +3305,18 @@ export const ProGym = ({
                       <div 
                         className="h-full bg-brand-primary transition-all duration-1000" 
                         style={{ width: `${(habitCompletionTotal / daysToConsider) * 100}%` }} 
+                      />
+                    </div>
+                  </Card>
+                  <Card className="p-8 bg-brand-surface border-white/5 space-y-2">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Weight Monitoring</span>
+                    <div className="text-3xl font-display font-black text-white">
+                      {Math.round((weightCompliance / daysToConsider) * 100)}%
+                    </div>
+                    <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-brand-primary/50 transition-all duration-1000" 
+                        style={{ width: `${(weightCompliance / daysToConsider) * 100}%` }} 
                       />
                     </div>
                   </Card>
@@ -3334,6 +3476,35 @@ export const ProGym = ({
                                       </div>
                                     );
                                   })}
+
+                                  {(() => {
+                                    const weightLoggingCompletions = reportLogs.filter(l => (l.weight || 0) > 0).length;
+                                    const weightPercentage = Math.round((weightLoggingCompletions / Math.max(1, daysToConsider)) * 100);
+                                    return (
+                                      <>
+                                        <div className="sticky left-0 z-20 bg-brand-surface flex items-center justify-between gap-3 pl-3 pr-4 min-w-0 h-10 border-r border-white/10 shadow-[4px_0_12px_rgba(0,0,0,0.4)]">
+                                          <span className="text-xs font-bold text-gray-100 truncate flex-1">Body Weight Logged</span>
+                                          <span className="text-[10px] font-mono font-black text-brand-primary shrink-0 bg-brand-primary/10 px-1.5 py-0.5 rounded border border-brand-primary/20">{weightPercentage}%</span>
+                                        </div>
+                                        {Array.from({ length: daysInMonth }).map((_, i) => {
+                                          const day = i + 1;
+                                          const dateStr = `${reportDate.getFullYear()}-${String(reportDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                                          const logAtDate = reportLogs.find(l => l.date === dateStr);
+                                          const isDone = logAtDate && (logAtDate.weight || 0) > 0;
+                                          const isFuture = new Date(dateStr) > new Date();
+
+                                          return (
+                                            <div key={i} className="flex justify-center h-10 items-center bg-white/[0.01] border-b border-white/[0.02]">
+                                              {isFuture ? <div className="w-2 h-2 rounded-full bg-white/[0.03]" /> :
+                                               isDone ? <div className="w-2.5 h-2.5 rounded-full bg-brand-primary shadow-[0_0_8px_rgba(16,185,129,0.4)]" /> :
+                                               <div className="w-2 h-2 rounded-full border border-white/10" />
+                                              }
+                                            </div>
+                                          );
+                                        })}
+                                      </>
+                                    );
+                                  })()}
 
                                   {(() => {
                                     const workoutCompletions = reportLogs.filter(l => (l.completedWorkouts || 0) > 0).length;
