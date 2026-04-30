@@ -43,7 +43,7 @@ import {
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Button } from './components/ui/Button';
-import { Input, Select } from './components/ui/Input';
+import { Input, Select, Checkbox } from './components/ui/Input';
 import { Card, Badge } from './components/ui/Card';
 import { cn, downloadFile } from './lib/utils';
 import { SecurityGuard } from './components/SecurityGuard';
@@ -272,7 +272,9 @@ export default function App() {
     caloriePreference: 'maintain',
     physicalActivity: 'moderate',
     desiredPhysicalActivity: 'high',
-    planDuration: '12-week'
+    planDuration: '12-week',
+    planStartDate: new Date().toISOString().split('T')[0],
+    syncToGymHub: true
   });
   const [photos, setPhotos] = useState<Photos>({
     front: null,
@@ -307,8 +309,9 @@ export default function App() {
 
   useEffect(() => {
     if (user && savedReports.length > 0) {
-      // Use the absolute latest report regardless of path
-      setLatestReport(savedReports[0]);
+      // Use the absolute latest report that is opted-in for Gym Hub import
+      const reportForGym = savedReports.find(r => r.userData?.syncToGymHub !== false);
+      setLatestReport(reportForGym || null);
     } else {
       setLatestReport(null);
     }
@@ -1292,7 +1295,37 @@ export default function App() {
                     />
                   )}
 
-
+                  <Input 
+                    label="Plan Start Date" 
+                    type="date" 
+                    required 
+                    value={userData.planStartDate}
+                    onChange={e => setUserData({...userData, planStartDate: e.target.value})}
+                  />
+                  <Select 
+                    label="Plan Duration"
+                    options={[
+                      {label: '7 Days', value: '7-day'},
+                      {label: '2 Weeks', value: '2-week'},
+                      {label: '4 Weeks', value: '4-week'},
+                      {label: '12 Weeks', value: '12-week'}
+                    ]}
+                    value={userData.planDuration}
+                    onChange={e => setUserData({...userData, planDuration: e.target.value as any})}
+                  />
+                  {path === 'full' && (
+                    <div className="md:col-span-2 pt-2 border-t border-white/[0.03]">
+                      <Checkbox 
+                        label="Sync to Gym Hub consistency tracker" 
+                        checked={userData.syncToGymHub}
+                        onChange={e => setUserData({...userData, syncToGymHub: e.target.checked})}
+                      />
+                      <p className="text-[10px] text-gray-500 mt-2 ml-8 italic leading-relaxed">
+                        When enabled, your training plan and metrics will automatically populate the Gym Hub. 
+                        Disable this if you are performing a secondary analysis or trial report.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {(path !== 'meal' && path !== 'assessment' && path !== 'progress') && (

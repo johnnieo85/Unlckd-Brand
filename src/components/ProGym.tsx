@@ -293,25 +293,26 @@ export const ProGym = ({
   useEffect(() => {
     // Determine how many days to show. Minimum 14 or enough to cover today + buffer.
     // If we have a report, we likely want to show the full 12 weeks (84 days).
-    const daysSinceStart = latestReport ? 
-      Math.ceil((new Date().getTime() - (latestReport.timestamp?.toDate ? latestReport.timestamp.toDate() : new Date(latestReport.timestamp)).getTime()) / (1000 * 60 * 60 * 24)) : 0;
+    const baseStartDate = latestReport?.userData?.planStartDate 
+      ? parseLocalDate(latestReport.userData.planStartDate)
+      : (latestReport?.timestamp?.toDate ? latestReport.timestamp.toDate() : (latestReport?.timestamp ? new Date(latestReport.timestamp) : new Date()));
+    
+    // Adjust to starting Monday
+    const startD = new Date(baseStartDate);
+    const day = startD.getDay();
+    const diff = (day === 0 ? -6 : 1 - day); // adjust when day is sunday
+    startD.setDate(startD.getDate() + diff);
+    startD.setHours(0, 0, 0, 0);
+
+    const daysSinceStart = Math.ceil((new Date().getTime() - startD.getTime()) / (1000 * 60 * 60 * 24));
     
     // Always show at least 7 days before today and 7 days after today if no report.
     // With report, show 84 days or more if program is longer.
     const count = latestReport ? Math.max(84, daysSinceStart + 14) : 21;
     
     if (calendarDates.length !== count) {
-      const startDate = latestReport 
-        ? (latestReport.timestamp?.toDate ? latestReport.timestamp.toDate() : new Date(latestReport.timestamp))
-        : new Date();
-      
-      if (!latestReport) {
-        startDate.setDate(startDate.getDate() - 7); // Start a week ago
-      }
-      startDate.setHours(0, 0, 0, 0);
-
       const initial = Array.from({ length: count }).map((_, i) => {
-        const d = new Date(startDate);
+        const d = new Date(startD);
         d.setDate(d.getDate() + i);
         return getLocalDateString(d);
       });
@@ -417,13 +418,20 @@ export const ProGym = ({
   const dailyMessage = motivationalMessages[dayOfWeek] || "Consistency is the key to transformation.";
 
   const currentWeekIndex = latestReport ? (() => {
-    if (!latestReport.timestamp) return 0;
-    const reportDate = latestReport.timestamp?.toDate ? latestReport.timestamp.toDate() : new Date(latestReport.timestamp);
-    const startDate = new Date(reportDate);
-    startDate.setHours(0, 0, 0, 0);
+    const baseStartDate = latestReport?.userData?.planStartDate 
+      ? parseLocalDate(latestReport.userData.planStartDate)
+      : (latestReport?.timestamp?.toDate ? latestReport.timestamp.toDate() : (latestReport?.timestamp ? new Date(latestReport.timestamp) : new Date()));
+    
+    // Adjust to starting Monday
+    const startD = new Date(baseStartDate);
+    const day = startD.getDay();
+    const diff = (day === 0 ? -6 : 1 - day); 
+    startD.setDate(startD.getDate() + diff);
+    startD.setHours(0, 0, 0, 0);
+
     const targetDate = parseLocalDate(selectedDate);
     targetDate.setHours(0, 0, 0, 0);
-    const diffTime = targetDate.getTime() - startDate.getTime();
+    const diffTime = targetDate.getTime() - startD.getTime();
     const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
     return Math.max(0, Math.min(Math.floor(diffDays / 7), 11));
   })() : 0;
@@ -484,7 +492,10 @@ export const ProGym = ({
     if (byDayNumber) return byDayNumber;
 
     // Fallback to cycling through available days
-    return planDays[dayOfWeek % planDays.length];
+    // Adjust modulo to align with Monday start (Mon=1 ... Sun=0)
+    // If it's Sunday (0), we want the 7th element if 7 elements exist.
+    const adjustedIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    return planDays[adjustedIndex % planDays.length];
   };
 
   const getMealsForSelectedDate = () => {
@@ -516,7 +527,8 @@ export const ProGym = ({
     });
     if (byDayNumber) return byDayNumber;
 
-    return planDays[dayOfWeek % planDays.length];
+    const adjustedIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    return planDays[adjustedIndex % planDays.length];
   };
 
   const importWorkoutFromPlan = async () => {
@@ -1659,6 +1671,8 @@ export const ProGym = ({
             const weekNum = Math.floor(i / 7) + 1;
             const isFirstDayOfWeek = i % 7 === 0;
 
+            const hasMeasurement = measurements.some(m => m.date === iso && (chartMetric === 'weight' ? (m.weight && m.weight > 0) : (m.bodyFat && m.bodyFat > 0)));
+
             return (
               <React.Fragment key={`${iso}-${i}`}>
                 {latestReport && isFirstDayOfWeek && i > 0 && (
@@ -1683,6 +1697,12 @@ export const ProGym = ({
                   </span>
                   <div className="relative">
                     <span className="text-lg font-bold font-mono">{d.getDate()}</span>
+                    {hasMeasurement && (
+                      <div className={cn(
+                        "absolute -top-1 -right-2 w-1.5 h-1.5 rounded-full",
+                        isSelected ? "bg-brand-dark/50" : "bg-brand-primary"
+                      )} />
+                    )}
                     <input 
                       type="date"
                       className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
@@ -2100,6 +2120,11 @@ export const ProGym = ({
                   <h3 className="font-bold text-gray-100">
                     {log?.useManualWorkout ? 'Manual Training Log' : 'Prescribed Training'}
                   </h3>
+                  {!isTrainingCollapsed && (
+                    <span className="text-[10px] font-black text-brand-primary/60 uppercase tracking-widest mt-0.5">
+                      {parseLocalDate(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                    </span>
+                  )}
                   {isTrainingCollapsed && (
                     <div className="flex items-center gap-3 mt-1">
                       {(() => {
@@ -2518,6 +2543,11 @@ export const ProGym = ({
                 </div>
                 <div className="flex flex-col">
                   <h3 className="font-bold text-gray-100">Daily Nutrition Log</h3>
+                  {!isNutritionCollapsed && (
+                    <span className="text-[10px] font-black text-brand-primary/60 uppercase tracking-widest mt-0.5">
+                      {parseLocalDate(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                    </span>
+                  )}
                   {isNutritionCollapsed && log?.meals && (
                     <div className="flex items-center gap-3 mt-1">
                       {(() => {

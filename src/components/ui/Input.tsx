@@ -26,6 +26,38 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
   }
 );
 
+interface CheckboxProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  label: string;
+}
+
+export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
+  ({ className, label, ...props }, ref) => {
+    return (
+      <label className={cn("flex items-center gap-3 cursor-pointer group select-none", className)}>
+        <div className="relative flex items-center justify-center">
+          <input
+            type="checkbox"
+            ref={ref}
+            className="peer sr-only"
+            {...props}
+          />
+          <div className="w-5 h-5 border-2 border-gray-800 rounded group-hover:border-brand-primary/50 peer-checked:border-brand-primary peer-checked:bg-brand-primary transition-all" />
+          <svg
+            className="absolute w-3 h-3 text-brand-dark opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth="4"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+        <span className="text-sm font-medium text-gray-400 group-hover:text-gray-200 transition-colors uppercase tracking-widest">{label}</span>
+      </label>
+    );
+  }
+);
+
 interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
   options: { label: string; value: string }[];
