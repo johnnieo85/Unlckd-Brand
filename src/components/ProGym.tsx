@@ -382,7 +382,7 @@ export const ProGym = ({
     await gymService.updateDailyLog(selectedDate, { meals: importedMeals });
   };
 
-  const dayOfWeek = new Date(selectedDate).getDay();
+  const dayOfWeek = parseLocalDate(selectedDate).getDay();
   const getNutritionTotals = () => {
     if (!log?.meals) return { calories: 0, protein: 0, fat: 0, carbs: 0 };
     return log.meals.reduce((acc, meal) => ({
@@ -416,6 +416,20 @@ export const ProGym = ({
 
   const dailyMessage = motivationalMessages[dayOfWeek] || "Consistency is the key to transformation.";
 
+  const currentWeekIndex = latestReport ? (() => {
+    if (!latestReport.timestamp) return 0;
+    const reportDate = latestReport.timestamp?.toDate ? latestReport.timestamp.toDate() : new Date(latestReport.timestamp);
+    const startDate = new Date(reportDate);
+    startDate.setHours(0, 0, 0, 0);
+    const targetDate = parseLocalDate(selectedDate);
+    targetDate.setHours(0, 0, 0, 0);
+    const diffTime = targetDate.getTime() - startDate.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+    return Math.max(0, Math.min(Math.floor(diffDays / 7), 11));
+  })() : 0;
+
+  const currentWeekNumber = currentWeekIndex + 1;
+
   // Helper to find the best matching day in the workout plan
   const getWorkoutForSelectedDate = () => {
     const isManual = log?.useManualWorkout || !latestReport;
@@ -442,24 +456,6 @@ export const ProGym = ({
       };
     }
     
-    // Calculate current week of 12
-    let currentWeekIndex = 0;
-    if (latestReport.timestamp) {
-      try {
-        const reportDate = latestReport.timestamp?.toDate ? latestReport.timestamp.toDate() : new Date(latestReport.timestamp);
-        const startDate = new Date(reportDate);
-        startDate.setHours(0, 0, 0, 0);
-        const targetDate = new Date(selectedDate);
-        targetDate.setHours(0, 0, 0, 0);
-        
-        const diffTime = targetDate.getTime() - startDate.getTime();
-        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-        currentWeekIndex = Math.max(0, Math.min(Math.floor(diffDays / 7), 11)); // 0-11 for 12 weeks
-      } catch (e) {
-        console.error("Error calculating week index", e);
-      }
-    }
-
     const weekData = latestReport.report.workoutPlan[currentWeekIndex] || latestReport.report.workoutPlan[0];
     if (!weekData?.days) return null;
     
@@ -494,31 +490,48 @@ export const ProGym = ({
   const getMealsForSelectedDate = () => {
     if (!latestReport?.report.mealPlan) return null;
     
-    let currentWeekIndex = 0;
-    if (latestReport.timestamp) {
-      try {
-        const reportDate = latestReport.timestamp?.toDate ? latestReport.timestamp.toDate() : new Date(latestReport.timestamp);
-        const startDate = new Date(reportDate);
-        startDate.setHours(0, 0, 0, 0);
-        const targetDate = new Date(selectedDate);
-        targetDate.setHours(0, 0, 0, 0);
-        
-        const diffTime = targetDate.getTime() - startDate.getTime();
-        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-        currentWeekIndex = Math.max(0, Math.min(Math.floor(diffDays / 7), 11));
-      } catch (e) {}
-    }
-
     const weekData = latestReport.report.mealPlan[currentWeekIndex] || latestReport.report.mealPlan[0];
     if (!weekData?.days) return null;
     
+    const planDays = weekData.days;
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const currentDayName = dayNames[dayOfWeek];
 
-    return weekData.days.find(d => 
+    // Try to find by name match
+    const byName = planDays.find(d => 
       d.day.toLowerCase().includes(currentDayName.toLowerCase()) || 
       currentDayName.toLowerCase().includes(d.day.toLowerCase())
-    ) || weekData.days[dayOfWeek % weekData.days.length];
+    );
+    if (byName) return byName;
+
+    // Try to find by "Day X"
+    const byDayNumber = planDays.find(d => {
+      const match = d.day.match(/Day\s*(\d+)/i);
+      if (match) {
+        const num = parseInt(match[1]);
+        const targetDayOfWeek = num === 7 ? 0 : num;
+        return targetDayOfWeek === dayOfWeek;
+      }
+      return false;
+    });
+    if (byDayNumber) return byDayNumber;
+
+    return planDays[dayOfWeek % planDays.length];
+  };
+
+  const importWorkoutFromPlan = async () => {
+    if (!latestReport || !log) return;
+    const workout = getWorkoutForSelectedDate();
+    if (!workout || workout.day === 'Manual Entry') return;
+
+    const updatedManual = {
+      focus: workout.focus || '',
+      warmUp: workout.warmUp || '',
+      mainWork: workout.mainWork || ''
+    };
+    const updatedLog = { ...log, manualWorkout: updatedManual, useManualWorkout: true };
+    setLog(updatedLog);
+    await gymService.updateDailyLog(selectedDate, { manualWorkout: updatedManual, useManualWorkout: true });
   };
 
   const toggleManualMode = () => {
@@ -1590,7 +1603,7 @@ export const ProGym = ({
             <div className="flex items-center gap-2 cursor-pointer">
               <Calendar className="w-4 h-4 text-brand-primary group-hover/header-date:scale-110 transition-all" />
               <span className="text-xs font-black uppercase tracking-widest text-gray-400 group-hover/header-date:text-white transition-colors">
-                {latestReport ? `Report Schedule • Week ${Math.floor((parseLocalDate(selectedDate).getTime() - (latestReport.timestamp?.toDate ? latestReport.timestamp.toDate() : new Date(latestReport.timestamp)).setHours(0,0,0,0)) / (7 * 24 * 60 * 60 * 1000)) + 1}` : 'Weekly Activity'}
+                {latestReport ? `Report Schedule • Week ${currentWeekNumber}` : 'Weekly Activity'}
               </span>
             </div>
           </div>
@@ -1609,11 +1622,7 @@ export const ProGym = ({
                     setUnlockedDates(prev => new Set([...prev, localDateStr]));
                   }}
                   className="absolute inset-0 opacity-0 cursor-pointer z-10 w-full"
-                  value={(() => {
-                    const startDate = latestReport.timestamp?.toDate ? latestReport.timestamp.toDate() : new Date(latestReport.timestamp);
-                    startDate.setHours(0,0,0,0);
-                    return Math.floor((parseLocalDate(selectedDate).getTime() - startDate.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
-                  })()}
+                  value={currentWeekNumber}
                 >
                   {Array.from({ length: 12 }).map((_, i) => (
                     <option key={i} value={i + 1}>Week {i + 1}</option>
@@ -2155,17 +2164,27 @@ export const ProGym = ({
                   {isTrainingCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
                 </Button>
                 {!isTrainingCollapsed && latestReport && (
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className={cn(
-                      "text-[10px] font-black uppercase tracking-widest px-3 h-7",
-                      log?.useManualWorkout ? "bg-brand-primary/10 border-brand-primary/20 text-brand-primary" : "border-white/5 opacity-60"
-                    )}
-                    onClick={toggleManualMode}
-                  >
-                    {log?.useManualWorkout ? 'Using Manual Mode' : 'Switch to Manual'}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className={cn(
+                        "text-[10px] font-black uppercase tracking-widest px-3 h-7",
+                        log?.useManualWorkout ? "bg-brand-primary/10 border-brand-primary/20 text-brand-primary" : "border-white/5 opacity-60"
+                      )}
+                      onClick={toggleManualMode}
+                    >
+                      {log?.useManualWorkout ? 'Manual Mode' : 'Guided Plan'}
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="border-brand-primary/20 hover:bg-brand-primary/10 text-brand-primary h-7 px-2 text-[10px] font-black uppercase tracking-widest"
+                      onClick={importWorkoutFromPlan}
+                    >
+                      Sync Plan
+                    </Button>
+                  </div>
                 )}
                 {!isTrainingCollapsed && !latestReport && (
                   <Badge className="bg-brand-primary/10 text-brand-primary border-brand-primary/20 font-black text-[10px]">MANUAL MODE</Badge>
@@ -2204,8 +2223,11 @@ export const ProGym = ({
                     <Info className="w-4 h-4 text-brand-primary" />
                     <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Focus & Objectives</span>
                   </div>
-                  <p className="text-sm text-gray-300 leading-relaxed">
-                    {latestReport?.report.goalAlignmentSummary}
+                  <p className="text-sm text-gray-300 leading-relaxed font-bold text-brand-primary">
+                    DAILY FOCUS: {workoutDay?.focus}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-2 leading-relaxed italic">
+                    {workoutDay?.notes || latestReport?.report.goalAlignmentSummary}
                   </p>
                 </div>
               )}
