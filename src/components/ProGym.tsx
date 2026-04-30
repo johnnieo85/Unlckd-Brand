@@ -87,6 +87,11 @@ const getLocalDateString = (date: Date) => {
   return `${year}-${month}-${day}`;
 };
 
+const parseLocalDate = (dateStr: string) => {
+  const parts = dateStr.split('-');
+  return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+};
+
 const SortableTracker = ({ id, children }: { id: string; children: React.ReactNode }) => {
   const {
     attributes,
@@ -283,25 +288,32 @@ export const ProGym = ({
     neck: 0
   });
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalDateString(new Date());
 
   useEffect(() => {
-    const count = latestReport ? 84 : 7;
-    // Initialize or adjust length
+    // Determine how many days to show. Minimum 14 or enough to cover today + buffer.
+    // If we have a report, we likely want to show the full 12 weeks (84 days).
+    const daysSinceStart = latestReport ? 
+      Math.ceil((new Date().getTime() - (latestReport.timestamp?.toDate ? latestReport.timestamp.toDate() : new Date(latestReport.timestamp)).getTime()) / (1000 * 60 * 60 * 24)) : 0;
+    
+    // Always show at least 7 days before today and 7 days after today if no report.
+    // With report, show 84 days or more if program is longer.
+    const count = latestReport ? Math.max(84, daysSinceStart + 14) : 21;
+    
     if (calendarDates.length !== count) {
       const startDate = latestReport 
         ? (latestReport.timestamp?.toDate ? latestReport.timestamp.toDate() : new Date(latestReport.timestamp))
         : new Date();
       
       if (!latestReport) {
-        startDate.setDate(startDate.getDate() - startDate.getDay()); // Sunday
+        startDate.setDate(startDate.getDate() - 7); // Start a week ago
       }
       startDate.setHours(0, 0, 0, 0);
 
       const initial = Array.from({ length: count }).map((_, i) => {
         const d = new Date(startDate);
         d.setDate(d.getDate() + i);
-        return d.toISOString().split('T')[0];
+        return getLocalDateString(d);
       });
       setCalendarDates(initial);
     }
@@ -1041,7 +1053,9 @@ export const ProGym = ({
           'Adequate Sleep': false,
           'Water Consumption': false
         },
-        useManualWorkout: !latestReport
+        useManualWorkout: !latestReport,
+        weight: dayMeasurement?.weight || 0,
+        weightUnit: dayMeasurement?.units.weight || measurementUnits.weight
       };
       setLog(initialLog);
       // Removed auto-save of initial log to avoid counting "viewed" days as active
@@ -1143,6 +1157,7 @@ export const ProGym = ({
         const filtered = prev.filter(m => m.date !== measurement.date);
         return [newM, ...filtered].sort((a, b) => b.date.localeCompare(a.date));
       });
+      setHasDayMeasurement(true);
 
       // Sync with DailyLog consistency tracker
       await gymService.updateDailyLog(selectedDate, { 
@@ -1280,8 +1295,8 @@ export const ProGym = ({
     // Get all dates for the specific month in reportDate
     const year = reportDate.getFullYear();
     const month = reportDate.getMonth();
-    const firstDay = new Date(year, month, 1).toISOString().split('T')[0];
-    const lastDay = new Date(year, month + 1, 0).toISOString().split('T')[0];
+    const firstDay = getLocalDateString(new Date(year, month, 1));
+    const lastDay = getLocalDateString(new Date(year, month + 1, 0));
     
     const [logs, monthMeasurements] = await Promise.all([
       gymService.getLogsInRange(firstDay, lastDay),
@@ -1289,7 +1304,14 @@ export const ProGym = ({
     ]);
 
     setReportLogs(logs);
-    setMeasurements(monthMeasurements);
+    // Don't overwrite the main measurements state used for the global tracker
+    // Instead, use them locally if needed for report logic or refresh all
+    if (monthMeasurements.length > 0) {
+      setMeasurements(prev => {
+        const otherMonths = prev.filter(m => !m.date.startsWith(`${year}-${String(month + 1).padStart(2, '0')}`));
+        return [...otherMonths, ...monthMeasurements].sort((a, b) => b.date.localeCompare(a.date));
+      });
+    }
     setIsReportLoading(false);
   };
 
@@ -1568,7 +1590,7 @@ export const ProGym = ({
             <div className="flex items-center gap-2 cursor-pointer">
               <Calendar className="w-4 h-4 text-brand-primary group-hover/header-date:scale-110 transition-all" />
               <span className="text-xs font-black uppercase tracking-widest text-gray-400 group-hover/header-date:text-white transition-colors">
-                {latestReport ? `Report Schedule • Week ${Math.floor((new Date(selectedDate).getTime() - (latestReport.timestamp?.toDate ? latestReport.timestamp.toDate() : new Date(latestReport.timestamp)).setHours(0,0,0,0)) / (7 * 24 * 60 * 60 * 1000)) + 1}` : 'Weekly Activity'}
+                {latestReport ? `Report Schedule • Week ${Math.floor((parseLocalDate(selectedDate).getTime() - (latestReport.timestamp?.toDate ? latestReport.timestamp.toDate() : new Date(latestReport.timestamp)).setHours(0,0,0,0)) / (7 * 24 * 60 * 60 * 1000)) + 1}` : 'Weekly Activity'}
               </span>
             </div>
           </div>
@@ -1582,11 +1604,16 @@ export const ProGym = ({
                     startDate.setHours(0,0,0,0);
                     const targetDate = new Date(startDate);
                     targetDate.setDate(targetDate.getDate() + (week - 1) * 7);
-                    setSelectedDate(targetDate.toISOString().split('T')[0]);
-                    setUnlockedDates(prev => new Set([...prev, targetDate.toISOString().split('T')[0]]));
+                    const localDateStr = getLocalDateString(targetDate);
+                    setSelectedDate(localDateStr);
+                    setUnlockedDates(prev => new Set([...prev, localDateStr]));
                   }}
                   className="absolute inset-0 opacity-0 cursor-pointer z-10 w-full"
-                  value={Math.floor((new Date(selectedDate).getTime() - (latestReport.timestamp?.toDate ? latestReport.timestamp.toDate() : new Date(latestReport.timestamp)).setHours(0,0,0,0)) / (7 * 24 * 60 * 60 * 1000)) + 1}
+                  value={(() => {
+                    const startDate = latestReport.timestamp?.toDate ? latestReport.timestamp.toDate() : new Date(latestReport.timestamp);
+                    startDate.setHours(0,0,0,0);
+                    return Math.floor((parseLocalDate(selectedDate).getTime() - startDate.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
+                  })()}
                 >
                   {Array.from({ length: 12 }).map((_, i) => (
                     <option key={i} value={i + 1}>Week {i + 1}</option>
@@ -1616,7 +1643,7 @@ export const ProGym = ({
         
         <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide px-1">
           {calendarDates.map((iso, i) => {
-            const d = new Date(iso + 'T12:00:00'); // Use noon to avoid TZ issues
+            const d = parseLocalDate(iso);
             const isSelected = selectedDate === iso;
             const isUnlocked = unlockedDates.has(iso);
             const isToday = iso === today;
@@ -2084,7 +2111,8 @@ export const ProGym = ({
                     className="text-brand-primary hover:bg-brand-primary/10 transition-all flex items-center gap-2"
                     onClick={() => {
                       if (!workoutDay) return;
-                      const dayName = new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long' });
+                      const dayDate = parseLocalDate(selectedDate);
+                      const dayName = dayDate.toLocaleDateString('en-US', { weekday: 'long' });
                       let content = `UNLCKD PRO TRAINING - ${dayName.toUpperCase()}\n`;
                       content += `==========================================\n\n`;
                       content += `FOCUS: ${workoutDay.focus || 'N/A'}\n\n`;
@@ -2827,8 +2855,7 @@ export const ProGym = ({
                       const displayRThigh = convertLen(Number(m.rightThigh), m.units?.length || 'cm');
 
                       // Safe local date parsing
-                      const parts = m.date.split('-');
-                      const displayDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])).toLocaleDateString();
+                      const displayDate = parseLocalDate(m.date).toLocaleDateString();
 
                       return (
                         <tr key={m.id} className="border-b border-white/[0.02] last:border-0 group">
@@ -3558,7 +3585,7 @@ export const ProGym = ({
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
                     data={measurements
-                      .filter(m => chartMetric === 'weight' ? m.weight : m.bodyFat)
+                      .filter(m => chartMetric === 'weight' ? (m.weight && m.weight > 0) : (m.bodyFat && m.bodyFat > 0))
                       .map(m => {
                         const val = chartMetric === 'weight' ? Number(m.weight) : Number(m.bodyFat);
                         let displayVal = val;
@@ -3572,8 +3599,7 @@ export const ProGym = ({
                         }
                         
                         // Handle UTC/Local date parsing issue
-                        const parts = m.date.split('-');
-                        const dateObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                        const dateObj = parseLocalDate(m.date);
                         
                         return {
                           date: dateObj.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
