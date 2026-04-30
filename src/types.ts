@@ -22,6 +22,8 @@ export interface UserData {
   physicalActivity: string;
   desiredPhysicalActivity: string;
   planDuration?: PlanDuration;
+  planStartDate?: string;
+  syncToGymHub?: boolean;
 }
 
 export interface Photos {
