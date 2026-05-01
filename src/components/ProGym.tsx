@@ -3131,7 +3131,7 @@ export const ProGym = ({
               <div className="p-2 bg-brand-primary/10 rounded-lg">
                 <Calendar className="w-5 h-5 text-brand-primary" />
               </div>
-              <h3 className="font-bold text-gray-100 uppercase tracking-widest text-sm">Monthly Objective</h3>
+              <h3 className="font-bold text-gray-100 uppercase tracking-widest text-sm">May Badge Goal</h3>
             </div>
             
             {userProfile?.monthlyGoal ? (
@@ -3164,9 +3164,9 @@ export const ProGym = ({
                 <Footprints className="w-8 h-8 text-brand-primary" />
              </div>
              <div>
-                <p className="text-[10px] text-brand-primary font-black uppercase tracking-widest">Victory Reward</p>
-                <h5 className="text-lg font-display font-bold text-white tracking-tight">The "Stepper" Elite Badge</h5>
-                <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mt-1">Achieve {log.stepGoal.toLocaleString()} steps daily for at least 75% of the month</p>
+                <p className="text-[10px] text-brand-primary font-black uppercase tracking-widest">May Victory Reward</p>
+                <h5 className="text-lg font-display font-bold text-white tracking-tight">The "Stepper" May Badge</h5>
+                <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mt-1">Achieve {log?.stepGoal?.toLocaleString() || '10,000'} steps daily for at least 75% of May</p>
              </div>
           </div>
         </Card>
@@ -3189,11 +3189,11 @@ export const ProGym = ({
                 userProfile?.badges?.find(b => b.id === 'stepper') 
                   ? "bg-brand-primary/10 border-brand-primary/40" 
                   : "bg-white/5 border-white/5 opacity-40 grayscale"
-              )} title={`Complete ${log.stepGoal.toLocaleString()} steps for 75% of the month`}>
+              )} title={`Complete ${log?.stepGoal?.toLocaleString() || '10,000'} steps for 75% of May`}>
                  <div className="w-12 h-12 rounded-full bg-brand-primary/20 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
                     <Footprints className="w-6 h-6 text-brand-primary" />
                  </div>
-                 <span className="text-[9px] font-black uppercase tracking-tighter text-center leading-none">Stepper</span>
+                 <span className="text-[9px] font-black uppercase tracking-tighter text-center leading-none">May Stepper</span>
               </div>
 
               {/* Placeholder Badges */}

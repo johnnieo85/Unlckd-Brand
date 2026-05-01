@@ -304,30 +304,38 @@ export default function App() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
-  const getPlanDate = (weekNum: number, dayName: string) => {
+  const getPlanDate = (weekNum: number, dayName: string, dayIndex?: number) => {
     if (!userData.planStartDate) return null;
     const baseDate = parseLocalDate(userData.planStartDate);
     baseDate.setHours(0, 0, 0, 0);
 
-    const dayMap: { [key: string]: number } = {
-      'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3, 'friday': 4, 'saturday': 5, 'sunday': 6
-    };
-    
-    let targetDay = 0;
-    const normalizedDay = dayName.toLowerCase().trim();
-    
-    if (dayMap[normalizedDay] !== undefined) {
-      targetDay = dayMap[normalizedDay];
+    let offset = 0;
+    if (dayIndex !== undefined) {
+      // Use sequential indexing if provided
+      offset = dayIndex;
     } else {
-      const match = dayName.match(/Day\s*(\d+)/i);
-      if (match) {
-        const num = parseInt(match[1]);
-        targetDay = (num - 1) % 7;
+      // Fallback to name-based matching if no index
+      const dayMap: { [key: string]: number } = {
+        'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3, 'friday': 4, 'saturday': 5, 'sunday': 6
+      };
+      
+      const normalizedDay = dayName.toLowerCase().trim();
+      if (dayMap[normalizedDay] !== undefined) {
+        offset = dayMap[normalizedDay];
+      } else {
+        const match = dayName.match(/Day\s*(\d+)/i);
+        if (match) {
+          offset = (parseInt(match[1]) - 1) % 7;
+        }
       }
     }
     
-    baseDate.setDate(baseDate.getDate() + ((weekNum - 1) * 7) + targetDay);
-    return baseDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    baseDate.setDate(baseDate.getDate() + ((weekNum - 1) * 7) + offset);
+    return baseDate.toLocaleDateString('en-US', { 
+      weekday: 'short', 
+      month: 'short', 
+      day: 'numeric' 
+    });
   };
   const [isSignUp, setIsSignUp] = useState(false);
   const [authEmail, setAuthEmail] = useState('');
@@ -2226,8 +2234,8 @@ export default function App() {
                             content += `WEEK ${week.week} - ${(week.phase || '').toUpperCase()}\n`;
                             content += `------------------------------------------\n`;
                             
-                            week.days.forEach(day => {
-                              const planDate = getPlanDate(week.week, day.day);
+                            week.days.forEach((day, dayIdx) => {
+                              const planDate = getPlanDate(week.week, day.day, dayIdx);
                               content += `${(day.day || '').toUpperCase()}${planDate ? ` [${planDate}]` : ''} (${day.focus || ''})\n`;
                               // Strip markdown links for text file: [Name](URL) -> Name
                               const cleanWarmup = (day.warmUp || '').replace(/\[(.*?)\]\(.*?\)/g, '$1');
@@ -2273,7 +2281,7 @@ export default function App() {
                                 <td className="px-4 py-4 border-r border-gray-800">
                                   <div className="flex flex-col">
                                     <span className="font-bold text-brand-primary">{day.day}</span>
-                                    <span className="text-[10px] text-gray-500 font-mono mt-0.5">{getPlanDate(week.week, day.day)}</span>
+                                    <span className="text-[10px] text-gray-500 font-mono mt-0.5">{getPlanDate(week.week, day.day, i)}</span>
                                   </div>
                                 </td>
                                 <td className="px-4 py-4 border-r border-gray-800 text-gray-200">{day.focus}</td>
@@ -2334,8 +2342,8 @@ export default function App() {
                             content += `WEEK ${week.week}\n`;
                             content += `-----------------\n`;
                             
-                            week.days.forEach(day => {
-                              const planDate = getPlanDate(week.week, day.day);
+                            week.days.forEach((day, dayIdx) => {
+                              const planDate = getPlanDate(week.week, day.day, dayIdx);
                               content += `${(day.day || '').toUpperCase()}${planDate ? ` [${planDate}]` : ''}\n`;
                               content += `Breakfast: ${day.breakfast || 'N/A'}${day.breakfastUrl ? ` (${day.breakfastUrl})` : ''}\n`;
                               content += `Lunch: ${day.lunch || 'N/A'}${day.lunchUrl ? ` (${day.lunchUrl})` : ''}\n`;
@@ -2384,7 +2392,7 @@ export default function App() {
                                 <td className="px-4 py-4 border-r border-gray-800">
                                   <div className="flex flex-col">
                                     <span className="font-bold text-brand-primary">{day.day}</span>
-                                    <span className="text-[10px] text-gray-500 font-mono mt-0.5">{getPlanDate(week.week, day.day)}</span>
+                                    <span className="text-[10px] text-gray-500 font-mono mt-0.5">{getPlanDate(week.week, day.day, i)}</span>
                                   </div>
                                 </td>
                                 <td className="px-4 py-4 border-r border-gray-800 text-gray-300">
