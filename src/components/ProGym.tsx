@@ -206,6 +206,7 @@ export const ProGym = ({
   const [isSettingPin, setIsSettingPin] = useState(false);
   const [calendarDates, setCalendarDates] = useState<string[]>([]);
   const [activeView, setActiveView] = useState<'hub' | 'report'>('hub');
+  const [isSyncing, setIsSyncing] = useState(false);
   const [trackerOrder, setTrackerOrder] = useState<string[]>(['hydration', 'movement']);
 
   const parseStepGoal = (goalStr: string) => {
@@ -285,11 +286,7 @@ export const ProGym = ({
       ? parseLocalDate(latestReport.userData.planStartDate)
       : (latestReport?.timestamp?.toDate ? latestReport.timestamp.toDate() : (latestReport?.timestamp ? new Date(latestReport.timestamp) : new Date()));
     
-    // Adjust to starting Monday
     const startD = new Date(baseStartDate);
-    const day = startD.getDay();
-    const diff = (day === 0 ? -6 : 1 - day); // adjust when day is sunday
-    startD.setDate(startD.getDate() + diff);
     startD.setHours(0, 0, 0, 0);
 
     const daysSinceStart = Math.ceil((new Date().getTime() - startD.getTime()) / (1000 * 60 * 60 * 24));
@@ -410,11 +407,7 @@ export const ProGym = ({
       ? parseLocalDate(latestReport.userData.planStartDate)
       : (latestReport?.timestamp?.toDate ? latestReport.timestamp.toDate() : (latestReport?.timestamp ? new Date(latestReport.timestamp) : new Date()));
     
-    // Adjust to starting Monday
     const startD = new Date(baseStartDate);
-    const day = startD.getDay();
-    const diff = (day === 0 ? -6 : 1 - day); 
-    startD.setDate(startD.getDate() + diff);
     startD.setHours(0, 0, 0, 0);
 
     const targetDate = parseLocalDate(selectedDate);
@@ -456,34 +449,18 @@ export const ProGym = ({
     if (!weekData?.days) return null;
     
     const planDays = weekData.days;
-    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const currentDayName = dayNames[dayOfWeek];
+    const baseStartDate = latestReport?.userData?.planStartDate 
+      ? parseLocalDate(latestReport.userData.planStartDate)
+      : (latestReport?.timestamp?.toDate ? latestReport.timestamp.toDate() : new Date());
+    const startD = new Date(baseStartDate);
+    startD.setHours(0, 0, 0, 0);
+    const targetDate = parseLocalDate(selectedDate);
+    targetDate.setHours(0, 0, 0, 0);
+    const diffTime = targetDate.getTime() - startD.getTime();
+    const diffDaysTotal = Math.round(diffTime / (1000 * 60 * 60 * 24));
+    const dayOfPlan = diffDaysTotal % 7;
 
-    // Try to find by name match first
-    const byName = planDays.find(d => 
-      d.day.toLowerCase().includes(currentDayName.toLowerCase()) || 
-      currentDayName.toLowerCase().includes(d.day.toLowerCase())
-    );
-    if (byName) return byName;
-
-    // Try to find by "Day X" where X matches day index (1-7)
-    const byDayNumber = planDays.find(d => {
-      const match = d.day.match(/Day\s*(\d+)/i);
-      if (match) {
-        const num = parseInt(match[1]);
-        // Map 1-7 (Mon-Sun) to dayOfWeek (0=Sun, 1=Mon...)
-        const targetDayOfWeek = num === 7 ? 0 : num;
-        return targetDayOfWeek === dayOfWeek;
-      }
-      return false;
-    });
-    if (byDayNumber) return byDayNumber;
-
-    // Fallback to cycling through available days
-    // Adjust modulo to align with Monday start (Mon=1 ... Sun=0)
-    // If it's Sunday (0), we want the 7th element if 7 elements exist.
-    const adjustedIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-    return planDays[adjustedIndex % planDays.length];
+    return planDays[dayOfPlan % planDays.length];
   };
 
   const getMealsForSelectedDate = () => {
@@ -493,30 +470,18 @@ export const ProGym = ({
     if (!weekData?.days) return null;
     
     const planDays = weekData.days;
-    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const currentDayName = dayNames[dayOfWeek];
+    const baseStartDate = latestReport?.userData?.planStartDate 
+      ? parseLocalDate(latestReport.userData.planStartDate)
+      : (latestReport?.timestamp?.toDate ? latestReport.timestamp.toDate() : new Date());
+    const startD = new Date(baseStartDate);
+    startD.setHours(0, 0, 0, 0);
+    const targetDate = parseLocalDate(selectedDate);
+    targetDate.setHours(0, 0, 0, 0);
+    const diffTime = targetDate.getTime() - startD.getTime();
+    const diffDaysTotal = Math.round(diffTime / (1000 * 60 * 60 * 24));
+    const dayOfPlan = diffDaysTotal % 7;
 
-    // Try to find by name match
-    const byName = planDays.find(d => 
-      d.day.toLowerCase().includes(currentDayName.toLowerCase()) || 
-      currentDayName.toLowerCase().includes(d.day.toLowerCase())
-    );
-    if (byName) return byName;
-
-    // Try to find by "Day X"
-    const byDayNumber = planDays.find(d => {
-      const match = d.day.match(/Day\s*(\d+)/i);
-      if (match) {
-        const num = parseInt(match[1]);
-        const targetDayOfWeek = num === 7 ? 0 : num;
-        return targetDayOfWeek === dayOfWeek;
-      }
-      return false;
-    });
-    if (byDayNumber) return byDayNumber;
-
-    const adjustedIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-    return planDays[adjustedIndex % planDays.length];
+    return planDays[dayOfPlan % planDays.length];
   };
 
   const importWorkoutFromPlan = async () => {
@@ -532,6 +497,27 @@ export const ProGym = ({
     const updatedLog = { ...log, manualWorkout: updatedManual, useManualWorkout: true };
     setLog(updatedLog);
     await gymService.updateDailyLog(selectedDate, { manualWorkout: updatedManual, useManualWorkout: true });
+  };
+
+  const syncAllFutureDays = async () => {
+    if (!latestReport || !latestReport.userData?.planStartDate) return;
+    
+    const confirm = window.confirm("This will overwrite all training and meal logs from your plan start date onwards with the latest prescribed plan. Existing data from that date will be deleted. Continue?");
+    if (!confirm) return;
+
+    setIsSyncing(true);
+    try {
+      await gymService.syncPlanToHub(latestReport);
+      
+      // Refresh current log
+      await loadData(selectedDate);
+      alert("Successfully synced Gym Hub with the latest plan starting from " + latestReport.userData.planStartDate);
+    } catch (e) {
+      console.error("Sync failed", e);
+      alert("Sync failed. Some days may not have updated.");
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const toggleManualMode = () => {
@@ -1606,6 +1592,17 @@ export const ProGym = ({
                 {latestReport ? `Report Schedule • Week ${currentWeekNumber}` : 'Weekly Activity'}
               </span>
             </div>
+            {latestReport && (
+              <Button 
+                variant="ghost" 
+                size="sm"
+                className="h-6 px-2 text-[10px] font-black uppercase tracking-widest text-brand-primary hover:bg-brand-primary/10 border border-brand-primary/20"
+                onClick={syncAllFutureDays}
+                disabled={isSyncing}
+              >
+                {isSyncing ? 'Syncing...' : 'Sync & Reset Hub'}
+              </Button>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {latestReport && (
