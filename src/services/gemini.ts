@@ -277,7 +277,7 @@ async function generateHealthAndSupport(
     FOCUS: 
     1. Health Metrics (BMI, Body Fat, Calorie Targets).
     2. Daily Life (Sleep, Water, Steps).
-    ${includeGrocery ? "3. Comprehensive Nutrition strategy. 4. Grocery store recommendation. 5. EXHAUSTIVE Grocery Checklist divided into 2-week blocks (e.g., 'Weeks 1-2', 'Weeks 3-4'). Every single ingredient for the 2-week meal plan must be listed with exact quantities." : "3. Motivation and general Nutrition strategies."}
+    ${includeGrocery ? "3. Comprehensive Nutrition strategy for the full 12-week duration. 4. Grocery store recommendation. 5. EXHAUSTIVE Grocery Checklist divided into 2-week blocks (e.g., 'Weeks 1-2', 'Weeks 3-4', 'Weeks 5-6', 'Weeks 7-8', 'Weeks 9-10', 'Weeks 11-12'). Every single ingredient for each 2-week meal plan segment MUST be listed with exact quantities and brands where applicable. If the plan is 12 weeks, you MUST provide 6 blocks of grocery lists." : "3. Motivation and general Nutrition strategies."}
   `;
 
   const response = await withRetry(() => ai.models.generateContent({
@@ -287,12 +287,13 @@ async function generateHealthAndSupport(
       systemInstruction: `
         You are a master performance nutritionist. Return ONLY valid JSON.
         GROCERY LIST PROTOCOL:
-        1. Accuracy: The grocery list must perfectly match 100% of the meals recommended. 
-        2. Format: Divide into 2-week blocks using the "phase" field (e.g., "Weeks 1-2", "Weeks 3-4").
+        1. Accuracy: The grocery list must perfectly match 100% of the meals recommended in the corresponding weeks. 
+        2. Format: Divide into 2-week blocks using the "phase" field (e.g., "Weeks 1-2", "Weeks 3-4"). Provide 6 blocks for a 12-week plan.
         3. Specifics: Include exact quantities (e.g., "700g Salmon", "2 Bags Spinach", "1 Bottle Olive Oil").
         4. Exhaustiveness: If a user buys only these items, they must be able to cook every meal in that 2-week block.
         5. Grouping: Use logical categories like "Protein", "Vegetables", "Staples/Spices", "Dairy".
-        6. Limits: Each text field under 100 characters. No markdown in JSON values.
+        6. Total Coverage: You MUST cover all 12 weeks of the plan in these blocks.
+        7. Limits: Each text field under 100 characters. No markdown in JSON values.
       `,
       responseMimeType: "application/json",
       tools: [{ googleSearch: {} }],
