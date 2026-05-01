@@ -17,8 +17,8 @@ export async function ensureUserProfile(user: FirebaseUser): Promise<UserProfile
       createdAt: serverTimestamp(),
       badges: [],
       monthlyGoal: {
-        title: "The Stepper Elite",
-        description: "Achieve 10,000 steps daily for at least 75% of the month to unlock the elite status.",
+        title: "The Stepper May Mission",
+        description: "Achieve 10,000 steps daily for at least 75% of May to unlock the elite status.",
         deadline: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString(),
         completed: false,
         badgeId: "stepper"
