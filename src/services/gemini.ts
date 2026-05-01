@@ -277,7 +277,7 @@ async function generateHealthAndSupport(
     FOCUS: 
     1. Health Metrics (BMI, Body Fat, Calorie Targets).
     2. Daily Life (Sleep, Water, Steps).
-    ${includeGrocery ? "3. Nutrition strategy and specific Grocery store recommendation with checklist. CRITICAL: Address the grocery list in 2-week blocks (e.g., Weeks 1-2, Weeks 3-4, etc.) for the entire 12-week duration." : "3. Motivation and general Nutrition strategies (No grocery list needed)."}
+    ${includeGrocery ? "3. Comprehensive Nutrition strategy. 4. Grocery store recommendation. 5. EXHAUSTIVE Grocery Checklist divided into 2-week blocks (e.g., 'Weeks 1-2', 'Weeks 3-4'). Every single ingredient for the 2-week meal plan must be listed with exact quantities." : "3. Motivation and general Nutrition strategies."}
   `;
 
   const response = await withRetry(() => ai.models.generateContent({
@@ -285,14 +285,14 @@ async function generateHealthAndSupport(
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     config: {
       systemInstruction: `
-        You are a performance nutritionist and lifestyle coach. Return ONLY valid JSON.
-        CRITICAL: The grocery list must be 100% accurate and strictly aligned with the meals you recommend. 
-        Every single ingredient required for the meal plan MUST be included in the grocery list, including specific quantities (e.g., "500g Chicken Breast" instead of just "Chicken").
-        Include all staples, spices, and specific brands if relevant for the diet.
-        The grocery list must be exhaustive - if a user follows only this list, they should have everything needed for 2 weeks of the plan.
-        Never miss commas between items.
-        STRICT LIMIT: Each text field must be under 120 characters. 
-        Focus on extreme brevity.
+        You are a master performance nutritionist. Return ONLY valid JSON.
+        GROCERY LIST PROTOCOL:
+        1. Accuracy: The grocery list must perfectly match 100% of the meals recommended. 
+        2. Format: Divide into 2-week blocks using the "phase" field (e.g., "Weeks 1-2", "Weeks 3-4").
+        3. Specifics: Include exact quantities (e.g., "700g Salmon", "2 Bags Spinach", "1 Bottle Olive Oil").
+        4. Exhaustiveness: If a user buys only these items, they must be able to cook every meal in that 2-week block.
+        5. Grouping: Use logical categories like "Protein", "Vegetables", "Staples/Spices", "Dairy".
+        6. Limits: Each text field under 100 characters. No markdown in JSON values.
       `,
       responseMimeType: "application/json",
       tools: [{ googleSearch: {} }],

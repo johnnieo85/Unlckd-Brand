@@ -307,38 +307,34 @@ export default function App() {
   const getPlanDate = (weekNum: number, dayName: string, dayIndex?: number) => {
     if (!userData.planStartDate) return { date: null, weekday: dayName };
     const baseDate = parseLocalDate(userData.planStartDate);
-    baseDate.setHours(0, 0, 0, 0);
+    baseDate.setHours(12, 0, 0, 0); // Use noon to avoid DST/timezone issues
 
     let offset = 0;
     if (dayIndex !== undefined) {
-      // Use sequential indexing if provided
       offset = dayIndex;
     } else {
-      // Fallback to name-based matching if no index
       const dayMap: { [key: string]: number } = {
         'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3, 'friday': 4, 'saturday': 5, 'sunday': 6
       };
-      
       const normalizedDay = dayName.toLowerCase().trim();
+      const match = dayName.match(/Day\s*(\d+)/i);
       if (dayMap[normalizedDay] !== undefined) {
         offset = dayMap[normalizedDay];
-      } else {
-        const match = dayName.match(/Day\s*(\d+)/i);
-        if (match) {
-          offset = (parseInt(match[1]) - 1) % 7;
-        }
+      } else if (match) {
+        offset = (parseInt(match[1]) - 1) % 7;
       }
     }
     
-    baseDate.setDate(baseDate.getDate() + ((weekNum - 1) * 7) + offset);
+    const targetDate = new Date(baseDate);
+    targetDate.setDate(baseDate.getDate() + ((weekNum - 1) * 7) + offset);
     
     return {
-      date: baseDate.toLocaleDateString('en-US', { 
+      date: targetDate.toLocaleDateString('en-US', { 
         weekday: 'short', 
         month: 'short', 
         day: 'numeric' 
       }),
-      weekday: baseDate.toLocaleDateString('en-US', { weekday: 'long' })
+      weekday: targetDate.toLocaleDateString('en-US', { weekday: 'long' })
     };
   };
   const [isSignUp, setIsSignUp] = useState(false);
@@ -2502,13 +2498,13 @@ export default function App() {
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                       <div className="space-y-1">
                         <h2 className="text-3xl font-display font-bold text-brand-primary">Grocery Checklist</h2>
-                        <p className="text-gray-400 text-sm">Download your custom grocery list aligned with your meal plan.</p>
+                        <p className="text-gray-400 text-sm">Every item listed is matched with your specific meal plan for absolute accuracy.</p>
                       </div>
                       <div className="flex flex-wrap items-center gap-3">
                         {report.recommendedGroceryStore && (
                           <div className="flex items-center gap-2 px-4 py-2 bg-brand-primary/10 border border-brand-primary/30 rounded-lg whitespace-nowrap">
                             <MapPin className="w-4 h-4 text-brand-primary" />
-                            <span className="text-sm font-medium text-gray-200">Store: <span className="text-brand-primary">{report.recommendedGroceryStore}</span></span>
+                            <span className="text-sm font-medium text-gray-200">Recommended Store: <span className="text-brand-primary">{report.recommendedGroceryStore}</span></span>
                           </div>
                         )}
                         <button 
@@ -2520,7 +2516,7 @@ export default function App() {
                             const phases = [...new Set(groceryItems.map(g => g.phase || 'General'))];
                             
                             phases.forEach(phase => {
-                              content += `PHASE: ${phase.toUpperCase()}\n`;
+                              content += `WEEKS: ${phase.toUpperCase()}\n`;
                               content += `=========================\n\n`;
                               
                               const itemsInPhase = groceryItems.filter(g => (g.phase || 'General') === phase);
@@ -2544,6 +2540,33 @@ export default function App() {
                           Download Checklist (.txt)
                         </button>
                       </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {[...new Set((report.groceryList || []).map(g => g.phase || 'General'))].map((phase, pIdx) => (
+                        <Card key={pIdx} className="bg-brand-surface border-gray-800 overflow-hidden">
+                          <div className="bg-brand-secondary/20 p-4 border-b border-gray-800">
+                             <h4 className="font-bold text-brand-primary uppercase tracking-widest text-xs">{phase} Checklist</h4>
+                          </div>
+                          <div className="p-6 space-y-6">
+                            {(report.groceryList || []).filter(g => (g.phase || 'General') === phase).map((cat, cIdx) => (
+                              <div key={cIdx} className="space-y-3">
+                                <h5 className="text-[10px] font-black uppercase text-gray-500 tracking-tighter transition-colors group-hover:text-brand-primary">{cat.category}</h5>
+                                <div className="grid grid-cols-1 gap-2">
+                                  {cat.items.split(',').map((item, iIdx) => (
+                                    <div key={iIdx} className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 group transition-all">
+                                      <div className="w-4 h-4 rounded border border-gray-700 flex items-center justify-center group-hover:border-brand-primary/40">
+                                        <div className="w-2 h-2 rounded-full bg-brand-primary scale-0 group-hover:scale-100 transition-transform" />
+                                      </div>
+                                      <span className="text-xs text-gray-300 group-hover:text-white">{item.trim()}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </Card>
+                      ))}
                     </div>
                   <LogoBranding />
                 </section>
