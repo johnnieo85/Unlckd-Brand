@@ -61,6 +61,7 @@ import { Input } from './ui/Input';
 import { gymService } from '../services/gymService';
 import { DailyLog, SavedReport, Measurement, UserProfile, Badge as UserBadge } from '../types';
 import { cn, downloadFile, getLocalDateString, parseLocalDate } from '../lib/utils';
+import { getDailyQuote } from '../constants/quotes';
 import { updateGymPin, updateUserProfile } from '../services/accessService';
 import { 
   LineChart, 
@@ -186,9 +187,8 @@ const DAILY_QUOTES = [
   { text: "The only bad workout is the one that didn't happen.", author: "UNLCKD" }
 ];
 
-const getDailyQuote = () => {
-  const dayOfYear = Math.floor((new Date().getTime() - new Date(new Date().getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24));
-  return DAILY_QUOTES[dayOfYear % DAILY_QUOTES.length];
+const getDailyQuoteInternal = () => {
+  return getDailyQuote();
 };
 
 export const ProGym = ({ 
@@ -1755,7 +1755,7 @@ export const ProGym = ({
         {/* Left Column: Rings & Main Stats */}
         <div className="lg:col-span-2 space-y-8">
           {(() => {
-            const dailyQuote = getDailyQuote();
+            const dailyQuote = getDailyQuoteInternal();
             return (
               <motion.div 
                 initial={{ opacity: 0, y: 10 }}

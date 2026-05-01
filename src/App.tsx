@@ -46,6 +46,7 @@ import { Button } from './components/ui/Button';
 import { Input, Select, Checkbox } from './components/ui/Input';
 import { Card, Badge } from './components/ui/Card';
 import { cn, downloadFile, getLocalDateString, parseLocalDate } from './lib/utils';
+import { getDailyQuote } from './constants/quotes';
 import { SecurityGuard } from './components/SecurityGuard';
 import { Path, UserData, Photos, ProgressPhotos, AssessmentResult, Rating, SavedReport, UserProfile } from './types';
 import { generateTransformationReport } from './services/gemini';
@@ -307,7 +308,7 @@ export default function App() {
   const getPlanDate = (weekNum: number, dayName: string, dayIndex?: number) => {
     if (!userData.planStartDate) return { date: null, weekday: dayName };
     const baseDate = parseLocalDate(userData.planStartDate);
-    baseDate.setHours(12, 0, 0, 0); // Use noon to avoid DST/timezone issues
+    baseDate.setHours(12, 0, 0, 0);
 
     let offset = 0;
     if (dayIndex !== undefined) {
@@ -328,13 +329,13 @@ export default function App() {
     const targetDate = new Date(baseDate);
     targetDate.setDate(baseDate.getDate() + ((weekNum - 1) * 7) + offset);
     
+    const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const shortWeekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
     return {
-      date: targetDate.toLocaleDateString('en-US', { 
-        weekday: 'short', 
-        month: 'short', 
-        day: 'numeric' 
-      }),
-      weekday: targetDate.toLocaleDateString('en-US', { weekday: 'long' })
+      date: `${shortWeekdays[targetDate.getDay()]}, ${months[targetDate.getMonth()]} ${targetDate.getDate()}`,
+      weekday: weekdays[targetDate.getDay()]
     };
   };
   const [isSignUp, setIsSignUp] = useState(false);
@@ -1827,22 +1828,23 @@ export default function App() {
               </div>
 
               {/* Motivational Quote */}
-              {report.motivationalQuote && (
-                <div className="text-center py-16 px-8 border border-brand-primary/20 bg-brand-primary/5 rounded-[2rem] relative overflow-hidden group">
-                  <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.1),transparent)] opacity-50" />
-                  <Quote className="w-10 h-10 text-brand-primary/20 mx-auto mb-6" />
-                  <h2 className="text-2xl md:text-3xl font-serif italic text-gray-100 leading-relaxed max-w-3xl mx-auto relative z-10">
-                    "{report.motivationalQuote.text}"
-                  </h2>
-                  {report.motivationalQuote.author && (
-                    <p className="mt-6 text-brand-primary font-bold tracking-widest text-sm uppercase relative z-10">— {report.motivationalQuote.author}</p>
-                  )}
-                  <div className="mt-10 flex flex-col items-center gap-2 relative z-10">
-                    <p className="text-gray-500 text-[10px] font-black uppercase tracking-[0.4em]">Unlock your greatness.</p>
-                    <div className="w-12 h-0.5 bg-brand-primary/30 rounded-full" />
+              {(() => {
+                const dailyQuote = getDailyQuote();
+                return (
+                  <div className="text-center py-16 px-8 border border-brand-primary/20 bg-brand-primary/5 rounded-[2rem] relative overflow-hidden group">
+                    <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.1),transparent)] opacity-50" />
+                    <Quote className="w-10 h-10 text-brand-primary/20 mx-auto mb-6" />
+                    <h2 className="text-2xl md:text-3xl font-serif italic text-gray-100 leading-relaxed max-w-3xl mx-auto relative z-10">
+                      "{dailyQuote.text}"
+                    </h2>
+                    <p className="mt-6 text-brand-primary font-bold tracking-widest text-sm uppercase relative z-10">— {dailyQuote.author}</p>
+                    <div className="mt-10 flex flex-col items-center gap-2 relative z-10">
+                      <p className="text-gray-500 text-[10px] font-black uppercase tracking-[0.4em]">Daily Fuel • Unlock your greatness.</p>
+                      <div className="w-12 h-0.5 bg-brand-primary/30 rounded-full" />
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Page 1: Header & Baseline Info */}
               <section className="space-y-8">
@@ -2282,7 +2284,7 @@ export default function App() {
                                <tr key={i} className="hover:bg-white/5 transition-colors">
                                  <td className="px-4 py-4 border-r border-gray-800">
                                    <div className="flex flex-col">
-                                     <span className="font-bold text-brand-primary">{planDateData.weekday}</span>
+                                     <span className="font-bold text-brand-primary uppercase tracking-tight">{planDateData.weekday}</span>
                                      <span className="text-[10px] text-gray-500 font-mono mt-0.5">{planDateData.date}</span>
                                    </div>
                                  </td>
@@ -2396,7 +2398,7 @@ export default function App() {
                                  )}
                                  <td className="px-4 py-4 border-r border-gray-800">
                                    <div className="flex flex-col">
-                                     <span className="font-bold text-brand-primary">{planDateData.weekday}</span>
+                                     <span className="font-bold text-brand-primary uppercase tracking-tight">{planDateData.weekday}</span>
                                      <span className="text-[10px] text-gray-500 font-mono mt-0.5">{planDateData.date}</span>
                                    </div>
                                  </td>
