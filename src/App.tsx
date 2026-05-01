@@ -307,11 +307,6 @@ export default function App() {
   const getPlanDate = (weekNum: number, dayName: string) => {
     if (!userData.planStartDate) return null;
     const baseDate = parseLocalDate(userData.planStartDate);
-    
-    // Adjust baseDate to starting Monday
-    const day = baseDate.getDay();
-    const diff = (day === 0 ? -6 : 1 - day); 
-    baseDate.setDate(baseDate.getDate() + diff);
     baseDate.setHours(0, 0, 0, 0);
 
     const dayMap: { [key: string]: number } = {
@@ -556,9 +551,20 @@ export default function App() {
       if (currentAuthUser) {
         try {
           console.log("Saving report to history for user:", currentAuthUser.uid);
-          await historyService.saveReport(path, userData, result, photos, path === 'progress' ? progressPhotos : undefined);
+          const savedId = await historyService.saveReport(path, userData, result, photos, path === 'progress' ? progressPhotos : undefined);
           await loadHistory();
           console.log("Report saved and history reloaded successfully");
+
+          // Auto-sync to Gym Hub if requested
+          if (userData.syncToGymHub) {
+            setLoadingMessage('Syncing plan to Gym Hub...');
+            const reports = await historyService.getReports();
+            const newlySaved = reports.find(r => r.id === savedId);
+            if (newlySaved) {
+              await gymService.syncPlanToHub(newlySaved);
+              console.log("Plan synced to Gym Hub successfully");
+            }
+          }
         } catch (saveError) {
           console.error("Failed to save report to history:", saveError);
           // If save fails, we still show the report to the user but warn them
