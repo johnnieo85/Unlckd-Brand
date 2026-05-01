@@ -287,8 +287,9 @@ async function generateHealthAndSupport(
       systemInstruction: `
         You are a performance nutritionist and lifestyle coach. Return ONLY valid JSON.
         CRITICAL: The grocery list must be 100% accurate and strictly aligned with the meals you recommend. 
-        Every single ingredient required for the meal plan MUST be included in the grocery list.
-        Include all staples and specifics.
+        Every single ingredient required for the meal plan MUST be included in the grocery list, including specific quantities (e.g., "500g Chicken Breast" instead of just "Chicken").
+        Include all staples, spices, and specific brands if relevant for the diet.
+        The grocery list must be exhaustive - if a user follows only this list, they should have everything needed for 2 weeks of the plan.
         Never miss commas between items.
         STRICT LIMIT: Each text field must be under 120 characters. 
         Focus on extreme brevity.
@@ -459,8 +460,9 @@ async function generateWorkoutPlan(
         contents: prompt,
         config: {
           systemInstruction: `Expert S&C Coach. JSON only. 
-          CRITICAL: Every videoUrl MUST be a verified, active YouTube tutorial from high-authority sources (e.g., "Renaissance Periodization", "Jeff Nippard", "Squat University", "Athlean-X", "ScottHermanFitness").
-          Use the search tool for EVERY exercise to ensure the link works and is NOT a short or private video.
+          QUALITY CHECK PROTOCOL: Every videoUrl MUST be a verified, active YouTube tutorial from high-authority sources (e.g., "Renaissance Periodization", "Jeff Nippard", "Squat University", "Athlean-X", "ScottHermanFitness").
+          Use the search tool for EVERY exercise to ensure the link works and is NOT a short, private video, or "Video Unavailable".
+          If a link is broken or restricted, search again for a reliable alternative.
           If no perfect video exists, use a reputable fitness article with a clear demonstration.
           Ensure exact requested weeks are provided.`,
           responseMimeType: "application/json",
@@ -551,8 +553,8 @@ async function generateMealPlan(
         contents: prompt,
         config: {
           systemInstruction: `Elite Nutritionist. JSON only. 
-          CRITICAL: Every URL MUST be a direct, active recipe link (Direct website URLs are preferred over Pinterest).
-          Use the search tool to verify every link leads to a live recipe. NO broken links, NO login walls.
+          QUALITY CHECK PROTOCOL: Every URL MUST be a direct, active recipe link (Direct website URLs are preferred over Pinterest).
+          Use the search tool to verify every link leads to a live recipe. NO broken links, NO login walls, NO "Page Not Found".
           NEVER guess a URL or Pin ID.
           The grocery list (generated separately) will be cross-referenced, so ensure these recipes are standard and realistic.
           Ensure exact requested weeks are provided.`,

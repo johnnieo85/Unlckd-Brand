@@ -305,7 +305,7 @@ export default function App() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   const getPlanDate = (weekNum: number, dayName: string, dayIndex?: number) => {
-    if (!userData.planStartDate) return null;
+    if (!userData.planStartDate) return { date: null, weekday: dayName };
     const baseDate = parseLocalDate(userData.planStartDate);
     baseDate.setHours(0, 0, 0, 0);
 
@@ -331,11 +331,15 @@ export default function App() {
     }
     
     baseDate.setDate(baseDate.getDate() + ((weekNum - 1) * 7) + offset);
-    return baseDate.toLocaleDateString('en-US', { 
-      weekday: 'short', 
-      month: 'short', 
-      day: 'numeric' 
-    });
+    
+    return {
+      date: baseDate.toLocaleDateString('en-US', { 
+        weekday: 'short', 
+        month: 'short', 
+        day: 'numeric' 
+      }),
+      weekday: baseDate.toLocaleDateString('en-US', { weekday: 'long' })
+    };
   };
   const [isSignUp, setIsSignUp] = useState(false);
   const [authEmail, setAuthEmail] = useState('');
@@ -2235,8 +2239,8 @@ export default function App() {
                             content += `------------------------------------------\n`;
                             
                             week.days.forEach((day, dayIdx) => {
-                              const planDate = getPlanDate(week.week, day.day, dayIdx);
-                              content += `${(day.day || '').toUpperCase()}${planDate ? ` [${planDate}]` : ''} (${day.focus || ''})\n`;
+                              const planDateData = getPlanDate(week.week, day.day, dayIdx);
+                              content += `${(planDateData.weekday || day.day || '').toUpperCase()}${planDateData.date ? ` [${planDateData.date}]` : ''} (${day.focus || ''})\n`;
                               // Strip markdown links for text file: [Name](URL) -> Name
                               const cleanWarmup = (day.warmUp || '').replace(/\[(.*?)\]\(.*?\)/g, '$1');
                               const cleanMainWork = (day.mainWork || '').replace(/\[(.*?)\]\(.*?\)/g, '$1');
@@ -2276,14 +2280,16 @@ export default function App() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-800">
-                            {week.days?.map((day, i) => (
-                              <tr key={i} className="hover:bg-white/5 transition-colors">
-                                <td className="px-4 py-4 border-r border-gray-800">
-                                  <div className="flex flex-col">
-                                    <span className="font-bold text-brand-primary">{day.day}</span>
-                                    <span className="text-[10px] text-gray-500 font-mono mt-0.5">{getPlanDate(week.week, day.day, i)}</span>
-                                  </div>
-                                </td>
+                             {week.days?.map((day, i) => {
+                               const planDateData = getPlanDate(week.week, day.day, i);
+                               return (
+                               <tr key={i} className="hover:bg-white/5 transition-colors">
+                                 <td className="px-4 py-4 border-r border-gray-800">
+                                   <div className="flex flex-col">
+                                     <span className="font-bold text-brand-primary">{planDateData.weekday}</span>
+                                     <span className="text-[10px] text-gray-500 font-mono mt-0.5">{planDateData.date}</span>
+                                   </div>
+                                 </td>
                                 <td className="px-4 py-4 border-r border-gray-800 text-gray-200">{day.focus}</td>
                                 <td className="px-4 py-4 border-r border-gray-800 text-gray-400 text-xs">
                                   <div className="space-y-2">
@@ -2317,7 +2323,8 @@ export default function App() {
                                 </td>
                                 <td className="px-4 py-4 text-gray-400 text-xs italic">{day.notes}</td>
                               </tr>
-                            ))}
+                               );
+                             })}
                           </tbody>
                         </table>
                       </div>
@@ -2343,8 +2350,8 @@ export default function App() {
                             content += `-----------------\n`;
                             
                             week.days.forEach((day, dayIdx) => {
-                              const planDate = getPlanDate(week.week, day.day, dayIdx);
-                              content += `${(day.day || '').toUpperCase()}${planDate ? ` [${planDate}]` : ''}\n`;
+                              const planDateData = getPlanDate(week.week, day.day, dayIdx);
+                              content += `${(planDateData.weekday || day.day || '').toUpperCase()}${planDateData.date ? ` [${planDateData.date}]` : ''}\n`;
                               content += `Breakfast: ${day.breakfast || 'N/A'}${day.breakfastUrl ? ` (${day.breakfastUrl})` : ''}\n`;
                               content += `Lunch: ${day.lunch || 'N/A'}${day.lunchUrl ? ` (${day.lunchUrl})` : ''}\n`;
                               content += `Dinner: ${day.dinner || 'N/A'}${day.dinnerUrl ? ` (${day.dinnerUrl})` : ''}\n`;
@@ -2382,19 +2389,21 @@ export default function App() {
                       <tbody className="divide-y divide-gray-800">
                         {report.mealPlan?.map((week, weekIdx) => (
                           <React.Fragment key={weekIdx}>
-                            {week.days?.map((day, i) => (
-                              <tr key={`${weekIdx}-${i}`} className="hover:bg-white/5 transition-colors">
-                                {i === 0 && (
-                                  <td className="px-4 py-4 font-bold text-gray-400 border-r border-gray-800" rowSpan={week.days.length}>
-                                    W{week.week}
-                                  </td>
-                                )}
-                                <td className="px-4 py-4 border-r border-gray-800">
-                                  <div className="flex flex-col">
-                                    <span className="font-bold text-brand-primary">{day.day}</span>
-                                    <span className="text-[10px] text-gray-500 font-mono mt-0.5">{getPlanDate(week.week, day.day, i)}</span>
-                                  </div>
-                                </td>
+                             {week.days?.map((day, i) => {
+                               const planDateData = getPlanDate(week.week, day.day, i);
+                               return (
+                               <tr key={`${weekIdx}-${i}`} className="hover:bg-white/5 transition-colors">
+                                 {i === 0 && (
+                                   <td className="px-4 py-4 font-bold text-gray-400 border-r border-gray-800" rowSpan={week.days.length}>
+                                     W{week.week}
+                                   </td>
+                                 )}
+                                 <td className="px-4 py-4 border-r border-gray-800">
+                                   <div className="flex flex-col">
+                                     <span className="font-bold text-brand-primary">{planDateData.weekday}</span>
+                                     <span className="text-[10px] text-gray-500 font-mono mt-0.5">{planDateData.date}</span>
+                                   </div>
+                                 </td>
                                 <td className="px-4 py-4 border-r border-gray-800 text-gray-300">
                                   <div className="flex flex-col gap-1">
                                     <span>{day.breakfast}</span>
@@ -2476,8 +2485,9 @@ export default function App() {
                                   </div>
                                 </td>
                               </tr>
-                            ))}
-                          </React.Fragment>
+                               );
+                             })}
+                           </React.Fragment>
                         ))}
                       </tbody>
                     </table>
