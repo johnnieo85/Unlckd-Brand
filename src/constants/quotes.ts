@@ -22,3 +22,11 @@ export const getDailyQuote = () => {
   const dayOfYear = Math.floor((date.getTime() - new Date(date.getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24));
   return DAILY_QUOTES[dayOfYear % DAILY_QUOTES.length];
 };
+
+export const getWeeklyQuote = () => {
+  const date = new Date();
+  const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
+  const pastDaysOfYear = (date.getTime() - firstDayOfYear.getTime()) / 86400000;
+  const weekOfYear = Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+  return DAILY_QUOTES[weekOfYear % DAILY_QUOTES.length];
+};

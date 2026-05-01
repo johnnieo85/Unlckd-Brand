@@ -46,7 +46,7 @@ import { Button } from './components/ui/Button';
 import { Input, Select, Checkbox } from './components/ui/Input';
 import { Card, Badge } from './components/ui/Card';
 import { cn, downloadFile, getLocalDateString, parseLocalDate } from './lib/utils';
-import { getDailyQuote } from './constants/quotes';
+import { getWeeklyQuote } from './constants/quotes';
 import { SecurityGuard } from './components/SecurityGuard';
 import { Path, UserData, Photos, ProgressPhotos, AssessmentResult, Rating, SavedReport, UserProfile } from './types';
 import { generateTransformationReport } from './services/gemini';
@@ -1829,17 +1829,17 @@ export default function App() {
 
               {/* Motivational Quote */}
               {(() => {
-                const dailyQuote = getDailyQuote();
+                const weeklyQuote = getWeeklyQuote();
                 return (
                   <div className="text-center py-16 px-8 border border-brand-primary/20 bg-brand-primary/5 rounded-[2rem] relative overflow-hidden group">
                     <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.1),transparent)] opacity-50" />
                     <Quote className="w-10 h-10 text-brand-primary/20 mx-auto mb-6" />
                     <h2 className="text-2xl md:text-3xl font-serif italic text-gray-100 leading-relaxed max-w-3xl mx-auto relative z-10">
-                      "{dailyQuote.text}"
+                      "{weeklyQuote.text}"
                     </h2>
-                    <p className="mt-6 text-brand-primary font-bold tracking-widest text-sm uppercase relative z-10">— {dailyQuote.author}</p>
+                    <p className="mt-6 text-brand-primary font-bold tracking-widest text-sm uppercase relative z-10">— {weeklyQuote.author}</p>
                     <div className="mt-10 flex flex-col items-center gap-2 relative z-10">
-                      <p className="text-gray-500 text-[10px] font-black uppercase tracking-[0.4em]">Daily Fuel • Unlock your greatness.</p>
+                      <p className="text-gray-500 text-[10px] font-black uppercase tracking-[0.4em]">Weekly Fuel • Unlock your greatness.</p>
                       <div className="w-12 h-0.5 bg-brand-primary/30 rounded-full" />
                     </div>
                   </div>
