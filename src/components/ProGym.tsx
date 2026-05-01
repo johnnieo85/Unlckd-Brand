@@ -1633,8 +1633,10 @@ export const ProGym = ({
                 <select 
                   onChange={(e) => {
                     const week = parseInt(e.target.value);
-                    const startDate = latestReport.timestamp?.toDate ? latestReport.timestamp.toDate() : new Date(latestReport.timestamp);
-                    startDate.setHours(0,0,0,0);
+                    const startDate = latestReport.userData?.planStartDate 
+                      ? parseLocalDate(latestReport.userData.planStartDate)
+                      : (latestReport.timestamp?.toDate ? latestReport.timestamp.toDate() : new Date(latestReport.timestamp));
+                    startDate.setHours(12,0,0,0);
                     const targetDate = new Date(startDate);
                     targetDate.setDate(targetDate.getDate() + (week - 1) * 7);
                     const localDateStr = getLocalDateString(targetDate);
