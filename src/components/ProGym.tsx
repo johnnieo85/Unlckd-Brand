@@ -3274,7 +3274,14 @@ export const ProGym = ({
               const defaultStepGoal = latestReport ? parseStepGoal(latestReport.report.stepGoals) : 10000;
               const stepCompliance = reportLogs.filter(l => l.steps >= (l.stepGoal || defaultStepGoal)).length;
               const waterCompliance = reportLogs.reduce((acc, l) => acc + (l.water >= l.waterGoal ? 1 : 0), 0);
-              const weightCompliance = new Set(measurements.filter(m => (m.weight || 0) > 0).map(m => m.date)).size;
+              const weightCompliance = new Set(
+                measurements
+                  .filter(m => {
+                    const yearMonth = `${reportDate.getFullYear()}-${String(reportDate.getMonth() + 1).padStart(2, '0')}`;
+                    return m.date.startsWith(yearMonth) && (m.weight || 0) > 0;
+                  })
+                  .map(m => m.date)
+              ).size;
               const habitCompletionTotal = reportLogs.reduce((acc, l) => acc + (Object.values(l.habits || {}).filter(Boolean).length / (Object.keys(l.habits || {}).length || 1)), 0);
 
               return (
@@ -3485,7 +3492,12 @@ export const ProGym = ({
                                   })}
 
                                   {(() => {
-                                    const weightLoggingDays = new Set(measurements.filter(m => (m.weight || 0) > 0).map(m => m.date));
+                                    const currentYearMonth = `${reportDate.getFullYear()}-${String(reportDate.getMonth() + 1).padStart(2, '0')}`;
+                                    const weightLoggingDays = new Set(
+                                      measurements
+                                        .filter(m => m.date.startsWith(currentYearMonth) && (m.weight || 0) > 0)
+                                        .map(m => m.date)
+                                    );
                                     const weightPercentage = Math.round((weightLoggingDays.size / Math.max(1, daysToConsider)) * 100);
                                     return (
                                       <>
