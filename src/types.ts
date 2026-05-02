@@ -76,10 +76,10 @@ export interface AssessmentResult {
     phase: string;
     days: {
       day: string;
-      focus: string;
-      warmUp: string;
-      mainWork: string;
-      videoUrl: string;
+      focus?: string;
+      warmUp: { name: string; videoUrl: string }[];
+      mainWork: { name: string; videoUrl: string; sets?: string; reps?: string }[];
+      videoUrl?: string;
       notes: string;
     }[];
   }[];

@@ -39,7 +39,9 @@ import {
   Zap,
   Youtube,
   LineChart,
-  Trophy
+  Trophy,
+  XCircle,
+  AlertCircle
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Button } from './components/ui/Button';
@@ -55,6 +57,9 @@ import { auth } from './lib/firebase';
 import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { historyService } from './services/historyService';
 import { ensureUserProfile, checkUserAccess, unlockPremium } from './services/accessService';
+
+import { Header } from './components/Header';
+import { Logo } from './components/Logo';
 
 const RatingTable = ({ title, ratings = [], summary, photo }: { title: string; ratings?: Rating[]; summary?: string; photo?: string | null }) => (
   <div className="space-y-6">
@@ -224,25 +229,311 @@ const ProgressComparison = ({ title, ratings = [], summary, beforePhoto, afterPh
 import { ProGym } from './components/ProGym';
 import { gymService } from './services/gymService';
 
+const getSearchUrl = (title: string, category: 'Workouts' | 'Nutrition') => {
+  // Enhanced cleaning to handle cases like "W1 Friday Session" or other session-only titles
+  const cleanTitle = title
+    .replace(/^W\d+.*?(Session|Workout|Day\s+\d+).*?:?\s*/i, '') // Remove batch prefixes
+    .replace(/^(Warm-up|MainWork|Primary|Sequence):\s*/i, '')   // Remove section headers
+    .trim();
+  
+  // If the result is just a date-like or session-like string, it's not an exercise
+  if (!cleanTitle || /^(Week|Day|Session|Workout)\s*\d*$/i.test(cleanTitle)) {
+    return '#'; 
+  }
+
+  if (category === 'Workouts') {
+    return `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanTitle + ' exercise demonstration')}`;
+  }
+  return `https://www.pinterest.com/search/pins/?q=${encodeURIComponent(cleanTitle + ' healthy recipe')}`;
+};
+
+const extractLinks = (report: AssessmentResult) => {
+  const links: { title: string; url: string; category: 'Workouts' | 'Nutrition' }[] = [];
+
+  // Workouts
+  if (report.recommendedWorkout?.exercises) {
+    report.recommendedWorkout.exercises.forEach(ex => {
+      links.push({ title: ex.name, url: getSearchUrl(ex.name, 'Workouts'), category: 'Workouts' });
+    });
+  }
+
+  // Helper to extract markdown links: [Title](URL)
+  const extractMarkdownLinks = (text: string, category: 'Workouts' | 'Nutrition') => {
+    const regex = /\[(.*?)\]\((.*?)\)/g;
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+      links.push({ title: match[1], url: getSearchUrl(match[1], category), category });
+    }
+  };
+
+  if (report.goalAlignmentSummary) extractMarkdownLinks(report.goalAlignmentSummary, 'Workouts');
+  if (report.trainerSummary) extractMarkdownLinks(report.trainerSummary, 'Workouts');
+  if (report.nutritionStrategy) extractMarkdownLinks(report.nutritionStrategy, 'Nutrition');
+
+  if (report.workoutPlan) {
+    report.workoutPlan.forEach(week => {
+      if (!week.days) return;
+      week.days.forEach(day => {
+        // Individual Exercises
+        if (day.warmUp) {
+          if (Array.isArray(day.warmUp)) {
+            day.warmUp.forEach(ex => {
+              links.push({ title: `W${week.week} ${day.day} Warm-up: ${ex.name}`, url: getSearchUrl(ex.name, 'Workouts'), category: 'Workouts' });
+            });
+          } else {
+            extractMarkdownLinks(String(day.warmUp), 'Workouts');
+          }
+        }
+        
+        if (day.mainWork) {
+          if (Array.isArray(day.mainWork)) {
+            day.mainWork.forEach(ex => {
+              links.push({ title: `W${week.week} ${day.day} Main: ${ex.name}`, url: getSearchUrl(ex.name, 'Workouts'), category: 'Workouts' });
+            });
+          } else {
+            extractMarkdownLinks(String(day.mainWork), 'Workouts');
+          }
+        }
+      });
+    });
+  }
+
+  // Nutrition
+  if (report.mealPlan) {
+    report.mealPlan.forEach(week => {
+      if (!week.days) return;
+      week.days.forEach(day => {
+        if (day.breakfast) links.push({ title: `W${week.week} ${day.day} Breakfast: ${day.breakfast}`, url: getSearchUrl(day.breakfast, 'Nutrition'), category: 'Nutrition' });
+        if (day.lunch) links.push({ title: `W${week.week} ${day.day} Lunch: ${day.lunch}`, url: getSearchUrl(day.lunch, 'Nutrition'), category: 'Nutrition' });
+        if (day.dinner) links.push({ title: `W${week.week} ${day.day} Dinner: ${day.dinner}`, url: getSearchUrl(day.dinner, 'Nutrition'), category: 'Nutrition' });
+        if (day.snack) links.push({ title: `W${week.week} ${day.day} Snack: ${day.snack}`, url: getSearchUrl(day.snack, 'Nutrition'), category: 'Nutrition' });
+      });
+    });
+  }
+
+  return links;
+};
+
+const LinkAuditModal = ({ 
+  isOpen, 
+  onClose, 
+  report,
+  onFix
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  report: AssessmentResult | null;
+  onFix: (invalidContext: string) => void;
+}) => {
+  const [auditResults, setAuditResults] = useState<Record<string, { status: 'pending' | 'checking' | 'valid' | 'invalid'; reason?: string }>>({});
+  const [isAuditing, setIsAuditing] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  if (!isOpen || !report) return null;
+
+  const links = extractLinks(report);
+  const invalidLinksCount = Object.values(auditResults).filter(r => r.status === 'invalid').length;
+
+  const performAudit = async () => {
+    setIsAuditing(true);
+    setProgress(0);
+    const results: Record<string, { status: 'pending' | 'checking' | 'valid' | 'invalid'; reason?: string }> = {};
+    links.forEach(l => results[l.url] = { status: 'pending' });
+    setAuditResults(results);
+
+    for (let i = 0; i < links.length; i++) {
+      const link = links[i];
+      setAuditResults(prev => ({ ...prev, [link.url]: { status: 'checking' } }));
+      
+      try {
+        const response = await fetch(`/api/audit-link?url=${encodeURIComponent(link.url)}`);
+        if (!response.ok) throw new Error('Proxy error');
+        
+        const data = await response.json();
+        setAuditResults(prev => ({ 
+          ...prev, 
+          [link.url]: { 
+            status: data.status === 'valid' ? 'valid' : 'invalid',
+            reason: data.reason
+          } 
+        }));
+      } catch (error) {
+        setAuditResults(prev => ({ 
+          ...prev, 
+          [link.url]: { status: 'invalid', reason: 'Audit Service Unavailable' } 
+        }));
+      }
+      
+      setProgress(((i + 1) / links.length) * 100);
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    setIsAuditing(false);
+  };
+
+  const handleFix = () => {
+    const invalidList = links
+      .filter(l => auditResults[l.url]?.status === 'invalid')
+      .map(l => `- ${l.category}: ${l.title} (${l.url}) -> Reason: ${auditResults[l.url]?.reason || 'Broken link'}`)
+      .join('\n');
+    
+    onFix(invalidList);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 no-print">
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="absolute inset-0 bg-brand-dark/95 backdrop-blur-xl"
+        onClick={onClose}
+      />
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        className="bg-brand-surface border border-white/5 rounded-[2.5rem] w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col shadow-2xl relative z-10"
+      >
+        <div className="p-8 border-b border-white/5">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-2xl font-display font-bold text-gray-100 flex items-center gap-3">
+                <CheckCircle2 className="w-6 h-6 text-brand-primary" />
+                Link Audit
+              </h3>
+              <p className="text-sm text-gray-400 mt-1">Status check for all demonstration and resource links.</p>
+            </div>
+            <button 
+              onClick={onClose}
+              className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+            >
+               <XCircle className="w-6 h-6" />
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between text-xs font-black uppercase tracking-widest">
+              <span className="text-gray-500">Audit Progress</span>
+              <span className="text-brand-primary">{Math.round(progress)}%</span>
+            </div>
+            <div className="relative h-2 bg-white/5 rounded-full overflow-hidden">
+              <motion.div 
+                className="absolute top-0 left-0 h-full bg-brand-primary"
+                initial={{ width: 0 }}
+                animate={{ width: `${progress}%` }}
+                transition={{ type: "spring", bounce: 0, duration: 0.5 }}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                onClick={performAudit}
+                disabled={isAuditing}
+                className="flex-1 bg-brand-primary/10 border border-brand-primary/20 text-brand-primary hover:bg-brand-primary/20 h-10 text-xs font-black uppercase tracking-[0.2em] rounded-xl"
+              >
+                {isAuditing ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Checking...
+                  </span>
+                ) : progress > 0 ? 'Restart Audit' : 'Initialize Audit'}
+              </Button>
+              {progress === 100 && invalidLinksCount > 0 && (
+                <Button 
+                  onClick={handleFix}
+                  className="flex-1 bg-rose-500/10 border border-rose-500/20 text-rose-500 hover:bg-rose-500/20 h-10 text-xs font-black uppercase tracking-[0.2em] rounded-xl flex items-center justify-center gap-2"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Fix & Regenerate
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-8 space-y-8">
+          {(['Workouts', 'Nutrition'] as const).map(category => {
+            const categoryLinks = links.filter(l => l.category === category);
+            if (categoryLinks.length === 0) return null;
+
+            return (
+              <div key={category} className="space-y-4">
+                <h4 className="text-xs font-black uppercase tracking-widest text-brand-primary/60 px-1">{category}</h4>
+                <div className="grid grid-cols-1 gap-3">
+                  {categoryLinks.map((link, idx) => {
+                    const result = auditResults[link.url] || { status: 'pending' };
+                    const status = result.status;
+                    return (
+                      <a 
+                        key={idx}
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`flex items-center justify-between p-4 bg-white/5 rounded-2xl border transition-all group ${
+                          status === 'invalid' ? 'border-rose-500/30 bg-rose-500/5' : 'border-white/5 hover:border-brand-primary/30 hover:bg-brand-primary/5'
+                        }`}
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="flex-shrink-0">
+                            {status === 'pending' && <div className="w-2 h-2 rounded-full bg-gray-600" />}
+                            {status === 'checking' && <Loader2 className="w-4 h-4 text-brand-primary animate-spin" />}
+                            {status === 'valid' && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
+                            {status === 'invalid' && <XCircle className="w-4 h-4 text-rose-500" />}
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-bold text-gray-200 group-hover:text-brand-primary transition-colors line-clamp-1">{link.title}</span>
+                            <span className="text-[10px] text-gray-500 font-mono mt-0.5 truncate max-w-[250px]">{link.url}</span>
+                            {status === 'invalid' && result.reason && (
+                              <span className="text-[10px] text-rose-400 font-bold uppercase mt-1">{result.reason}</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {status === 'valid' && <span className="text-[10px] font-black text-emerald-500/50 uppercase tracking-tighter">VERIFIED</span>}
+                          {status === 'invalid' && <span className="text-[10px] font-black text-rose-500/50 uppercase tracking-tighter">FAILED</span>}
+                          <ExternalLink className="w-4 h-4 text-gray-600 group-hover:text-brand-primary transition-colors" />
+                        </div>
+                      </a>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+
+          {links.length === 0 && (
+            <div className="text-center py-12">
+              <Activity className="w-12 h-12 text-gray-700 mx-auto mb-4 opacity-50" />
+              <p className="text-gray-500 font-medium">No links were detected in this report.</p>
+            </div>
+          )}
+        </div>
+
+        <div className="p-6 bg-brand-primary/5 border-t border-white/5 flex flex-col items-center gap-2">
+          <p className="text-[10px] text-gray-500 font-medium text-center uppercase tracking-widest">
+            Note: Some links may require manual verification due to security restrictions.
+          </p>
+          <p className="text-xs text-brand-primary/60 font-bold uppercase tracking-widest">UNLCKD • RESOURCE INTEGRITY</p>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<'reports' | 'gym'>('reports');
   const [latestReport, setLatestReport] = useState<SavedReport | null>(null);
   const [step, setStep] = useState<'landing' | 'intake' | 'photos' | 'progress-photos' | 'processing' | 'report' | 'history' | 'no-access'>('landing');
+  const [showLinkAudit, setShowLinkAudit] = useState(false);
 
   const LogoBranding = () => (
     <div className="flex items-center justify-between border-t border-white/10 pt-6 mt-12 print:border-gray-200 print:pt-4 print:mt-8">
-      <div 
-        className="flex items-center gap-2 cursor-pointer group"
+      <Logo 
+        size="sm"
         onClick={() => {
           setStep('landing');
           setActiveTab('reports');
         }}
-      >
-        <div className="w-8 h-8 bg-brand-primary/10 rounded-lg flex items-center justify-center print:bg-black print:w-6 print:h-6 group-hover:scale-105 transition-transform">
-          <Activity className="w-5 h-5 text-brand-primary print:w-4 print:h-4 print:text-white" />
-        </div>
-        <span className="font-display font-bold text-base tracking-tight uppercase text-gray-200 print:text-black print:text-sm group-hover:text-brand-primary transition-colors">UNLCKD <span className="text-gray-500 print:text-gray-600">Pro</span></span>
-      </div>
+      />
       <div className="flex items-center gap-6">
         <div className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-widest print:text-[10px] print:gap-1.5">
           <Instagram className="w-4 h-4 text-brand-primary print:w-3 print:h-3" />
@@ -525,10 +816,10 @@ export default function App() {
 
   const [isResubmitting, setIsResubmitting] = useState(false);
 
-  const processReport = async (isResubmit: boolean = false) => {
+  const processReport = async (isResubmit: boolean = false, invalidLinksContext?: string) => {
     setStep('processing');
-    setIsResubmitting(isResubmit);
-    const messages = isResubmit ? [
+    setIsResubmitting(isResubmit || !!invalidLinksContext);
+    const messages = (isResubmit || invalidLinksContext) ? [
       'Re-evaluating your data for accuracy...',
       'Correcting plan inconsistencies...',
       'Re-verifying exercise video links...',
@@ -552,7 +843,8 @@ export default function App() {
         userData, 
         path === 'progress' ? progressPhotos : photos, 
         path,
-        isResubmit
+        isResubmit || !!invalidLinksContext,
+        invalidLinksContext
       );
       setReport(result);
       
@@ -668,9 +960,10 @@ export default function App() {
     const monthNames = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
     const month = monthNames[now.getMonth()];
     const year = now.getFullYear();
+    const time = now.toLocaleTimeString('en-GB', { hour12: false }).replace(/:/g, ''); // H_M_S without special chars for filename safety
     
     const formattedDate = `${day}${month}${year}`;
-    const fileName = `UNLCKDProTrainer_${lastName}_${formattedDate}`;
+    const fileName = `UNLCKDProTrainer_${lastName}_${formattedDate}_${time}`;
     
     document.title = fileName;
     window.print();
@@ -691,111 +984,20 @@ export default function App() {
         <div className="absolute -bottom-[10%] left-[20%] w-[50%] h-[50%] bg-brand-primary/5 blur-[150px] rounded-full" />
       </div>
 
-      <header className="fixed top-0 w-full z-50 bg-brand-dark/40 backdrop-blur-xl border-b border-white/5 no-print">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div 
-            className="flex items-center gap-3 cursor-pointer group"
-            onClick={() => {
-              setStep('landing');
-              setActiveTab('reports');
-            }}
-          >
-            <div className="w-10 h-10 bg-brand-primary rounded-lg flex items-center justify-center shadow-lg shadow-brand-primary/20 group-hover:scale-105 transition-transform">
-              <Activity className="w-6 h-6 text-brand-dark" />
-            </div>
-            <span className="font-display font-bold text-2xl tracking-tight uppercase group-hover:text-brand-primary transition-colors">UNLCKD <span className="text-brand-primary">Pro</span></span>
-          </div>
-          
-          <div className="flex items-center gap-4 no-print">
-            <a 
-              href="https://unlckdbrand.com/unlckd-pro-trainer" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="hidden sm:flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-full text-xs font-bold text-gray-300 hover:bg-white/10 transition-all hover:text-brand-primary"
-            >
-              Get Access
-              <ExternalLink className="w-3 h-3" />
-            </a>
-
-            {user ? (
-              <>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={async () => {
-                    setActiveTab('reports');
-                    setStep('history');
-                    await loadHistory();
-                  }}
-                  className={cn("gap-2 hover:bg-white/5", activeTab === 'reports' && step === 'history' && "text-brand-primary bg-white/5")}
-                >
-                  <History className="w-4 h-4" />
-                  My Reports
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => {
-                    if (!hasAccess) {
-                      setStep('no-access');
-                      return;
-                    }
-                    if (!isPremium) {
-                      setShowGymAuth(true);
-                    } else {
-                      setActiveTab('gym');
-                    }
-                  }}
-                  className={cn("gap-2 hover:bg-white/5", activeTab === 'gym' && "text-brand-primary bg-white/5")}
-                >
-                  <Dumbbell className="w-4 h-4" />
-                  Gym Hub
-                  {!isPremium && <Lock className="w-3 h-3 text-gray-500" />}
-                </Button>
-                <div className="flex items-center gap-3 pl-4 border-l border-white/10">
-                  <div className="text-right hidden sm:block">
-                    <div className="flex items-center gap-2 justify-end mb-0.5">
-                      {userProfile && (
-                        <Badge className="text-[8px] h-3.5 px-1 py-0 border-brand-primary/20 bg-brand-primary/10 text-brand-primary uppercase font-black leading-none mr-1">
-                          Lvl {getLevelInfo(userProfile.xp || 0).level}
-                        </Badge>
-                      )}
-                      {hasAccess ? (
-                        <Badge className="text-[8px] h-3.5 px-1 py-0 border-brand-primary/20 bg-brand-primary/10 text-brand-primary uppercase font-black leading-none">Pro</Badge>
-                      ) : (
-                        <Badge className="text-[8px] h-3.5 px-1 py-0 border-red-500/20 bg-red-500/10 text-red-500 uppercase font-black leading-none">Restricted</Badge>
-                      )}
-                      <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Signed In As</p>
-                    </div>
-                    <p className="text-xs text-gray-300 font-medium truncate max-w-[120px]">
-                      {user.displayName || user.email}
-                      {isPremium && <span className="text-brand-primary ml-1 text-[10px] font-black">(premium)</span>}
-                    </p>
-                  </div>
-                  <Button variant="ghost" size="icon" onClick={handleSignOut} className="hover:bg-white/5 text-gray-400 hover:text-white">
-                    <LogOut className="w-4 h-4" />
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <Button 
-                size="sm" 
-                onClick={handleSignIn} 
-                className="gap-2 bg-brand-primary text-brand-dark font-bold hover:bg-brand-primary/90"
-              >
-                <LogIn className="w-4 h-4" />
-                Sign In
-              </Button>
-            )}
-            
-            {step !== 'landing' && (
-              <Button variant="ghost" size="sm" onClick={() => setStep('landing')} className="hover:bg-white/5 ml-2">
-                Exit
-              </Button>
-            )}
-          </div>
-        </div>
-      </header>
+      <Header 
+        user={user}
+        hasAccess={hasAccess}
+        isPremium={isPremium}
+        userProfile={userProfile}
+        activeTab={activeTab}
+        step={step}
+        setStep={setStep}
+        setActiveTab={setActiveTab}
+        loadHistory={loadHistory}
+        handleSignIn={handleSignIn}
+        handleSignOut={handleSignOut}
+        setShowGymAuth={setShowGymAuth}
+      />
 
       <main className="relative pt-32 pb-20 px-6 max-w-6xl mx-auto">
         <AnimatePresence mode="wait">
@@ -1817,6 +2019,15 @@ export default function App() {
                   Print Ready
                 </div>
                 <Button 
+                  variant="outline" 
+                  size="md" 
+                  className="gap-2 border-brand-primary/20 hover:bg-brand-primary/10 text-gray-300"
+                  onClick={() => setShowLinkAudit(true)}
+                >
+                  <CheckCircle2 className="w-5 h-5 text-brand-primary" />
+                  Audit Links
+                </Button>
+                <Button 
                   variant="primary" 
                   size="md" 
                   className="gap-2 bg-brand-primary text-brand-dark font-bold hover:bg-brand-primary/90 shadow-xl shadow-brand-primary/20"
@@ -1881,6 +2092,7 @@ export default function App() {
                           'Transformation Report' 
                         },
                         { label: 'Date', value: new Date().toLocaleDateString() },
+                        { label: 'Unique ID', value: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) },
                         { label: 'Age / Sex', value: `${userData.age} / ${userData.sex.charAt(0).toUpperCase() + userData.sex.slice(1)}` },
                         { label: 'Height / Weight', value: `${userData.height} ${userData.heightUnit} / ${userData.weight} ${userData.weightUnit}` },
                         { label: 'Location', value: userData.location },
@@ -2155,27 +2367,23 @@ export default function App() {
                         <p className="text-sm text-gray-400 mb-6 leading-relaxed">{report.recommendedWorkout.description}</p>
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {report.recommendedWorkout.exercises?.map((ex, i) => (
-                            <div key={i} className="p-4 bg-brand-surface border border-gray-800 rounded-xl space-y-2">
-                              <div className="flex justify-between items-start">
-                                {ex.videoUrl ? (
-                                  <a 
-                                    href={ex.videoUrl} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer" 
-                                    className="font-bold text-brand-primary hover:underline flex items-center gap-1"
-                                  >
-                                    {ex.name} <ExternalLink className="w-3 h-3" />
-                                  </a>
-                                ) : (
-                                  <h4 className="font-bold text-brand-primary">{ex.name}</h4>
-                                )}
-                                <Badge className="text-[10px] border-gray-700">{ex.sets} x {ex.reps}</Badge>
-                              </div>
-                              <p className="text-xs text-gray-500 italic"><span className="text-gray-400 font-medium not-italic">Focus:</span> {ex.focus}</p>
-                            </div>
-                          ))}
-                        </div>
+  {report.recommendedWorkout.exercises?.map((ex, i) => (
+    <div key={i} className="p-4 bg-brand-surface border border-gray-800 rounded-xl space-y-2">
+      <div className="flex justify-between items-start">
+        <a 
+          href={`https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name + ' demonstration')}`} 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          className="font-bold text-brand-primary hover:underline flex items-center gap-1"
+        >
+          {ex.name} <ExternalLink className="w-3 h-3" />
+        </a>
+        <Badge className="text-[10px] border-gray-700">{ex.sets} x {ex.reps}</Badge>
+      </div>
+      <p className="text-xs text-gray-500 italic"><span className="text-gray-400 font-medium not-italic">Focus:</span> {ex.focus}</p>
+    </div>
+  ))}
+</div>
                       </div>
                     </div>
                   )}
@@ -2238,10 +2446,18 @@ export default function App() {
                             
                             week.days.forEach((day, dayIdx) => {
                               const planDateData = getPlanDate(week.week, day.day, dayIdx);
-                              content += `${(planDateData.weekday || day.day || '').toUpperCase()}${planDateData.date ? ` [${planDateData.date}]` : ''} (${day.focus || ''})\n`;
+                              content += `${(planDateData.weekday || day.day || '').toUpperCase()}${planDateData.date ? ` [${planDateData.date}]` : ''}\n`;
+                              
                               // Strip markdown links for text file: [Name](URL) -> Name
-                              const cleanWarmup = (day.warmUp || '').replace(/\[(.*?)\]\(.*?\)/g, '$1');
-                              const cleanMainWork = (day.mainWork || '').replace(/\[(.*?)\]\(.*?\)/g, '$1');
+                              const warmUpStr = Array.isArray(day.warmUp) 
+                                ? day.warmUp.map(ex => `${ex.name}`).join('\n')
+                                : (day.warmUp || '');
+                              const mainWorkStr = Array.isArray(day.mainWork)
+                                ? day.mainWork.map(ex => `${ex.name} (${ex.sets} x ${ex.reps})`).join('\n')
+                                : (day.mainWork || '');
+
+                              const cleanWarmup = warmUpStr.replace(/\[(.*?)\]\(.*?\)/g, '$1');
+                              const cleanMainWork = mainWorkStr.replace(/\[(.*?)\]\(.*?\)/g, '$1');
                               
                               content += `Warm-up:\n${cleanWarmup}\n`;
                               content += `Main Work:\n${cleanMainWork}\n`;
@@ -2271,7 +2487,6 @@ export default function App() {
                           <thead className="bg-brand-secondary/20 text-gray-400 uppercase text-[10px] tracking-wider">
                             <tr>
                               <th className="px-4 py-3 font-semibold border-r border-gray-800 w-32">Day / Date</th>
-                              <th className="px-4 py-3 font-semibold border-r border-gray-800">Focus</th>
                               <th className="px-4 py-3 font-semibold border-r border-gray-800">Warm-Up</th>
                               <th className="px-4 py-3 font-semibold border-r border-gray-800">Main Work</th>
                               <th className="px-4 py-3 font-semibold">Notes</th>
@@ -2288,37 +2503,57 @@ export default function App() {
                                      <span className="text-[10px] text-gray-500 font-mono mt-0.5">{planDateData.date}</span>
                                    </div>
                                  </td>
-                                <td className="px-4 py-4 border-r border-gray-800 text-gray-200">{day.focus}</td>
                                 <td className="px-4 py-4 border-r border-gray-800 text-gray-400 text-xs">
-                                  <div className="space-y-2">
-                                    <ReactMarkdown components={{ a: ({node, ...props}) => <a {...props} className="text-brand-primary hover:underline" target="_blank" rel="noopener noreferrer" /> }}>
-                                      {day.warmUp}
-                                    </ReactMarkdown>
-                                    <a 
-                                      href={`https://www.youtube.com/results?search_query=${encodeURIComponent(day.warmUp.replace(/\[.*?\]\(.*?\)/g, '').trim() + ' demonstration')}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-[9px] text-gray-500 hover:text-brand-primary flex items-center gap-1 mt-1 opacity-60 hover:opacity-100"
-                                    >
-                                      <Search className="w-2.5 h-2.5" /> Search Alternative
-                                    </a>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-4 border-r border-gray-800 text-gray-300 font-medium">
-                                  <div className="space-y-2">
-                                    <ReactMarkdown components={{ a: ({node, ...props}) => <a {...props} className="text-brand-primary hover:underline" target="_blank" rel="noopener noreferrer" /> }}>
-                                      {day.mainWork}
-                                    </ReactMarkdown>
-                                    <a 
-                                      href={`https://www.youtube.com/results?search_query=${encodeURIComponent(day.mainWork.replace(/\[.*?\]\(.*?\)/g, '').trim() + ' exercise tutorial')}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-[9px] text-gray-500 hover:text-brand-primary flex items-center gap-1 mt-1 opacity-60 hover:opacity-100"
-                                    >
-                                      <Search className="w-2.5 h-2.5" /> Search Alternative
-                                    </a>
-                                  </div>
-                                </td>
+  <div className="space-y-1">
+    {(Array.isArray(day.warmUp) ? day.warmUp : []).map((ex, idx) => (
+      <div key={idx} className="flex items-center gap-1">
+        <a 
+          href={`https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name + ' exercise demonstration')}`}
+          target="_blank" 
+          rel="noopener noreferrer" 
+          className="text-brand-primary hover:underline font-medium"
+        >
+          - {ex.name}
+        </a>
+      </div>
+    ))}
+    {!Array.isArray(day.warmUp) && (
+      <ReactMarkdown components={{ a: ({node, ...props}) => {
+        const title = (props.children?.[0] as string) || 'Exercise';
+        const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(title + ' demonstration')}`;
+        return <a {...props} href={searchUrl} className="text-brand-primary hover:underline" target="_blank" rel="noopener noreferrer" />;
+      }}}>
+        {String(day.warmUp || '')}
+      </ReactMarkdown>
+    )}
+  </div>
+</td>
+<td className="px-4 py-4 border-r border-gray-800 text-gray-300 font-medium">
+  <div className="space-y-1">
+    {(Array.isArray(day.mainWork) ? day.mainWork : []).map((ex, idx) => (
+      <div key={idx} className="flex items-center gap-1">
+        <a 
+          href={`https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name + ' exercise tutorial')}`}
+          target="_blank" 
+          rel="noopener noreferrer" 
+          className="text-brand-primary hover:underline"
+        >
+          - {ex.name}
+        </a>
+        <span className="text-[10px] text-gray-500 font-mono ml-auto">{ex.sets}x{ex.reps}</span>
+      </div>
+    ))}
+    {!Array.isArray(day.mainWork) && (
+      <ReactMarkdown components={{ a: ({node, ...props}) => {
+        const title = (props.children?.[0] as string) || 'Exercise';
+        const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(title + ' tutorial')}`;
+        return <a {...props} href={searchUrl} className="text-brand-primary hover:underline" target="_blank" rel="noopener noreferrer" />;
+      }}}>
+        {String(day.mainWork || '')}
+      </ReactMarkdown>
+    )}
+  </div>
+</td>
                                 <td className="px-4 py-4 text-gray-400 text-xs italic">{day.notes}</td>
                               </tr>
                                );
@@ -2368,8 +2603,19 @@ export default function App() {
                       </button>
                     )}
                   </div>
-                  <div className="p-6 bg-brand-surface border border-gray-800 rounded-xl text-gray-300 leading-relaxed">
-                    {report.nutritionStrategy}
+                  <div className="p-6 bg-brand-surface border border-gray-800 rounded-xl text-gray-300 leading-relaxed overflow-hidden">
+                    <div className="markdown-body">
+  <ReactMarkdown components={{ a: ({node, ...props}) => {
+    const title = (props.children?.[0] as string) || 'Link';
+    const isWorkout = title.toLowerCase().includes('workout') || title.toLowerCase().includes('exercise');
+    const searchUrl = isWorkout 
+      ? `https://www.youtube.com/results?search_query=${encodeURIComponent(title + ' demonstration')}`
+      : `https://www.pinterest.com/search/pins/?q=${encodeURIComponent(title + ' healthy recipe')}`;
+    return <a {...props} href={searchUrl} className="text-brand-primary hover:underline" target="_blank" rel="noopener noreferrer" />;
+  }}}>
+    {report.nutritionStrategy}
+  </ReactMarkdown>
+</div>
                   </div>
 
                   <div className="overflow-x-auto bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl">
@@ -2403,85 +2649,57 @@ export default function App() {
                                    </div>
                                  </td>
                                 <td className="px-4 py-4 border-r border-gray-800 text-gray-300">
-                                  <div className="flex flex-col gap-1">
-                                    <span>{day.breakfast}</span>
-                                    <div className="flex items-center gap-2">
-                                      {day.breakfastUrl && (
-                                        <a href={day.breakfastUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-primary hover:underline flex items-center gap-1">
-                                          Recipe <ExternalLink className="w-2 h-2" />
-                                        </a>
-                                      )}
-                                      <a 
-                                        href={`https://www.google.com/search?q=${encodeURIComponent(day.breakfast + ' recipe healthy')}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-[9px] text-gray-500 hover:text-brand-primary flex items-center gap-1"
-                                      >
-                                        Search <Search className="w-2 h-2" />
-                                      </a>
-                                    </div>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-4 border-r border-gray-800 text-gray-300">
-                                  <div className="flex flex-col gap-1">
-                                    <span>{day.lunch}</span>
-                                    <div className="flex items-center gap-2">
-                                      {day.lunchUrl && (
-                                        <a href={day.lunchUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-primary hover:underline flex items-center gap-1">
-                                          Recipe <ExternalLink className="w-2 h-2" />
-                                        </a>
-                                      )}
-                                      <a 
-                                        href={`https://www.google.com/search?q=${encodeURIComponent(day.lunch + ' recipe healthy')}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-[9px] text-gray-500 hover:text-brand-primary flex items-center gap-1"
-                                      >
-                                        Search <Search className="w-2 h-2" />
-                                      </a>
-                                    </div>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-4 border-r border-gray-800 text-gray-300">
-                                  <div className="flex flex-col gap-1">
-                                    <span>{day.dinner}</span>
-                                    <div className="flex items-center gap-2">
-                                      {day.dinnerUrl && (
-                                        <a href={day.dinnerUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-primary hover:underline flex items-center gap-1">
-                                          Recipe <ExternalLink className="w-2 h-2" />
-                                        </a>
-                                      )}
-                                      <a 
-                                        href={`https://www.google.com/search?q=${encodeURIComponent(day.dinner + ' recipe healthy')}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-[9px] text-gray-500 hover:text-brand-primary flex items-center gap-1"
-                                      >
-                                        Search <Search className="w-2 h-2" />
-                                      </a>
-                                    </div>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-4 text-gray-300">
-                                  <div className="flex flex-col gap-1">
-                                    <span>{day.snack}</span>
-                                    <div className="flex items-center gap-2">
-                                      {day.snackUrl && (
-                                        <a href={day.snackUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-primary hover:underline flex items-center gap-1">
-                                          Recipe <ExternalLink className="w-2 h-2" />
-                                        </a>
-                                      )}
-                                      <a 
-                                        href={`https://www.google.com/search?q=${encodeURIComponent(day.snack + ' healthy snack idea')}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-[9px] text-gray-500 hover:text-brand-primary flex items-center gap-1"
-                                      >
-                                        Search <Search className="w-2 h-2" />
-                                      </a>
-                                    </div>
-                                  </div>
-                                </td>
+  <div className="flex flex-col gap-1">
+    <span className="font-medium text-gray-100">{day.breakfast}</span>
+    <a 
+      href={`https://www.pinterest.com/search/pins/?q=${encodeURIComponent(day.breakfast + ' healthy recipe')}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-[10px] text-brand-primary hover:underline flex items-center gap-1 font-bold"
+    >
+      View Pinterest Search <ExternalLink className="w-2 h-2" />
+    </a>
+  </div>
+</td>
+<td className="px-4 py-4 border-r border-gray-800 text-gray-300">
+  <div className="flex flex-col gap-1">
+    <span className="font-medium text-gray-100">{day.lunch}</span>
+    <a 
+      href={`https://www.pinterest.com/search/pins/?q=${encodeURIComponent(day.lunch + ' healthy recipe')}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-[10px] text-brand-primary hover:underline flex items-center gap-1 font-bold"
+    >
+      View Pinterest Search <ExternalLink className="w-2 h-2" />
+    </a>
+  </div>
+</td>
+<td className="px-4 py-4 border-r border-gray-800 text-gray-300">
+  <div className="flex flex-col gap-1">
+    <span className="font-medium text-gray-100">{day.dinner}</span>
+    <a 
+      href={`https://www.pinterest.com/search/pins/?q=${encodeURIComponent(day.dinner + ' healthy recipe')}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-[10px] text-brand-primary hover:underline flex items-center gap-1 font-bold"
+    >
+      View Pinterest Search <ExternalLink className="w-2 h-2" />
+    </a>
+  </div>
+</td>
+<td className="px-4 py-4 text-gray-300">
+  <div className="flex flex-col gap-1">
+    <span className="font-medium text-gray-100">{day.snack}</span>
+    <a 
+      href={`https://www.pinterest.com/search/pins/?q=${encodeURIComponent(day.snack + ' healthy idea')}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-[10px] text-brand-primary hover:underline flex items-center gap-1 font-bold"
+    >
+      View Pinterest Search <ExternalLink className="w-2 h-2" />
+    </a>
+  </div>
+</td>
                               </tr>
                                );
                              })}
@@ -2534,33 +2752,58 @@ export default function App() {
                               content += `\n`;
                             });
                             
-                            downloadFile('unlckd-grocery-list.txt', content);
+                            downloadFile('unlckd-master-grocery-list.txt', content);
                           }}
                           className="flex items-center gap-2 px-6 py-3 bg-brand-primary hover:bg-brand-primary/90 text-black rounded-lg text-sm font-bold transition-all transform hover:scale-105 shadow-lg shadow-brand-primary/20 active:scale-95 outline-none"
                         >
                           <Download className="w-4 h-4" />
-                          Download Checklist (.txt)
+                          Master List (.txt)
                         </button>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {[...new Set((report.groceryList || []).map(g => g.phase || 'General'))].map((phase, pIdx) => (
-                        <Card key={pIdx} className="bg-brand-surface border-gray-800 overflow-hidden">
-                          <div className="bg-brand-secondary/20 p-4 border-b border-gray-800">
+                        <Card key={pIdx} className="bg-brand-surface border-gray-800 overflow-hidden flex flex-col group">
+                          <div className="bg-brand-secondary/20 p-4 border-b border-gray-800 flex items-center justify-between">
                              <h4 className="font-bold text-brand-primary uppercase tracking-widest text-xs">{phase} Checklist</h4>
+                             <button 
+                               onClick={() => {
+                                 let content = `UNLCKD PRO TRAINER - GROCERY CHECKLIST\n`;
+                                 content += `PHASE: ${phase.toUpperCase()}\n`;
+                                 content += `==========================================\n\n`;
+                                 
+                                 const itemsInPhase = (report.groceryList || []).filter(g => (g.phase || 'General') === phase);
+                                 itemsInPhase.forEach(g => {
+                                   content += `${g.category.toUpperCase()}\n`;
+                                   content += `-----------------\n`;
+                                   const items = g.items.split(',').map(i => i.trim()).filter(i => i !== '');
+                                   items.forEach(item => {
+                                     content += `[ ] ${item}\n`;
+                                   });
+                                   content += `\n`;
+                                 });
+                                 
+                                 downloadFile(`unlckd-grocery-${phase.toLowerCase().replace(/\s+/g, '-')}.txt`, content);
+                               }}
+                               className="p-2 hover:bg-brand-primary/10 rounded-lg text-brand-primary transition-colors flex items-center gap-2 text-[10px] font-black uppercase tracking-tighter"
+                               title="Download this batch"
+                             >
+                               <Download className="w-3 h-3" />
+                               Save List
+                             </button>
                           </div>
-                          <div className="p-6 space-y-6">
+                          <div className="p-6 space-y-6 flex-1">
                             {(report.groceryList || []).filter(g => (g.phase || 'General') === phase).map((cat, cIdx) => (
                               <div key={cIdx} className="space-y-3">
                                 <h5 className="text-[10px] font-black uppercase text-gray-500 tracking-tighter transition-colors group-hover:text-brand-primary">{cat.category}</h5>
-                                <div className="grid grid-cols-1 gap-2">
+                                <div className="grid grid-cols-1 gap-1.5">
                                   {cat.items.split(',').map((item, iIdx) => (
-                                    <div key={iIdx} className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 group transition-all">
-                                      <div className="w-4 h-4 rounded border border-gray-700 flex items-center justify-center group-hover:border-brand-primary/40">
-                                        <div className="w-2 h-2 rounded-full bg-brand-primary scale-0 group-hover:scale-100 transition-transform" />
+                                    <div key={iIdx} className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 group/item transition-all">
+                                      <div className="w-4 h-4 rounded border border-gray-700 flex items-center justify-center group-hover/item:border-brand-primary/40">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-brand-primary scale-0 group-hover/item:scale-100 transition-transform" />
                                       </div>
-                                      <span className="text-xs text-gray-300 group-hover:text-white">{item.trim()}</span>
+                                      <span className="text-xs text-gray-300 group-hover/item:text-white leading-relaxed">{item.trim()}</span>
                                     </div>
                                   ))}
                                 </div>
@@ -2832,16 +3075,14 @@ export default function App() {
 
       <footer className="py-12 border-t border-gray-800 bg-brand-dark">
         <div className="max-w-7xl mx-auto px-4 text-center space-y-4">
-          <div 
-            className="flex items-center justify-center gap-2 opacity-50 cursor-pointer hover:opacity-100 transition-opacity group"
+          <Logo 
+            size="sm"
+            className="opacity-50 hover:opacity-100 justify-center"
             onClick={() => {
               setStep('landing');
               setActiveTab('reports');
             }}
-          >
-            <Dumbbell className="w-4 h-4 group-hover:scale-110 transition-transform" />
-            <span className="font-display font-bold text-sm tracking-tight group-hover:text-brand-primary transition-colors">UNLCKD Pro Trainer</span>
-          </div>
+          />
           <p className="text-xs text-gray-600">
             © 2026 UNLCKD Pro Trainer. AI-generated assessments are for informational purposes only. Consult a professional before starting any new fitness or nutrition program.
           </p>
@@ -2948,6 +3189,19 @@ export default function App() {
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showLinkAudit && (
+          <LinkAuditModal 
+            isOpen={showLinkAudit} 
+            onClose={() => setShowLinkAudit(false)} 
+            report={report} 
+            onFix={(context) => {
+              setShowLinkAudit(false);
+              processReport(true, context);
+            }}
+          />
         )}
       </AnimatePresence>
     </div>

@@ -122,6 +122,9 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 8, delay = 10000): P
       errorMsg.includes('high demand') ||
       errorMsg.includes('504') ||
       errorMsg.includes('deadline exceeded') ||
+      errorMsg.includes('rpc failed') ||
+      errorMsg.includes('xhr error') ||
+      errorMsg.includes('status: unknown') ||
       error.status === 'UNAVAILABLE' ||
       errorMsg.includes('fetch failed');
 
@@ -277,7 +280,7 @@ async function generateHealthAndSupport(
     FOCUS: 
     1. Health Metrics (BMI, Body Fat, Calorie Targets).
     2. Daily Life (Sleep, Water, Steps).
-    ${includeGrocery ? `3. Comprehensive Nutrition strategy for the full 12-week duration. 4. Grocery store recommendation. 5. EXHAUSTIVE Grocery Checklist divided into 2-week blocks (e.g., 'Weeks 1-2', 'Weeks 3-4', 'Weeks 5-6', 'Weeks 7-8', 'Weeks 9-10', 'Weeks 11-12'). Every single ingredient for each 2-week meal plan segment MUST be listed with exact quantities and brands where applicable.
+    ${includeGrocery ? `3. Comprehensive Nutrition strategy for the full 12-week duration. This strategy MUST reference at least 5 key specific meals or ingredients that appear in the meal plan, including their names and verified links. 4. Grocery store recommendation.` : "3. Motivation and general Nutrition strategies."}
     
     UNIT ALIGNMENT: 
     - If user weight is in 'lbs', use US Imperial units for food: oz, lbs, cups, tsp, tbsp.
@@ -285,9 +288,9 @@ async function generateHealthAndSupport(
     The user's weight unit is: ${userData.weightUnit || 'lbs'}.
     
     LINK QUALITY PROTOCOL:
-    - For exercise demonstrations, ONLY use: https://www.youtube.com/results?search_query=[EXERCISE+NAME]+demonstration
-    - Never hallucinate specific video IDs.
-    - For nutrition links, only use high-authority domains (e.g., bodybuilding.com, healthline.com, examine.com).` : "3. Motivation and general Nutrition strategies."}
+    - For EVERY exercise demonstration mentioned, you MUST use this YouTube search link: https://www.youtube.com/results?search_query=[EXERCISE+NAME]+exercise+tutorial
+    - For EVERY nutrition or recipe mention, you MUST use this Pinterest search link: https://www.pinterest.com/search/pins/?q=[MEAL+NAME]+healthy+recipe
+    - NEVER provide direct URLs to specific websites or video IDs. ALWAYS use the search result links above.
   `;
 
   const response = await withRetry(() => ai.models.generateContent({
@@ -296,19 +299,17 @@ async function generateHealthAndSupport(
     config: {
       systemInstruction: `
         You are a master performance nutritionist. Return ONLY valid JSON.
-        GROCERY LIST PROTOCOL:
-        1. Accuracy: The grocery list must perfectly match 100% of the meals recommended in the corresponding weeks. 
-        2. Format: Divide into 2-week blocks using the "phase" field (e.g., "Weeks 1-2", "Weeks 3-4"). Provide 6 blocks for a 12-week plan.
-        3. Specifics: Include exact quantities (e.g., "700g Salmon" or "24 oz Steak", "2 Bags Spinach", "1 Bottle Olive Oil").
-        4. Unit Consistency: Use ${userData.weightUnit === 'lbs' ? 'US Imperial (oz, lbs, cups, tbsp)' : 'Metric (g, kg, ml, l)'} for ALL food measurements.
-        5. Exhaustiveness: If a user buys only these items, they must be able to cook every meal in that 2-week block.
-        6. Grouping: Use logical categories like "Protein", "Vegetables", "Staples/Spices", "Dairy".
-        7. Total Coverage: You MUST cover all 12 weeks of the plan in these blocks.
-        8. Limits: Each text field under 100 characters. No markdown in JSON values.
         
         NUTRITION PROTOCOL:
         - When recommending meals, ensure quantities align with the unit system: ${userData.weightUnit === 'lbs' ? 'oz/lbs' : 'grams/kg'}.
-        - Ensure all links follow the results search pattern or use known high-authority URLs.
+        - Every single meal or ingredient mentioned in your summaries/strategies MUST be a specific, individually listed item that will appear in the final plan.
+        - NEVER use generic advice. Reference at least 5-7 specific meals by name and provide their verified search links using the pattern [Meal Name](SearchURL).
+        - Use the search tool to verify every single meal link leads to a high-quality recipe.
+        
+        WORKOUT PROTOCOL:
+        - When discussing training strategy, reference specific, individual exercises (e.g., "Incorporate [Romanian Deadlifts](VideoURL) for posterior chain...").
+        - Link to verified demonstrations for every exercise mentioned.
+        - Ensure all references are to individual movements, NOT generic "workout focuses".
       `,
       responseMimeType: "application/json",
       tools: [{ googleSearch: {} }],
@@ -348,18 +349,6 @@ async function generateHealthAndSupport(
             required: ["duration", "rationale", "tips"],
           },
           recommendedGroceryStore: { type: Type.STRING },
-          groceryList: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                phase: { type: Type.STRING },
-                category: { type: Type.STRING },
-                items: { type: Type.STRING },
-              },
-              required: ["phase", "category", "items"],
-            },
-          },
           hydrationTargets: { type: Type.STRING },
           waterSchedule: { type: Type.ARRAY, items: { type: Type.STRING } },
           stepGoals: { type: Type.STRING },
@@ -424,7 +413,6 @@ async function generateHealthAndSupport(
           "healthMetrics", 
           "motivationalQuote", 
           "sleepRecommendation", 
-          "groceryList", 
           "hydrationTargets", 
           "stepGoals", 
           "nutritionStrategy", 
@@ -448,7 +436,8 @@ async function generateHealthAndSupport(
  */
 async function generateWorkoutPlan(
   userData: UserData,
-  isResubmit: boolean
+  isResubmit: boolean,
+  invalidLinksContext?: string
 ): Promise<Partial<AssessmentResult>> {
   const workoutPlan: any[] = [];
   
@@ -458,16 +447,24 @@ async function generateWorkoutPlan(
       User: ${userData.name}, Goal: ${userData.goals}.
       Current Range: Weeks ${startWeek}-${endWeek}.
       
-      CRITICAL: You MUST use the search tool to find and verify active, non-broken YouTube video links.
-      ONLY use videos from established, high-authority fitness channels: "Renaissance Periodization", "Jeff Nippard", "Squat University", "Athlean-X", "ScottHermanFitness", "Mind Pump TV", "Buff Dudes", "Alan Thrall", "Bodybuilding.com". 
-      Avoid "Shorts", deleted videos, or private clips. Every videoUrl MUST be a high-accuracy, reliable tutorial.
-      If a specific video is hard to verify, provide a high-quality link from a major fitness publication (e.g., Men's Health, Muscle & Fitness).
-      Every videoUrl MUST be a direct, working link.
+      ${invalidLinksContext ? `FIX MODE: The following links from a previous generation were flagged as invalid or problematic. Please search for BETTER, high-quality alternatives for these specific movements/recipes:\n${invalidLinksContext}` : ""}
+
+      LINK QUALITY PROTOCOL:
+      - For EVERY exercise (warmUp and mainWork), you MUST set "videoUrl" to a YouTube search result link: https://www.youtube.com/results?search_query=[EXERCISE+NAME]+exercise+tutorial
+      - Replace [EXERCISE+NAME] with the actual name of the exercise, URL-encoded where necessary.
+      - NEVER provide direct URLs to specific YouTube videos or hallucinate video IDs.
       
-      EVERY exercise MUST be formatted as "[Name (Sets x Reps)](YouTube Link)".
-      CRITICAL: Use a NEW LINE (\n) for EACH exercise in the "mainWork" and "warmUp" strings. 
-      Every exercise must be on its own row. Do not group multiple exercises into a single paragraph or string without newlines.
-      Return exactly ${endWeek - startWeek + 1} week objects in the workoutPlan array.
+      STRUCTURE & COMPLETENESS:
+      - Each week MUST contain exactly 7 day objects (Monday through Sunday).
+      - EVERY single training day MUST contain ONLY individual exercises (no summary focus blocks).
+      - EVERY single training day MUST have at least 3-5 warmUp exercises and 5-8 mainWork exercises.
+      - NEVER use placeholders like "Repeat Week 1" or "Same as Day 1". 
+      - Every exercise MUST have a unique, non-generic name (e.g., "Barbell High Bar Squat" instead of just "Squat").
+      - Every single exercise object MUST have a verified, non-empty videoUrl.
+      - warmUp: Array of objects { name, videoUrl }
+      - mainWork: Array of objects { name, sets, reps, videoUrl }
+      
+      Return exactly ${endWeek - startWeek + 1} week objects in the workoutPlan array, with 7 days in each week.
     `;
 
     try {
@@ -476,10 +473,8 @@ async function generateWorkoutPlan(
         contents: prompt,
         config: {
           systemInstruction: `Expert S&C Coach. JSON only. 
-          QUALITY CHECK PROTOCOL: Every videoUrl MUST be a verified, active YouTube tutorial from high-authority sources (e.g., "Renaissance Periodization", "Jeff Nippard", "Squat University", "Athlean-X", "ScottHermanFitness").
-          Use the search tool for EVERY exercise to ensure the link works and is NOT a short, private video, or "Video Unavailable".
-          If a link is broken or restricted, search again for a reliable alternative.
-          If no perfect video exists, use a reputable fitness article with a clear demonstration.
+          QUALITY CHECK PROTOCOL: Every videoUrl MUST be a formatted YouTube search result link as specified in the prompt.
+          Do NOT provide direct links to specific YouTube videos.
           Ensure exact requested weeks are provided.`,
           responseMimeType: "application/json",
           tools: [{ googleSearch: {} }],
@@ -500,13 +495,33 @@ async function generateWorkoutPlan(
                         type: Type.OBJECT,
                         properties: {
                           day: { type: Type.STRING },
-                          focus: { type: Type.STRING },
-                          warmUp: { type: Type.STRING },
-                          mainWork: { type: Type.STRING },
-                          videoUrl: { type: Type.STRING },
+                          warmUp: {
+                            type: Type.ARRAY,
+                            items: {
+                              type: Type.OBJECT,
+                              properties: {
+                                name: { type: Type.STRING },
+                                videoUrl: { type: Type.STRING }
+                              },
+                              required: ["name", "videoUrl"]
+                            }
+                          },
+                          mainWork: {
+                            type: Type.ARRAY,
+                            items: {
+                              type: Type.OBJECT,
+                              properties: {
+                                name: { type: Type.STRING },
+                                sets: { type: Type.STRING },
+                                reps: { type: Type.STRING },
+                                videoUrl: { type: Type.STRING }
+                              },
+                              required: ["name", "sets", "reps", "videoUrl"]
+                            }
+                          },
                           notes: { type: Type.STRING },
                         },
-                        required: ["day", "focus", "warmUp", "mainWork", "videoUrl", "notes"],
+                        required: ["day", "warmUp", "mainWork", "notes"],
                       },
                     },
                   },
@@ -527,14 +542,16 @@ async function generateWorkoutPlan(
     }
   };
 
-  // Process in 3 batches of 4 weeks to reduce request count and stay within search tool quotas
-  const batches = [[1, 4], [5, 8], [9, 12]];
+  // Process in 12 batches of 1 week to stay within search tool quotas and prevent RPC timeouts
+  const batches = Array.from({ length: 12 }, (_, i) => [i + 1, i + 1]);
   
   for (const [start, end] of batches) {
     const batch = await fetchBatch(start, end);
-    workoutPlan.push(...batch);
+    if (batch && Array.isArray(batch)) {
+      workoutPlan.push(...batch);
+    }
     // Significant cooling delay between search-heavy batches
-    await new Promise(resolve => setTimeout(resolve, 8000));
+    await new Promise(resolve => setTimeout(resolve, 10000));
   }
 
   return { workoutPlan: workoutPlan.sort((a, b) => a.week - b.week) };
@@ -545,7 +562,8 @@ async function generateWorkoutPlan(
  */
 async function generateMealPlan(
   userData: UserData,
-  isResubmit: boolean
+  isResubmit: boolean,
+  invalidLinksContext?: string
 ): Promise<Partial<AssessmentResult>> {
   const mealPlan: any[] = [];
 
@@ -554,10 +572,18 @@ async function generateMealPlan(
       Generate Weeks ${startWeek} through ${endWeek} of a personalized 12-week meal plan for UNLCKD Pro Trainer.
       User: ${userData.name}, Preferences: ${userData.caloriePreference}, Allergies: ${userData.allergies}.
       
-      CRITICAL: You MUST use the search tool to find and verify direct, active recipe links.
-      Prefer links from verified recipe developers: "Skinnytaste", "Minimalist Baker", "EatingWell", "AllRecipes", "Food Network", "Simply Recipes", "Serious Eats".
-      While Pinterest pins are okay, direct website links (e.g., https://www.skinnytaste.com/xyz) are STRONGLY PREFERRED as they are more stable.
-      Avoid login-walled sites or dead Pinterest IDs. Every meal URL MUST lead to a live, readable recipe.
+      ${invalidLinksContext ? `FIX MODE: The following links from a previous generation were flagged as invalid or problematic. Please search for BETTER, high-quality alternatives for these specific meals:\n${invalidLinksContext}` : ""}
+
+      LINK QUALITY PROTOCOL:
+      - For EVERY meal recommendation, you MUST set the corresponding URL field (breakfastUrl, lunchUrl, dinnerUrl, snackUrl) to a Pinterest search result link: https://www.pinterest.com/search/pins/?q=[MEAL+NAME]+healthy+recipe
+      - Replace [MEAL+NAME] with the actual name of the meal, URL-encoded where necessary.
+      - NEVER provide direct URLs to specific recipe websites. 
+      
+      COMPLETENESS & VARIETY:
+      - EVERY single day MUST have unique breakfast, lunch, dinner, and snack recommendations.
+      - NEVER say "Leftovers" or "Eat same as Day 1". 
+      - Every meal MUST have a specific name and a corresponding verified recipe URL.
+      - Macros MUST be realistic for the specific meal name provided.
       
       Current Range: Weeks ${startWeek}-${endWeek}.
       Return exactly ${endWeek - startWeek + 1} week objects in the mealPlan array.
@@ -569,10 +595,8 @@ async function generateMealPlan(
         contents: prompt,
         config: {
           systemInstruction: `Elite Nutritionist. JSON only. 
-          QUALITY CHECK PROTOCOL: Every URL MUST be a direct, active recipe link (Direct website URLs are preferred over Pinterest).
-          Use the search tool to verify every link leads to a live recipe. NO broken links, NO login walls, NO "Page Not Found".
-          NEVER guess a URL or Pin ID.
-          The grocery list (generated separately) will be cross-referenced, so ensure these recipes are standard and realistic.
+          QUALITY CHECK PROTOCOL: Every meal URL MUST be a formatted Google search result link as specified in the prompt.
+          Do NOT provide direct links to specific recipe websites.
           Ensure exact requested weeks are provided.`,
           responseMimeType: "application/json",
           tools: [{ googleSearch: {} }],
@@ -626,24 +650,88 @@ async function generateMealPlan(
     }
   };
 
-  // Process in 3 batches of 4 weeks to reduce request count
-  const batches = [[1, 4], [5, 8], [9, 12]];
+  // Process in 6 batches of 2 weeks to reduce request count and prevent RPC timeouts
+  const batches = [[1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12]];
 
   for (const [start, end] of batches) {
     const batch = await fetchBatch(start, end);
     mealPlan.push(...batch);
     // Significant cooling delay between search-heavy batches
-    await new Promise(resolve => setTimeout(resolve, 8000));
+    await new Promise(resolve => setTimeout(resolve, 10000));
   }
 
   return { mealPlan: mealPlan.sort((a, b) => a.week - b.week) };
+}
+
+async function generateBatchGroceryList(
+  userData: UserData,
+  mealPlan: any[],
+  startWeek: number,
+  endWeek: number
+): Promise<any[]> {
+  const model = "gemini-flash-latest";
+  
+  // Extract specific meals for the requested context
+  const relevantWeeks = mealPlan.filter(w => w.week >= startWeek && w.week <= endWeek);
+  
+  const prompt = `
+    Generate a high-accuracy, exhaustive Grocery Checklist for Weeks ${startWeek}-${endWeek} of the "UNLCKD Pro Trainer" program.
+    
+    CONTEXT (Specific Meals planned for these weeks):
+    ${JSON.stringify(relevantWeeks, null, 2)}
+    
+    CRITICAL ACCURACY PROTOCOL:
+    1. WORD-BY-WORD AUDIT: You MUST scan every single meal title in the provided context (e.g., "Greek Yogurt with Mixed Berries and Sliced Almonds"). Extract EVERY noun. In this example, "Greek Yogurt", "Mixed Berries", and "Almonds" MUST appear on the list.
+    2. ZERO-MISS POLICY: Every single ingredient required to cook 100% of the meals listed in the context above MUST be included. If a meal says "Egg White Omelet with Spinach and Feta", the list MUST contain: Egg Whites, Spinach, and Feta Cheese. No exceptions.
+    3. RAW INGREDIENT MAPPING: Break down every meal into its base components. For example, "Healthy Blueberry Oatmeal with Flaxseeds" must result in: Blueberries, Oats/Oatmeal, and Flaxseeds.
+    4. QUANTITY CALCULATIONS: Calculate total quantities for the entire 2-week period based on serving sizes and frequencies. Sum up repeating items (e.g., if chicken is used in 4 meals across the weeks, provide the TOTAL weight needed).
+    5. PRECISE MEASUREMENTS: Use ${userData.weightUnit === 'lbs' ? 'US Imperial (oz, lbs, cups, tsp, tbsp)' : 'Metric (g, kg, ml, l)'} for every item.
+    6. GROUPED BY CATEGORY: Use strict categories: "Protein (Meat/Fish/Eggs)", "Produce (Vegetables & Fruits)", "Dairy & Cheese", "Grains, Nuts & Seeds", "Fats, Oils & Spices", "Pantry Staples".
+    7. NO SUMMARIES: Do not skip items by grouping them as "assorted veggies". List each specific vegetable mentioned in the meal plan (e.g., "Kale, Spinach, Bell Peppers").
+    8. HIDDEN INGREDIENTS: If a meal name implies a sauce (e.g., "Taco Bowls"), include the necessary spices (Cumin, Chili Powder) or toppings (Salsa, Lime).
+    
+    JSON STRUCTURE:
+    Return an array of objects for the "groceryList" field:
+    { "phase": "Weeks ${startWeek}-${endWeek}", "category": "Protein|Produce|Dairy|Grains|Staples", "items": "Exhaustive list of items with quantities" }
+  `;
+
+  const response = await withRetry(() => ai.models.generateContent({
+    model,
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    config: {
+      systemInstruction: "Expert Nutritionist. Exhaustive ingredient indexing. Return valid JSON only.",
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          groceryList: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                phase: { type: Type.STRING },
+                category: { type: Type.STRING },
+                items: { type: Type.STRING },
+              },
+              required: ["phase", "category", "items"],
+            },
+          },
+        },
+        required: ["groceryList"],
+      },
+    },
+  }));
+
+  const data = safeParseJson(response.text || "{}");
+  return data.groceryList || [];
 }
 
 export async function generateTransformationReport(
   userData: UserData,
   photos: Photos | ProgressPhotos,
   path: string,
-  isResubmit: boolean = false
+  isResubmit: boolean = false,
+  invalidLinksContext?: string
 ): Promise<AssessmentResult> {
   // Truncate goals if extremely long
   const cleanUserData = {
@@ -674,7 +762,7 @@ export async function generateTransformationReport(
         console.log("Generating 12-week workout plan...");
         // Cooldown after previous search-heavy steps
         await new Promise(resolve => setTimeout(resolve, 5000));
-        const workout = await generateWorkoutPlan(cleanUserData, isResubmit);
+        const workout = await generateWorkoutPlan(cleanUserData, isResubmit, invalidLinksContext);
         result = { ...result, ...workout };
       } catch (e) {
         console.error("Workout generation failed:", e);
@@ -688,8 +776,23 @@ export async function generateTransformationReport(
         console.log("Generating 12-week meal plan...");
         // Cooldown after previous search-heavy steps
         await new Promise(resolve => setTimeout(resolve, 5000));
-        const meal = await generateMealPlan(cleanUserData, isResubmit);
-        result = { ...result, ...meal };
+        const mealResult = await generateMealPlan(cleanUserData, isResubmit, invalidLinksContext);
+        result = { ...result, ...mealResult };
+        
+        // 4. GENERATE BATCHED GROCERY LISTS (Post-meal plan)
+        if (mealResult.mealPlan && mealResult.mealPlan.length > 0) {
+          console.log("Generating high-accuracy batched grocery lists...");
+          const groceryBatches = [[1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12]];
+          const allGroceries: any[] = [];
+          
+          for (const [start, end] of groceryBatches) {
+            console.log(`Generating groceries for weeks ${start}-${end}...`);
+            const batch = await generateBatchGroceryList(cleanUserData, mealResult.mealPlan, start, end);
+            allGroceries.push(...batch);
+            await new Promise(resolve => setTimeout(resolve, 3000)); // Small delay between grocery batches
+          }
+          result.groceryList = allGroceries;
+        }
       } catch (e) {
         console.error("Meal generation failed:", e);
         throw new Error(`Meal plan generation failed: ${e instanceof Error ? e.message : 'Unknown error'}`);

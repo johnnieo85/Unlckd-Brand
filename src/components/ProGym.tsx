@@ -61,7 +61,7 @@ import { Input } from './ui/Input';
 import { gymService } from '../services/gymService';
 import { DailyLog, SavedReport, Measurement, UserProfile, Badge as UserBadge } from '../types';
 import { cn, downloadFile, getLocalDateString, parseLocalDate } from '../lib/utils';
-import { getDailyQuote } from '../constants/quotes';
+import { getWeeklyQuote } from '../constants/quotes';
 import { updateGymPin, updateUserProfile } from '../services/accessService';
 import { 
   LineChart, 
@@ -171,6 +171,24 @@ const Ring = ({
 
 const getWeeklyQuoteInternal = () => {
   return getWeeklyQuote();
+};
+
+const getSearchUrl = (title: string, category: 'Workouts' | 'Nutrition') => {
+  // Enhanced cleaning to handle cases like "W1 Friday Session" or other session-only titles
+  const cleanTitle = title
+    .replace(/^W\d+.*?(Session|Workout|Day\s+\d+).*?:?\s*/i, '') // Remove batch prefixes
+    .replace(/^(Warm-up|MainWork|Primary|Sequence):\s*/i, '')   // Remove section headers
+    .trim();
+  
+  // If the result is just a date-like or session-like string, it's not an exercise
+  if (!cleanTitle || /^(Week|Day|Session|Workout)\s*\d*$/i.test(cleanTitle)) {
+    return '#'; 
+  }
+
+  if (category === 'Workouts') {
+    return `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanTitle + ' exercise demonstration')}`;
+  }
+  return `https://www.pinterest.com/search/pins/?q=${encodeURIComponent(cleanTitle + ' healthy recipe')}`;
 };
 
 export const ProGym = ({ 
@@ -388,8 +406,8 @@ export const ProGym = ({
     const workout = getWorkoutForSelectedDate() as any;
     if (!workout) return { completed: 0, total: 0 };
     
-    const warmUp = (workout.warmUp || workout.warmUpSequence || '').split(/,|\n/).filter((l: string) => l.trim());
-    const mainWork = (workout.mainWork || workout.mainWorkout || '').split('\n').filter((l: string) => l.trim());
+    const warmUp = Array.isArray(workout.warmUp) ? workout.warmUp : (workout.warmUp || workout.warmUpSequence || '').split(/,|\n/).filter((l: string) => l.trim());
+    const mainWork = Array.isArray(workout.mainWork) ? workout.mainWork : (workout.mainWork || workout.mainWorkout || '').split('\n').filter((l: string) => l.trim());
     
     const total = warmUp.length + mainWork.length;
     let completed = 0;
@@ -491,13 +509,21 @@ export const ProGym = ({
 
   const importWorkoutFromPlan = async () => {
     if (!latestReport || !log) return;
-    const workout = getWorkoutForSelectedDate();
+    const workout = getWorkoutForSelectedDate() as any;
     if (!workout || workout.day === 'Manual Entry') return;
+
+    const warmUpStr = Array.isArray(workout.warmUp) 
+      ? workout.warmUp.map((ex: any) => `${ex.name} (${ex.videoUrl})`).join('\n')
+      : (workout.warmUp || '');
+      
+    const mainWorkStr = Array.isArray(workout.mainWork)
+      ? workout.mainWork.map((ex: any) => `${ex.name} [${ex.sets}x${ex.reps}] (${ex.videoUrl})`).join('\n')
+      : (workout.mainWork || '');
 
     const updatedManual = {
       focus: workout.focus || '',
-      warmUp: workout.warmUp || '',
-      mainWork: workout.mainWork || ''
+      warmUp: warmUpStr,
+      mainWork: mainWorkStr
     };
     const updatedLog = { ...log, manualWorkout: updatedManual, useManualWorkout: true };
     setLog(updatedLog);
@@ -604,8 +630,17 @@ export const ProGym = ({
   const mealDay = getMealsForSelectedDate();
 
   // Helper to parse exercise name, sets, and reps
-  const parseExercise = (rawEx: string) => {
-    const rawText = rawEx.trim().replace(/^[-*]\s*/, '');
+  const parseExercise = (rawEx: any) => {
+    if (rawEx && typeof rawEx === 'object') {
+      return {
+        name: rawEx.name,
+        sets: rawEx.sets || '',
+        reps: rawEx.reps || '',
+        url: rawEx.videoUrl || ''
+      };
+    }
+    
+    const rawText = String(rawEx || '').trim().replace(/^[-*]\s*/, '');
     
     // Extract URL
     const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -2144,22 +2179,21 @@ export const ProGym = ({
                       const dayName = dayDate.toLocaleDateString('en-US', { weekday: 'long' });
                       let content = `UNLCKD PRO TRAINING - ${dayName.toUpperCase()}\n`;
                       content += `==========================================\n\n`;
-                      content += `FOCUS: ${workoutDay.focus || 'N/A'}\n\n`;
                       
                       content += `WARM-UP SEQUENCE:\n`;
                       content += `-----------------\n`;
-                      const warmUpLines = (workoutDay.warmUp || '').split(/,|\n/).filter((l: string) => l.trim());
-                      warmUpLines.forEach((l: string) => {
+                      const warmUpLines = Array.isArray(workoutDay.warmUp) ? workoutDay.warmUp : (typeof workoutDay.warmUp === 'string' ? workoutDay.warmUp : '').split(/,|\n/).filter((l: any) => typeof l === 'string' && l.trim());
+                      warmUpLines.forEach((l: any) => {
                         const { name, sets, reps } = parseExercise(l);
-                        content += `- ${name} (${sets} x ${reps})\n`;
+                        content += `- ${name} ${sets ? `(${sets} x ${reps})` : ''}\n`;
                       });
                       
                       content += `\nMAIN WORKOUT:\n`;
                       content += `-------------\n`;
-                      const mainWorkLines = (workoutDay.mainWork || '').split(/,|\n/).filter((l: string) => l.trim());
-                      mainWorkLines.forEach((l: string) => {
+                      const mainWorkLines = Array.isArray(workoutDay.mainWork) ? workoutDay.mainWork : (typeof workoutDay.mainWork === 'string' ? workoutDay.mainWork : '').split(/,|\n/).filter((l: any) => typeof l === 'string' && l.trim());
+                      mainWorkLines.forEach((l: any) => {
                         const { name, sets, reps } = parseExercise(l);
-                        content += `- ${name} (${sets} x ${reps})\n`;
+                        content += `- ${name} ${sets ? `(${sets} x ${reps})` : ''}\n`;
                       });
 
                       if (workoutDay.notes) {
@@ -2226,26 +2260,13 @@ export const ProGym = ({
                 <div className="space-y-4 mb-4">
                   <div className="p-4 bg-brand-primary/5 border border-brand-primary/20 rounded-xl">
                     <p className="text-xs font-bold text-brand-primary mb-2">Manual Entry Mode</p>
-                    <p className="text-[10px] text-brand-primary/60">Customize your training focus below. Add exercises directly in the tables below.</p>
+                    <p className="text-[10px] text-brand-primary/60">Add exercises directly in the tables below.</p>
                   </div>
-                  <Input 
-                    label="Today's Training Focus"
-                    placeholder="e.g. Hypertrophy: Chest & Back"
-                    value={log.manualWorkout?.focus || ''}
-                    onChange={(e) => updateManualWorkout('focus', e.target.value)}
-                  />
                 </div>
               )}
 
               {!(log?.useManualWorkout || !latestReport) && (
                 <div className="p-6 bg-white/[0.02] rounded-2xl border border-white/5">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Info className="w-4 h-4 text-brand-primary" />
-                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Focus & Objectives</span>
-                  </div>
-                  <p className="text-sm text-gray-300 leading-relaxed font-bold text-brand-primary">
-                    DAILY FOCUS: {workoutDay?.focus}
-                  </p>
                   <p className="text-xs text-gray-400 mt-2 leading-relaxed italic">
                     {workoutDay?.notes || latestReport?.report.goalAlignmentSummary}
                   </p>
@@ -2296,7 +2317,7 @@ export const ProGym = ({
                           </tr>
                         </thead>
                         <tbody className="text-xs">
-                          {(workoutDay?.warmUp || 'Dynamic mobility flow, Walking lunges').split(/,|\n/).filter(line => line.trim()).map((ex, i) => {
+                          {(Array.isArray(workoutDay?.warmUp) ? workoutDay.warmUp : (typeof workoutDay?.warmUp === 'string' ? workoutDay.warmUp : '').split(/,|\n/).filter(line => typeof line === 'string' && line.trim())).map((ex, i) => {
                             const { name, sets, reps, url } = parseExercise(ex);
                             const exerciseId = `warmup-${i}`;
                             const isCompleted = log?.workoutData?.[exerciseId]?.completed || false;
@@ -2333,13 +2354,16 @@ export const ProGym = ({
                                         <Minus className="w-3 h-3" />
                                       </button>
                                     </div>
-                                  ) : url ? (
-                                    <a href={url} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                                      {name}
-                                    </a>
                                   ) : (
-                                    name
-                                  )}
+  <a 
+    href={getSearchUrl(name, 'Workouts')} 
+    target="_blank" 
+    rel="noopener noreferrer" 
+    className="hover:underline flex items-center gap-1"
+  >
+    {name} <ExternalLink className="w-2.5 h-2.5 opacity-50" />
+  </a>
+)}
                                 </td>
                                 <td className="py-3 px-2">
                                   <input 
@@ -2413,7 +2437,7 @@ export const ProGym = ({
                         </tr>
                       </thead>
                       <tbody className="text-sm">
-                        {(workoutDay?.mainWork || '').split('\n').filter(line => line.trim()).map((ex, i) => {
+                        {(Array.isArray(workoutDay?.mainWork) ? workoutDay.mainWork : (typeof workoutDay?.mainWork === 'string' ? workoutDay.mainWork : '').split('\n').filter(line => typeof line === 'string' && line.trim())).map((ex, i) => {
                           const exerciseId = `main-${i}`;
                           const isCompleted = log?.workoutData?.[exerciseId]?.completed || false;
                           const { name, sets, reps, url } = parseExercise(ex);
@@ -2452,22 +2476,18 @@ export const ProGym = ({
                                     </div>
                                   ) : (
                                     <div className="flex items-center gap-3">
-                                      <div className="w-6 h-6 rounded-md bg-white/5 flex items-center justify-center">
-                                        <Dumbbell className="w-3 h-3 text-gray-600" />
-                                      </div>
-                                      {url ? (
-                                        <a 
-                                          href={url} 
-                                          target="_blank" 
-                                          rel="noopener noreferrer"
-                                          className="text-brand-primary font-bold hover:underline"
-                                        >
-                                          {name}
-                                        </a>
-                                      ) : (
-                                        <span className="font-bold text-brand-primary">{name}</span>
-                                      )}
-                                    </div>
+  <div className="w-6 h-6 rounded-md bg-white/5 flex items-center justify-center">
+    <Dumbbell className="w-3 h-3 text-gray-600" />
+  </div>
+  <a 
+    href={getSearchUrl(name, 'Workouts')} 
+    target="_blank" 
+    rel="noopener noreferrer"
+    className="text-brand-primary font-bold hover:underline flex items-center gap-1"
+  >
+    {name} <ExternalLink className="w-2.5 h-2.5 opacity-50" />
+  </a>
+</div>
                                   )}
                                </td>
                               <td className="py-4 px-4">
@@ -2648,13 +2668,14 @@ export const ProGym = ({
                           ) : (
                             <>
                               <span className="text-[10px] uppercase font-black text-gray-500 mb-1">{meal.type}</span>
-                              {meal.url ? (
-                                <a href={meal.url} target="_blank" rel="noopener noreferrer" className="text-brand-primary font-bold hover:underline">
-                                  {meal.name}
-                                </a>
-                              ) : (
-                                <span className="text-brand-primary font-bold">{meal.name}</span>
-                              )}
+                              <a 
+                                href={getSearchUrl(meal.name, 'Nutrition')} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="text-brand-primary font-bold hover:underline flex items-center gap-1"
+                              >
+                                {meal.name} <ExternalLink className="w-2.5 h-2.5 opacity-50" />
+                              </a>
                             </>
                           )}
                         </div>
