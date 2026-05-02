@@ -304,10 +304,18 @@ export const gymService = {
       };
 
       if (workout) {
+        const warmUpStr = Array.isArray(workout.warmUp) 
+          ? workout.warmUp.map((ex: any) => `${ex.name} (${ex.videoUrl})`).join('\n')
+          : (workout.warmUp || '');
+          
+        const mainWorkStr = Array.isArray(workout.mainWork)
+          ? workout.mainWork.map((ex: any) => `${ex.name} [${ex.sets}x${ex.reps}] (${ex.videoUrl})`).join('\n')
+          : (workout.mainWork || '');
+
         updates.manualWorkout = {
           focus: workout.focus || '',
-          warmUp: workout.warmUp || '',
-          mainWork: workout.mainWork || ''
+          warmUp: warmUpStr,
+          mainWork: mainWorkStr
         };
       }
 
