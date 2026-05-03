@@ -257,8 +257,12 @@ export const ProGym = ({
 
   useEffect(() => {
     if (userProfile?.userId) {
-      const unlocked = sessionStorage.getItem(`gym_hub_unlocked_${userProfile.userId}`) === 'true';
-      if (unlocked) setIsHubUnlocked(true);
+      try {
+        const unlocked = sessionStorage.getItem(`gym_hub_unlocked_${userProfile.userId}`) === 'true';
+        if (unlocked) setIsHubUnlocked(true);
+      } catch (e) {
+        console.warn("Storage access denied for Gym Hub unlock state:", e);
+      }
     }
   }, [userProfile?.userId]);
   
@@ -1296,7 +1300,11 @@ export const ProGym = ({
     if (!userProfile) return;
     if (pinEntry.trim() === userProfile.gymPin?.toString().trim()) {
       setIsHubUnlocked(true);
-      sessionStorage.setItem(`gym_hub_unlocked_${userProfile.userId}`, 'true');
+      try {
+        sessionStorage.setItem(`gym_hub_unlocked_${userProfile.userId}`, 'true');
+      } catch (e) {
+        console.warn("Storage access denied for Gym Hub unlock:", e);
+      }
       setError('');
     } else {
       setError('Incorrect PIN. Please try again.');
@@ -1319,7 +1327,11 @@ export const ProGym = ({
       await updateGymPin(userProfile.userId, pinSetup.pin.trim());
       setIsHubUnlocked(true);
       setIsSettingPin(false);
-      sessionStorage.setItem(`gym_hub_unlocked_${userProfile.userId}`, 'true');
+      try {
+        sessionStorage.setItem(`gym_hub_unlocked_${userProfile.userId}`, 'true');
+      } catch (e) {
+        console.warn("Storage access denied for Gym Hub unlock:", e);
+      }
       setError('');
       if (onProfileUpdate) onProfileUpdate();
       // In a real app, you might want to refresh the profile state here
@@ -1587,7 +1599,11 @@ export const ProGym = ({
               className="h-10 w-10 md:h-11 md:w-11 bg-white/5 border-white/10 hover:bg-white/10 rounded-xl md:rounded-2xl shrink-0"
               onClick={() => {
                 setIsHubUnlocked(false);
-                sessionStorage.removeItem(`gym_hub_unlocked_${userProfile?.userId}`);
+                try {
+                  sessionStorage.removeItem(`gym_hub_unlocked_${userProfile?.userId}`);
+                } catch (e) {
+                  console.warn("Storage access denied for Gym Hub lock:", e);
+                }
               }}
               title="Lock Hub"
             >

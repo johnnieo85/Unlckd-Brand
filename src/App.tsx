@@ -635,6 +635,21 @@ export default function App() {
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [showSafariShield, setShowSafariShield] = useState(false);
+  const [isStorageBlocked, setIsStorageBlocked] = useState(false);
+
+  useEffect(() => {
+    // Check if localStorage is available
+    try {
+      const test = 'test';
+      localStorage.setItem(test, test);
+      localStorage.removeItem(test);
+      setIsStorageBlocked(false);
+    } catch (e) {
+      console.warn("Local storage is blocked by browser security settings.");
+      setIsStorageBlocked(true);
+      setShowSafariShield(true);
+    }
+  }, []);
 
   useEffect(() => {
     // Detect Safari security errors globally
@@ -748,7 +763,8 @@ export default function App() {
     // If we're in a Safari iframe, we know it will likely fail.
     // Give the user an immediate informative message instead of hanging.
     if (isAppleDevice && isIframe) {
-      setAuthError("Safari blocks login inside this preview. Please use the 'Open in a new tab' link below to sign in.");
+      setAuthError("Safari security restrictions are active. Please use the 'Open in New Tab' link at the bottom of the sign-in box.");
+      setShowSafariShield(true);
       return;
     }
 
@@ -759,26 +775,44 @@ export default function App() {
     // Force prompt for account selection to avoid "stuck" silent failures
     provider.setCustomParameters({ prompt: 'select_account' });
 
-    // Safety timeout to prevent infinite spinner if popup hangs
+    // Safety timeout
     const timeout = setTimeout(() => {
       setIsSigningIn(false);
-    }, 15000);
+    }, 20000);
 
     try {
-      // For Google login on Safari/iOS, we must call signInWithPopup as the VERY FIRST await
-      // to satisfy the "user gesture" requirement.
+      if (isIframe) {
+        // If we're in an iframe, we strongly suggest opening in a new tab
+        setAuthError("Safari/Privacy restrictions block login in this frame. Please use the link below to open in a new tab.");
+        setShowSafariShield(true);
+        setIsSigningIn(false);
+        return;
+      }
+      
+      // Try Popup first as it's more reliable for immediate user feedback
+      // even on Safari top-level (if it works)
       await signInWithPopup(auth, provider);
-      
-      // Post-auth: try to set persistence if possible (non-blocking for the UI)
-      setPersistence(auth, browserSessionPersistence).catch(() => {});
-      
       setIsAuthModalOpen(false);
     } catch (error: any) {
       console.error("Google Auth Error:", error);
-      handleAuthError(error);
+      
+      // Fallback to redirect ONLY if popup fails and it's Safari top-level
+      if (!isIframe && isAppleDevice && (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/internal-error' || error.name === 'SecurityError')) {
+        try {
+          setAuthError("Popup failed. Using redirect mode instead...");
+          await signInWithRedirect(auth, provider);
+          return;
+        } catch (redirectError) {
+          handleAuthError(redirectError);
+        }
+      } else {
+        handleAuthError(error);
+      }
     } finally {
       clearTimeout(timeout);
-      setIsSigningIn(false);
+      if (!(isAppleDevice && !isIframe)) {
+        setIsSigningIn(false);
+      }
     }
   };
 
@@ -830,7 +864,12 @@ export default function App() {
     if (isSecurityError && isAppleDevice) {
       message = isIframe 
         ? "Safari blocks login in this preview window. Please use the 'Open in a new tab' link at the bottom."
-        : "Safari security settings (ITP) are blocking login. Try disabling 'Prevent Cross-Site Tracking' in Safari settings.";
+        : "Safari security settings (ITP) are blocking the connection. Try checking 'Block All Cookies' or 'Private Browsing' settings.";
+      
+      // If it's a security error in a new tab, suggest email login
+      if (!isIframe) {
+        message += " Alternatively, use Email/Password login which is more resilient.";
+      }
     } else {
       switch (error?.code) {
         case 'auth/popup-blocked':
@@ -1078,18 +1117,25 @@ export default function App() {
   return (
     <div className="min-h-screen bg-brand-dark text-gray-100 selection:bg-brand-primary selection:text-white relative overflow-x-hidden">
       {showSafariShield && (
-        <div className="fixed top-0 left-0 right-0 z-[100] bg-brand-primary text-brand-dark py-2 px-4 text-center text-xs font-bold shadow-lg flex items-center justify-center gap-3">
+        <div className={cn(
+          "fixed top-0 left-0 right-0 z-[100] py-2 px-4 text-center text-xs font-bold shadow-lg flex items-center justify-center gap-3 transition-colors",
+          isStorageBlocked ? "bg-rose-500 text-white" : "bg-brand-primary text-brand-dark"
+        )}>
           <ShieldAlert className="w-4 h-4" />
-          <span>Safari security restrictions detected. Login may be blocked in this view.</span>
+          <span>
+            {isStorageBlocked 
+              ? "Storage is BLOCKED by your browser. Sign-in cannot persist. Please disable Private Mode or use another browser." 
+              : "Safari security settings (ITP) may block login in this frame."}
+          </span>
           <a 
             href={window.location.href} 
             target="_blank" 
             rel="noopener noreferrer"
-            className="bg-brand-dark text-white px-3 py-1 rounded-full text-[10px] hover:bg-black transition-colors"
+            className="bg-brand-dark text-white px-3 py-1 rounded-full text-[10px] hover:bg-black transition-colors whitespace-nowrap"
           >
-            Open in New Tab & Fix
+            Open Top-Level Link
           </a>
-          <button onClick={() => setShowSafariShield(false)} className="opacity-50 hover:opacity-100">
+          <button onClick={() => setShowSafariShield(false)} className="opacity-50 hover:opacity-100 ml-2">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -3298,29 +3344,48 @@ export default function App() {
                 )}
               </Button>
 
-              <div className="mt-8 text-center space-y-4">
-                <p className="text-sm text-gray-400">
-                  Don't have an account? {' '}
-                  <a 
-                    href="https://unlckdbrand.com/unlckd-pro-trainer" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-brand-primary hover:underline font-bold"
-                  >
-                    Gain Access
-                  </a>
-                </p>
+              <div className="mt-8 text-center space-y-6">
+                <div className="pt-4 border-t border-white/5 space-y-2">
+                  <p className="text-sm text-gray-400">
+                    {isSignUp ? "Already have an account?" : "No password set up yet?"} {' '}
+                    <button 
+                      onClick={() => setIsSignUp(!isSignUp)}
+                      className="text-brand-primary hover:underline font-bold"
+                    >
+                      {isSignUp ? "Sign In" : "Sign Up"}
+                    </button>
+                  </p>
+                  <p className="text-[10px] text-gray-600 italic">
+                    Note: Pro membership is required for premium features.
+                  </p>
+                </div>
 
                 {/iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent) && !(/Chrome/i.test(navigator.userAgent)) && (
                   <div className="bg-brand-primary/10 rounded-xl p-4 border border-brand-primary/20 space-y-2">
-                    <p className="text-[10px] font-bold text-brand-primary uppercase tracking-widest flex items-center gap-2">
-                      <ExternalLink className="w-3 h-3" />
-                      Safari/iOS Support
+                    <p className="text-[10px] font-bold text-brand-primary uppercase tracking-widest flex items-center justify-center gap-2">
+                      <ShieldAlert className="w-3 h-3" />
+                      Browser Security Notice
                     </p>
                     <p className="text-[10px] text-gray-400 leading-relaxed">
-                      If the login button hangs or errors, Safari is likely blocking the secure connection in this view. 
-                      Please <a href={window.location.href} target="_blank" rel="noopener noreferrer" className="text-brand-primary underline font-bold">click here to open in a new tab</a> where login will work perfectly.
+                      {isStorageBlocked 
+                        ? "Your browser is blocking essential storage (likely Private Mode or strict ITP). Sign-in cannot persist. Try disabling Private Mode or using a different browser."
+                        : "Safari's strict privacy rules often block sign-in popups in this preview frame."}
                     </p>
+                    <div className="flex flex-col gap-2 pt-1">
+                      <a 
+                        href={window.location.href} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="inline-block bg-brand-primary text-brand-dark px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-white transition-colors"
+                      >
+                        Open in New Tab
+                      </a>
+                      {isStorageBlocked && (
+                        <p className="text-[8px] text-gray-500 italic">
+                          If the new tab still fails, check your "Block All Cookies" settings in Safari.
+                        </p>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
