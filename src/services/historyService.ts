@@ -121,8 +121,16 @@ export const historyService = {
     try {
       await getDocFromServer(doc(db, 'test', 'connection'));
     } catch (error: any) {
-      if (error.message.includes('the client is offline')) {
+      if (error.message?.includes('the client is offline')) {
         console.error("Please check your Firebase configuration.");
+      }
+      // Silence security errors in Safari iframes
+      const isSecurityError = 
+        error?.message?.includes('insecure') || 
+        error?.name === 'SecurityError' || 
+        error?.message?.includes('partition');
+      if (isSecurityError) {
+        console.info("Firestore connection test throttled by browser security settings (likely Safari ITP in an iframe).");
       }
     }
   }
