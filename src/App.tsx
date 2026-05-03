@@ -41,7 +41,9 @@ import {
   LineChart,
   Trophy,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  ShieldAlert,
+  X
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Button } from './components/ui/Button';
@@ -54,7 +56,7 @@ import { Path, UserData, Photos, ProgressPhotos, AssessmentResult, Rating, Saved
 import { generateTransformationReport } from './services/gemini';
 import { getLevelInfo } from './lib/levels';
 import { auth } from './lib/firebase';
-import { onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, setPersistence, browserSessionPersistence } from 'firebase/auth';
 import { historyService } from './services/historyService';
 import { ensureUserProfile, checkUserAccess, unlockPremium } from './services/accessService';
 
@@ -632,6 +634,25 @@ export default function App() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
+  const [showSafariShield, setShowSafariShield] = useState(false);
+
+  useEffect(() => {
+    // Detect Safari security errors globally
+    const handleGlobalError = (event: any) => {
+      const error = event.error || event.reason;
+      if (error?.message?.includes('insecure') || error?.name === 'SecurityError') {
+        setShowSafariShield(true);
+      }
+    };
+
+    window.addEventListener('error', handleGlobalError);
+    window.addEventListener('unhandledrejection', handleGlobalError);
+
+    return () => {
+      window.removeEventListener('error', handleGlobalError);
+      window.removeEventListener('unhandledrejection', handleGlobalError);
+    };
+  }, []);
 
   useEffect(() => {
     if (user && savedReports.length > 0) {
@@ -645,10 +666,34 @@ export default function App() {
 
   useEffect(() => {
     // Handle redirect result for mobile/Apple devices
-    getRedirectResult(auth).catch(error => {
-      console.error("Redirect auth error:", error);
-      handleAuthError(error);
-    });
+    // Wrap in a safe check to avoid "Operation is insecure" on Safari iframes
+    const checkRedirect = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result?.user) {
+          setIsAuthModalOpen(false);
+        }
+      } catch (error: any) {
+        // Only report if it's not a security error we expect in an iframe
+        const isSecurityError = 
+          error?.message?.includes('insecure') || 
+          error?.name === 'SecurityError' || 
+          error?.code === 'auth/internal-error' ||
+          error?.message?.includes('partition');
+          
+        if (!isSecurityError && error.code !== 'auth/redirect-cancelled-by-user') {
+          console.error("Redirect auth error:", error);
+          if (error?.message?.includes('insecure')) {
+            const isApple = /iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent);
+            if (isApple) setAuthError("Safari security restrictions detected. Use the 'Open in a new tab' link below.");
+          } else {
+            handleAuthError(error);
+          }
+        }
+      }
+    };
+
+    checkRedirect();
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
@@ -667,6 +712,9 @@ export default function App() {
         setSavedReports([]);
         setHasAccess(null);
       }
+    }, (error: any) => {
+      const isSecurityError = error?.message?.includes('insecure') || error?.name === 'SecurityError';
+      if (!isSecurityError) console.error("Auth listener error:", error);
     });
     historyService.testConnection();
     return () => unsubscribe();
@@ -694,6 +742,16 @@ export default function App() {
   };
 
   const handleGoogleSignIn = async () => {
+    const isAppleDevice = /iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent) && !(/Chrome/i.test(navigator.userAgent));
+    const isIframe = window.self !== window.top;
+    
+    // If we're in a Safari iframe, we know it will likely fail.
+    // Give the user an immediate informative message instead of hanging.
+    if (isAppleDevice && isIframe) {
+      setAuthError("Safari blocks login inside this preview. Please use the 'Open in a new tab' link below to sign in.");
+      return;
+    }
+
     setIsSigningIn(true);
     setAuthError(null);
     const provider = new GoogleAuthProvider();
@@ -701,25 +759,26 @@ export default function App() {
     // Force prompt for account selection to avoid "stuck" silent failures
     provider.setCustomParameters({ prompt: 'select_account' });
 
+    // Safety timeout to prevent infinite spinner if popup hangs
+    const timeout = setTimeout(() => {
+      setIsSigningIn(false);
+    }, 15000);
+
     try {
-      // For iOS and other mobile devices, signInWithRedirect is more reliable
-      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      // For Google login on Safari/iOS, we must call signInWithPopup as the VERY FIRST await
+      // to satisfy the "user gesture" requirement.
+      await signInWithPopup(auth, provider);
       
-      if (isMobile) {
-        await signInWithRedirect(auth, provider);
-        // Note: The page will redirect, so finally block won't run here
-      } else {
-        await signInWithPopup(auth, provider);
-        setIsAuthModalOpen(false);
-      }
+      // Post-auth: try to set persistence if possible (non-blocking for the UI)
+      setPersistence(auth, browserSessionPersistence).catch(() => {});
+      
+      setIsAuthModalOpen(false);
     } catch (error: any) {
       console.error("Google Auth Error:", error);
       handleAuthError(error);
     } finally {
-      // Only clear if we didn't redirect
-      if (!/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-        setIsSigningIn(false);
-      }
+      clearTimeout(timeout);
+      setIsSigningIn(false);
     }
   };
 
@@ -744,35 +803,55 @@ export default function App() {
   };
 
   const handleAuthError = (error: any) => {
-    if (error?.code === 'auth/popup-closed-by-user') return;
+    setIsSigningIn(false);
+    
+    const isSecurityError = 
+      error?.message?.includes('insecure') || 
+      error?.name === 'SecurityError' || 
+      error?.code === 'auth/internal-error' ||
+      error?.message?.includes('partition');
+      
+    const isAppleDevice = /iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent) && !(/Chrome/i.test(navigator.userAgent));
+    const isIframe = window.self !== window.top;
+    
+    if (isSecurityError) {
+      setShowSafariShield(true);
+    }
+
+    if (error?.code === 'auth/popup-closed-by-user') {
+      if (isAppleDevice && isIframe) {
+        setAuthError("Safari's security settings blocked the login popup in this frame. Use the 'Open in a new tab' link below.");
+      }
+      return;
+    }
     
     let message = "Authentication failed. Please try again.";
     
-    switch (error?.code) {
-      case 'auth/popup-blocked':
-        message = "Popup was blocked by your browser. Please enable popups and try again.";
-        break;
-      case 'auth/unauthorized-domain':
-        message = "This domain is not authorized in the Firebase console. Please add the app URL to authorized domains.";
-        break;
-      case 'auth/user-not-found':
-      case 'auth/wrong-password':
-      case 'auth/invalid-credential':
-        message = "Invalid email or password.";
-        break;
-      case 'auth/email-already-in-use':
-        message = "This email is already in use.";
-        break;
-      case 'auth/weak-password':
-        message = "Password should be at least 6 characters.";
-        break;
-      case 'auth/invalid-email':
-        message = "Please enter a valid email address.";
-        break;
+    if (isSecurityError && isAppleDevice) {
+      message = isIframe 
+        ? "Safari blocks login in this preview window. Please use the 'Open in a new tab' link at the bottom."
+        : "Safari security settings (ITP) are blocking login. Try disabling 'Prevent Cross-Site Tracking' in Safari settings.";
+    } else {
+      switch (error?.code) {
+        case 'auth/popup-blocked':
+          message = "Popup was blocked. Please enable popups or use the 'Open in a new tab' link below.";
+          break;
+        case 'auth/unauthorized-domain':
+          message = "This domain is not authorized. Please check your Firebase settings.";
+          break;
+        case 'auth/network-request-failed':
+          message = "Network error. Please check your connection.";
+          break;
+        case 'auth/user-not-found':
+        case 'auth/wrong-password':
+        case 'auth/invalid-credential':
+          message = "Invalid email or password.";
+          break;
+      }
     }
     
     setAuthError(message);
-    console.error("Auth error:", error);
+    console.error("Auth detailed error:", error);
   };
 
   const handleSignIn = () => {
@@ -998,6 +1077,23 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-brand-dark text-gray-100 selection:bg-brand-primary selection:text-white relative overflow-x-hidden">
+      {showSafariShield && (
+        <div className="fixed top-0 left-0 right-0 z-[100] bg-brand-primary text-brand-dark py-2 px-4 text-center text-xs font-bold shadow-lg flex items-center justify-center gap-3">
+          <ShieldAlert className="w-4 h-4" />
+          <span>Safari security restrictions detected. Login may be blocked in this view.</span>
+          <a 
+            href={window.location.href} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="bg-brand-dark text-white px-3 py-1 rounded-full text-[10px] hover:bg-black transition-colors"
+          >
+            Open in New Tab & Fix
+          </a>
+          <button onClick={() => setShowSafariShield(false)} className="opacity-50 hover:opacity-100">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
       <SecurityGuard />
       {/* Background decorative elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
@@ -3173,7 +3269,7 @@ export default function App() {
                   className="w-full h-12 bg-brand-primary text-brand-dark font-bold text-lg shadow-lg shadow-brand-primary/20"
                   disabled={isSigningIn}
                 >
-                  {isSigningIn ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Sign In'}
+                  {isSigningIn && authEmail ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Sign In'}
                 </Button>
               </form>
 
@@ -3202,7 +3298,7 @@ export default function App() {
                 )}
               </Button>
 
-              <div className="mt-8 text-center">
+              <div className="mt-8 text-center space-y-4">
                 <p className="text-sm text-gray-400">
                   Don't have an account? {' '}
                   <a 
@@ -3214,6 +3310,19 @@ export default function App() {
                     Gain Access
                   </a>
                 </p>
+
+                {/iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent) && !(/Chrome/i.test(navigator.userAgent)) && (
+                  <div className="bg-brand-primary/10 rounded-xl p-4 border border-brand-primary/20 space-y-2">
+                    <p className="text-[10px] font-bold text-brand-primary uppercase tracking-widest flex items-center gap-2">
+                      <ExternalLink className="w-3 h-3" />
+                      Safari/iOS Support
+                    </p>
+                    <p className="text-[10px] text-gray-400 leading-relaxed">
+                      If the login button hangs or errors, Safari is likely blocking the secure connection in this view. 
+                      Please <a href={window.location.href} target="_blank" rel="noopener noreferrer" className="text-brand-primary underline font-bold">click here to open in a new tab</a> where login will work perfectly.
+                    </p>
+                  </div>
+                )}
               </div>
             </motion.div>
           </div>
