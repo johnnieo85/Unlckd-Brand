@@ -54,7 +54,7 @@ import { Path, UserData, Photos, ProgressPhotos, AssessmentResult, Rating, Saved
 import { generateTransformationReport } from './services/gemini';
 import { getLevelInfo } from './lib/levels';
 import { auth } from './lib/firebase';
-import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { historyService } from './services/historyService';
 import { ensureUserProfile, checkUserAccess, unlockPremium } from './services/accessService';
 
@@ -644,6 +644,12 @@ export default function App() {
   }, [user, savedReports]);
 
   useEffect(() => {
+    // Handle redirect result for mobile/Apple devices
+    getRedirectResult(auth).catch(error => {
+      console.error("Redirect auth error:", error);
+      handleAuthError(error);
+    });
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
       if (user) {
@@ -691,13 +697,29 @@ export default function App() {
     setIsSigningIn(true);
     setAuthError(null);
     const provider = new GoogleAuthProvider();
+    
+    // Force prompt for account selection to avoid "stuck" silent failures
+    provider.setCustomParameters({ prompt: 'select_account' });
+
     try {
-      await signInWithPopup(auth, provider);
-      setIsAuthModalOpen(false);
+      // For iOS and other mobile devices, signInWithRedirect is more reliable
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      
+      if (isMobile) {
+        await signInWithRedirect(auth, provider);
+        // Note: The page will redirect, so finally block won't run here
+      } else {
+        await signInWithPopup(auth, provider);
+        setIsAuthModalOpen(false);
+      }
     } catch (error: any) {
+      console.error("Google Auth Error:", error);
       handleAuthError(error);
     } finally {
-      setIsSigningIn(false);
+      // Only clear if we didn't redirect
+      if (!/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+        setIsSigningIn(false);
+      }
     }
   };
 
@@ -3170,8 +3192,14 @@ export default function App() {
                 className="w-full h-12 border-white/5 hover:bg-white/5 gap-3"
                 disabled={isSigningIn}
               >
-                <img src="https://www.google.com/favicon.ico" alt="Google" className="w-4 h-4" />
-                Google Account
+                {isSigningIn && !authEmail ? (
+                  <Loader2 className="w-5 h-5 animate-spin mx-auto" />
+                ) : (
+                  <>
+                    <img src="https://www.google.com/favicon.ico" alt="Google" className="w-4 h-4" />
+                    Google Account
+                  </>
+                )}
               </Button>
 
               <div className="mt-8 text-center">
