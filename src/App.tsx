@@ -641,9 +641,18 @@ export default function App() {
   useEffect(() => {
     // Force a one-time logout and session clear for the 6-digit PIN security update
     const PIN_VERSION = 'v2_6mapin';
-    const currentVersion = localStorage.getItem('unlckd_gym_version');
     
-    if (currentVersion !== PIN_VERSION) {
+    // Check if localStorage is even accessible before trying to read/write version
+    let currentVersion = null;
+    let storageAvailable = false;
+    try {
+      currentVersion = localStorage.getItem('unlckd_gym_version');
+      storageAvailable = true;
+    } catch (e) {
+      console.warn("Auth: Storage blocked, skipping version-based reset.");
+    }
+    
+    if (storageAvailable && currentVersion !== PIN_VERSION) {
       const performGlobalReset = async () => {
         try {
           await signOut(auth);
@@ -653,7 +662,11 @@ export default function App() {
           console.info("Security Update: Sessions cleared for 6-digit PIN migration.");
           window.location.reload();
         } catch (e) {
-          localStorage.setItem('unlckd_gym_version', PIN_VERSION);
+          try {
+            localStorage.setItem('unlckd_gym_version', PIN_VERSION);
+          } catch (storageErr) {
+            // Ignore if we can't even set the version
+          }
         }
       };
       performGlobalReset();
@@ -829,21 +842,18 @@ export default function App() {
 
     try {
       if (isIframe) {
-        // Log explicitly for debugging
-        console.info("Auth: Sign-in attempted from within an iframe. Popups/Redirects may be restricted by the browser or Google.");
+        // Warn but allow attempt
+        console.info("Auth: Iframe detected. Popups/Redirects might be restricted.");
         
-        // If we're in an iframe, we strongly suggest opening in a new tab for reliability
-        setAuthError("Google Sign-In is restricted inside this preview frame for security. Please use Email login or the 'Open in Standard Tab' button below.");
-        
-        // Try popup anyway as some browsers allow it, but we've warned the user
         try {
           await signInWithPopup(auth, provider);
           setIsAuthModalOpen(false);
+          setIsSigningIn(false);
           return;
         } catch (popupError: any) {
           console.warn("Auth: Popup failed in iframe:", popupError);
-          // Do NOT proceed to redirect if in an iframe - it ALWAYS leads to a 403 error from Google
-          setAuthError("Google security forbids sign-in redirects in this preview. Please use Email/Password or click 'Open in Standard Tab' to sign in with Google.");
+          // Redirect in iframe is a guaranteed 403 from Google
+          setAuthError("Google Sign-In is blocked in this preview. For security, please use Email login or click 'Open in Standard Tab' below.");
           setShowSafariShield(true);
           setIsSigningIn(false);
           return;
@@ -875,15 +885,13 @@ export default function App() {
             return;
           }
 
-          if (isAppleDevice) {
-            console.info("Popup failed/blocked on Apple device, attempting redirect fallback...");
-            setAuthError("Sign-in popup was blocked or closed. Redirecting instead...");
-            
-            // Small delay to let the user read the message
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            await signInWithRedirect(auth, provider);
-            return;
-          }
+          console.info("Auth: Popup failed or closed, attempting redirect fallback...");
+          setAuthError("Sign-in popup was blocked or closed. Switching to redirect...");
+          
+          // Small delay to let the user read the message
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          await signInWithRedirect(auth, provider);
+          return;
         }
         throw popupError;
       }
@@ -892,9 +900,7 @@ export default function App() {
       handleAuthError(error);
     } finally {
       clearTimeout(timeout);
-      if (!(isAppleDevice && !isIframe)) {
-        setIsSigningIn(false);
-      }
+      setIsSigningIn(false);
     }
   };
 
@@ -957,7 +963,7 @@ export default function App() {
           message = "Popup was blocked. Please enable popups or use the 'Open in a new tab' link below.";
           break;
         case 'auth/unauthorized-domain':
-          message = "This domain is not authorized. Please check your Firebase settings.";
+          message = "Unauthorized Domain: Please add this URL to your Firebase Authorized Domains list in the Firebase Console.";
           break;
         case 'auth/network-request-failed':
           message = "Network error. Please check your connection.";
