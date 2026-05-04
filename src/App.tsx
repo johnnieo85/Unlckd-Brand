@@ -701,11 +701,14 @@ export default function App() {
         
         if (error.code === 'auth/internal-error' && error.message?.includes('partition')) {
           setAuthError("Browser security prevented the login. Try 'Open in Standard Tab' or use Email login.");
+          setIsAuthModalOpen(true);
         } else if (error.code === 'auth/unauthorized-domain') {
           handleAuthError(error);
+          setIsAuthModalOpen(true);
         } else {
           // General redirect error handler
           handleAuthError(error);
+          setIsAuthModalOpen(true);
         }
       }
     };
@@ -774,18 +777,8 @@ export default function App() {
     })();
 
     try {
-      // In a standard tab, we use Redirect because it's more reliable on mobile
-      // BUT if the domain is different from authDomain, Redirect can fail if cookies are blocked.
-      // We will try Popup first even in standard tab IF they are on a custom domain?
-      // No, let's keep the current logic but improve the popup failure message.
-
-      if (!isIframe) {
-        console.info("Auth: Initiating standard redirect login...");
-        await signInWithRedirect(auth, provider);
-        return; 
-      }
-
-      console.info("Auth: Initiating popup login for iframe...");
+      // Step 1: Always try Popup first as it's better for debugging and doesn't lose page state
+      console.info("Auth: Attempting Popup login...");
       try {
         await signInWithPopup(auth, provider);
         setIsAuthModalOpen(false);
@@ -793,12 +786,21 @@ export default function App() {
       } catch (popupError: any) {
         console.warn("Auth: Popup login failed:", popupError);
         
+        // If it's blocked or closed, try Redirect as a fallback for non-iframes
         if (popupError.code === 'auth/popup-blocked' || 
             popupError.code === 'auth/popup-closed-by-user' ||
             popupError.code === 'auth/cancelled-popup-request') {
           
+          if (!isIframe) {
+            console.info("Auth: Popup blocked/closed in standard tab, falling back to Redirect...");
+            setAuthError("Popup blocked. Redirecting to secure login...");
+            await new Promise(resolve => setTimeout(resolve, 800));
+            await signInWithRedirect(auth, provider);
+            return;
+          }
+
           setAuthEmail(''); // Reset email if any
-          setAuthError("Login window was closed or blocked. In this preview, we strongly recommend logging in with Email or clicking 'Open in Standard Tab'.");
+          setAuthError("Login window was closed or blocked. In this preview, we strongly recommend logging in with Email or clicking 'Open in Standard Tab' below.");
         } else {
           throw popupError;
         }
@@ -835,12 +837,18 @@ export default function App() {
     setIsSigningIn(false);
     console.error("Auth detailed error:", error);
 
+    if (error?.code === 'auth/unauthorized-domain') {
+      const hostname = window.location.hostname;
+      setAuthError(`DOMAIN NOT AUTHORIZED: The domain '${hostname}' is not in your Firebase Authorized Domains list. Go to Firebase Console > Authentication > Settings > Authorized Domains and add '${hostname}' and 'www.${hostname}'.`);
+      return;
+    }
+
     if (error?.code === 'auth/popup-closed-by-user') {
       const isIframe = window.self !== window.top;
       if (isIframe) {
         setAuthError("The sign-in window was closed or blocked. In this preview, security rules may prevent the login. Try Email login or 'Open in Standard Tab'.");
       } else {
-        setAuthError("The sign-in process was interrupted. If the window closed by itself, ensure this domain is added to 'Authorized Domains' in your Firebase Console.");
+        setAuthError("The sign-in process was interrupted. If the window closed by itself, check if your domain reached the Google consent screen correctly.");
       }
       return;
     }
@@ -852,7 +860,8 @@ export default function App() {
         message = "Popup was blocked by your browser. Please enable popups for this site.";
         break;
       case 'auth/unauthorized-domain':
-        message = `Domain Not Authorized: Please add '${window.location.hostname}' to your Firebase Authorized Domains list (Firebase Console > Authentication > Settings).`;
+        const host = window.location.hostname;
+        message = `CRITICAL: The domain '${host}' is NOT AUTHORIZED in your Firebase project. Please go to your Firebase Console > Authentication > Settings > Authorized Domains and manually add '${host}' and 'www.${host}' to the list.`;
         break;
       case 'auth/network-request-failed':
         message = "Network error. Please check your connection and try again.";
