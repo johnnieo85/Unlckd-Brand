@@ -636,6 +636,7 @@ export default function App() {
   const [authPassword, setAuthPassword] = useState('');
   const [showSafariShield, setShowSafariShield] = useState(false);
   const [isStorageBlocked, setIsStorageBlocked] = useState(false);
+  const isIframe = typeof window !== 'undefined' && window.self !== window.top;
 
   useEffect(() => {
     // Force a one-time logout and session clear for the 6-digit PIN security update
@@ -808,17 +809,15 @@ export default function App() {
     const isAppleDevice = /iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent) && !(/Chrome/i.test(navigator.userAgent));
     const isIframe = window.self !== window.top;
     
-    // If we're in a Safari iframe, we know it will likely fail.
-    // Give the user an immediate informative message instead of hanging.
-    if (isAppleDevice && isIframe) {
-      setAuthError("Safari security restrictions are active. Please use the 'Open in New Tab' link at the bottom of the sign-in box.");
-      setShowSafariShield(true);
-      return;
-    }
-
     setIsSigningIn(true);
     setAuthError(null);
     const provider = new GoogleAuthProvider();
+    
+    // If we're in a Safari iframe, we know it will likely fail.
+    // Show the shield but don't return, let them try or read the message.
+    if (isAppleDevice && isIframe) {
+      setShowSafariShield(true);
+    }
     
     // Force prompt for account selection to avoid "stuck" silent failures
     provider.setCustomParameters({ prompt: 'select_account' });
@@ -829,19 +828,31 @@ export default function App() {
     }, 20000);
 
     try {
-      if (isStorageBlocked) {
-        setAuthError("Storage is blocked. Please disable Private Mode or settings like 'Block All Cookies' to sign in.");
-        setShowSafariShield(true);
-        setIsSigningIn(false);
-        return;
-      }
-
       if (isIframe) {
-        // If we're in an iframe, we strongly suggest opening in a new tab
-        setAuthError("Sign-in is blocked in this view. Please use the 'Open in Standard Tab' button below.");
-        setShowSafariShield(true);
-        setIsSigningIn(false);
-        return;
+        // Log explicitly for debugging
+        console.info("Auth: Sign-in attempted from within an iframe. Popups/Redirects may be restricted by the browser or Google.");
+        
+        // If we're in an iframe, we strongly suggest opening in a new tab for reliability
+        setAuthError("Google Sign-In is restricted inside this preview frame for security. Please use Email login or the 'Open in Standard Tab' button below.");
+        
+        // Try popup anyway as some browsers allow it, but we've warned the user
+        try {
+          await signInWithPopup(auth, provider);
+          setIsAuthModalOpen(false);
+          return;
+        } catch (popupError: any) {
+          console.warn("Auth: Popup failed in iframe:", popupError);
+          // Do NOT proceed to redirect if in an iframe - it ALWAYS leads to a 403 error from Google
+          setAuthError("Google security forbids sign-in redirects in this preview. Please use Email/Password or click 'Open in Standard Tab' to sign in with Google.");
+          setShowSafariShield(true);
+          setIsSigningIn(false);
+          return;
+        }
+      }
+      
+      if (isStorageBlocked) {
+        console.warn("Storage is blocked. Proceeding with in-memory persistence.");
+        // We don't return here anymore, allowing Firebase's inMemoryPersistence to take over
       }
       
       // On Safari, popups are often more reliable than redirects IF they aren't blocked.
@@ -850,20 +861,29 @@ export default function App() {
         await signInWithPopup(auth, provider);
         setIsAuthModalOpen(false);
       } catch (popupError: any) {
-        // If popup was blocked or failed, try redirect as fallback on Apple devices
-        if (isAppleDevice && (
-          popupError.code === 'auth/popup-blocked' || 
-          popupError.code === 'auth/popup-closed-by-user' ||
-          popupError.code === 'auth/internal-error' ||
-          popupError.name === 'SecurityError'
-        )) {
-          console.info("Popup failed/blocked, attempting redirect fallback...");
-          setAuthError("Sign-in popup was blocked. Redirecting instead...");
+        // If popup was blocked or failed, try redirect as fallback ONLY if not in an iframe
+        // Google explicitly blocks OAuth redirects inside iframes (results in 403)
+        if (popupError.code === 'auth/popup-blocked' || 
+            popupError.code === 'auth/popup-closed-by-user' ||
+            popupError.code === 'auth/internal-error' ||
+            popupError.name === 'SecurityError') {
           
-          // Small delay to let the user read the message
-          await new Promise(resolve => setTimeout(resolve, 1500));
-          await signInWithRedirect(auth, provider);
-          return;
+          if (isIframe) {
+            console.warn("Popup blocked in iframe. Redirect forbidden to avoid 403.");
+            setAuthError("Sign-in popup was blocked. Google security forbids redirects inside this preview. Please click 'Open in Standard Tab' below.");
+            setIsSigningIn(false);
+            return;
+          }
+
+          if (isAppleDevice) {
+            console.info("Popup failed/blocked on Apple device, attempting redirect fallback...");
+            setAuthError("Sign-in popup was blocked or closed. Redirecting instead...");
+            
+            // Small delay to let the user read the message
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            await signInWithRedirect(auth, provider);
+            return;
+          }
         }
         throw popupError;
       }
@@ -916,7 +936,9 @@ export default function App() {
 
     if (error?.code === 'auth/popup-closed-by-user') {
       if (isAppleDevice && isIframe) {
-        setAuthError("Safari's security settings blocked the login popup in this frame. Use the 'Open in a new tab' link below.");
+        setAuthError("Safari security often blocks login in this preview. Use 'Open in Standard Tab' or Email login.");
+      } else {
+        setAuthError("The sign-in popup was closed. Please try again or use the Email/Password option.");
       }
       return;
     }
@@ -925,9 +947,9 @@ export default function App() {
     
     if (isSecurityError && isAppleDevice) {
       if (isIframe) {
-        message = "Safari security blocks login in this preview. Use 'Open in Standard Tab' below.";
+        message = "Safari security blocks Google login in this preview. Please use Email/Password login or click 'Open in Standard Tab' below.";
       } else {
-        message = "Storage restriction detected. Please: 1. Turn OFF 'Private Browsing' 2. Go to Settings > Safari > Advanced and Turn OFF 'Block All Cookies'.";
+        message = "Storage restriction detected. For a guaranteed login, we recommend using Email/Password or disabling 'Private Browsing' in Safari.";
       }
     } else {
       switch (error?.code) {
@@ -3431,18 +3453,20 @@ export default function App() {
                   </p>
                 </div>
 
-                {/iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent) && !(/Chrome/i.test(navigator.userAgent)) && (
+                {(isIframe || (/iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent) && !(/Chrome/i.test(navigator.userAgent)))) && (
                   <div className="bg-brand-primary/10 rounded-xl p-4 border border-brand-primary/20 space-y-3">
                     <div className="flex items-center justify-center gap-2 text-brand-primary">
                       <ShieldAlert className="w-3 h-3" />
                       <p className="text-[10px] font-bold uppercase tracking-widest">
-                        Browser Security Notice
+                        Preview Security Notice
                       </p>
                     </div>
                     <p className="text-[10px] text-gray-400 leading-relaxed px-2">
-                      {isStorageBlocked 
-                        ? "Your browser is blocking essential storage (Private Mode or 'Block All Cookies'). Sign-in WILL FAIL unless you use a standard tab and allow cookies."
-                        : "Safari's strict privacy rules (ITP) often block sign-in popups in this preview frame."}
+                      {isIframe 
+                        ? "Google security forbids sign-in redirects in this preview window. If Google login fails, please use Email login or open the app in a standard tab."
+                        : (isStorageBlocked 
+                            ? "Your browser is blocking essential storage. Sign-in WILL FAIL unless you use a standard tab or log in with Email/Password."
+                            : "Safari's strict privacy rules (ITP) may block Google popups. If you have issues, use Email/Password login or open in a standard tab.")}
                     </p>
                     <div className="flex flex-col gap-2 pt-1 px-2">
                       <a 
