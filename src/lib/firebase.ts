@@ -62,13 +62,14 @@ const tryPersistence = async () => {
   try {
     // Try local persistence first
     await setPersistence(auth, browserLocalPersistence);
+    console.info("Auth: Local persistence initialized successfully.");
   } catch (e: any) {
-    console.warn("Auth: Local persistence blocked, trying in-memory:", e);
+    console.warn("Auth: Local persistence blocked or failed, trying in-memory:", e);
     try {
       // Small Delay before fallback
       await new Promise(r => setTimeout(r, 100));
       await setPersistence(auth, inMemoryPersistence);
-      console.info("Auth: Using in-memory persistence (session will reset on refresh)");
+      console.warn("Auth: Using in-memory persistence. Sign-in will NOT survive page reloads (Redirect will fail).");
     } catch (memErr) {
       console.error("Auth: All persistence types failed", memErr);
     }

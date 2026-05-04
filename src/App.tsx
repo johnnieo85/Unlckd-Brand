@@ -684,13 +684,27 @@ export default function App() {
     // Handle redirect result for mobile/Apple devices
     const checkRedirect = async () => {
       try {
+        console.info("Auth: Checking for redirect result...");
         const result = await getRedirectResult(auth);
         if (result?.user) {
+          console.info("Auth: Redirect result success:", result.user.email);
           setIsAuthModalOpen(false);
+          setAuthError(null);
+        } else {
+          console.info("Auth: No pending redirect result.");
         }
       } catch (error: any) {
-        if (error.code !== 'auth/redirect-cancelled-by-user') {
-          console.error("Redirect auth error:", error);
+        console.error("Auth: Redirect error caught:", error);
+        
+        // Handle common cross-site redirect failures
+        if (error.code === 'auth/redirect-cancelled-by-user') return;
+        
+        if (error.code === 'auth/internal-error' && error.message?.includes('partition')) {
+          setAuthError("Browser security prevented the login. Try 'Open in Standard Tab' or use Email login.");
+        } else if (error.code === 'auth/unauthorized-domain') {
+          handleAuthError(error);
+        } else {
+          // General redirect error handler
           handleAuthError(error);
         }
       }
@@ -750,50 +764,48 @@ export default function App() {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
     
-    // Check if we are in an iframe (AI Studio preview)
-    const isIframe = window.self !== window.top;
+    // Safety check for isIframe
+    const isIframe = (function() {
+      try {
+        return window.self !== window.top;
+      } catch (e) {
+        return true;
+      }
+    })();
 
     try {
+      // In a standard tab, we use Redirect because it's more reliable on mobile
+      // BUT if the domain is different from authDomain, Redirect can fail if cookies are blocked.
+      // We will try Popup first even in standard tab IF they are on a custom domain?
+      // No, let's keep the current logic but improve the popup failure message.
+
       if (!isIframe) {
-        // In a standard tab, Redirect is much more robust than Popup (especially on mobile/Safari)
-        console.info("Auth: Using Redirect for standard tab...");
+        console.info("Auth: Initiating standard redirect login...");
         await signInWithRedirect(auth, provider);
-        return; // Redirect reloads the page
+        return; 
       }
 
-      // If in Iframe, we MUST try Popup because Redirect is typically blocked in frames
-      console.info("Auth: In iframe, attempting Popup...");
+      console.info("Auth: Initiating popup login for iframe...");
       try {
         await signInWithPopup(auth, provider);
         setIsAuthModalOpen(false);
+        setAuthError(null);
       } catch (popupError: any) {
-        console.warn("Google Sign-In Popup failed:", popupError);
+        console.warn("Auth: Popup login failed:", popupError);
         
-        // Handle specific popup failures
         if (popupError.code === 'auth/popup-blocked' || 
             popupError.code === 'auth/popup-closed-by-user' ||
             popupError.code === 'auth/cancelled-popup-request') {
           
-          setAuthError("Google Login was blocked by your browser's security or closed. In this preview window, we recommend using Email login or clicking 'Open in Standard Tab' below.");
+          setAuthEmail(''); // Reset email if any
+          setAuthError("Login window was closed or blocked. In this preview, we strongly recommend logging in with Email or clicking 'Open in Standard Tab'.");
         } else {
           throw popupError;
         }
       }
     } catch (error: any) {
-      console.error("Google Auth Error:", error);
-      
-      if (error.code === 'auth/unauthorized-domain') {
-        const hostname = window.location.hostname;
-        setAuthError(`Domain Not Authorized: Please add '${hostname}' to your Firebase Authorized Domains list (Firebase Console > Auth > Settings).`);
-      } else if (error.code === 'auth/popup-blocked') {
-        setAuthError("Sign-in popup was blocked. Please enable popups or try Email login.");
-      } else if (error.code === 'auth/popup-closed-by-user') {
-        setAuthError("The sign-in process was interrupted. If this keeps happening, use Email login or check your 'Authorized Domains' in Firebase.");
-      } else if (error.code === 'auth/internal-error' && error.message?.includes('partition')) {
-        setAuthError("Browser security (Partitioned Cookies) blocked the sign-in. Use a non-private window or Email login.");
-      } else {
-        handleAuthError(error);
-      }
+      console.error("Auth: Master Google Auth Error:", error);
+      handleAuthError(error);
     } finally {
       setIsSigningIn(false);
     }
