@@ -43,7 +43,11 @@ import {
   XCircle,
   AlertCircle,
   ShieldAlert,
-  X
+  X,
+  Smartphone,
+  ShieldCheck,
+  Facebook,
+  Users
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Button } from './components/ui/Button';
@@ -1495,6 +1499,73 @@ export default function App() {
                       </div>
                     </div>
                   </Card>
+                </div>
+
+                {/* FAQ Section */}
+                <div className="pt-24 border-t border-white/5 space-y-12">
+                  <div className="space-y-4">
+                    <h2 className="text-3xl md:text-5xl font-display font-bold tracking-tight">Support & FAQ</h2>
+                    <p className="text-gray-400 max-w-xl mx-auto">Solutions for common access issues and technical questions.</p>
+                  </div>
+                  
+                  <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
+                    <Card className="p-8 bg-white/[0.02] border-white/5 hover:border-brand-primary/30 transition-all space-y-4">
+                      <div className="w-10 h-10 rounded-lg bg-brand-primary/10 flex items-center justify-center">
+                        <Smartphone className="w-5 h-5 text-brand-primary" />
+                      </div>
+                      <h3 className="text-xl font-bold font-display italic uppercase">Trouble Accessing on iPhone?</h3>
+                      <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
+                        <p>If you can access from other devices but not your iPhone, try these steps:</p>
+                        <ul className="list-disc pl-5 space-y-2">
+                          <li><span className="text-gray-200">Try Cellular Data:</span> Turn off Wi-Fi in Settings. If it works, the issue is your Wi-Fi configuration.</li>
+                          <li><span className="text-gray-200">Disable Wi-Fi Privacy:</span> Settings → Wi-Fi → (i) → Toggle off <b>Private Wi-Fi Address</b> and <b>Limit IP Tracking</b>.</li>
+                          <li><span className="text-gray-200">Clear Safari Cache:</span> Settings → Apps → Safari → Advanced → Website Data → Delete data for this site.</li>
+                          <li><span className="text-gray-200">Check VPN/iCloud:</span> Ensure VPN is OFF and disable <b>iCloud Private Relay</b> in Name → iCloud.</li>
+                          <li><span className="text-gray-200">Change DNS:</span> Settings → Wi-Fi → (i) → Configure DNS → Manual. Add <code className="bg-white/5 px-1 rounded text-brand-primary">1.1.1.1</code> and <code className="bg-white/5 px-1 rounded text-brand-primary">8.8.8.8</code>.</li>
+                        </ul>
+                      </div>
+                    </Card>
+
+                    <Card className="p-8 bg-white/[0.02] border-white/5 hover:border-brand-primary/30 transition-all space-y-4">
+                      <div className="w-10 h-10 rounded-lg bg-brand-primary/10 flex items-center justify-center">
+                        <ShieldCheck className="w-5 h-5 text-brand-primary" />
+                      </div>
+                      <h3 className="text-xl font-bold font-display italic uppercase">General Troubleshooting</h3>
+                      <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
+                        <p>For login issues and blank pages:</p>
+                        <ul className="list-disc pl-5 space-y-2">
+                          <li><span className="text-gray-200">Incognito Mode:</span> Avoid Private/Incognito tabs as browsers block the security tokens needed for login.</li>
+                          <li><span className="text-gray-200">Google Auth:</span> If a popup is blocked, use <b>Email Login</b> or click <b>"Open in Standard Tab"</b>.</li>
+                          <li><span className="text-gray-200">Network Reset:</span> If connectivity persists, Settings → General → Transfer or Reset → Reset Network Settings.</li>
+                          <li><span className="text-gray-200">Persistent Issues:</span> Note the specific error (e.g. 403 Forbidden) and contact support with a screenshot.</li>
+                        </ul>
+                      </div>
+                    </Card>
+                    <Card className="p-8 bg-white/[0.02] border-white/5 hover:border-brand-primary/30 transition-all space-y-4">
+                      <div className="w-10 h-10 rounded-lg bg-brand-primary/10 flex items-center justify-center">
+                        <Users className="w-5 h-5 text-brand-primary" />
+                      </div>
+                      <h3 className="text-xl font-bold font-display italic uppercase">Join the Community</h3>
+                      <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
+                        <p>Follow us for training tips, athlete highlights, and community updates:</p>
+                        <div className="flex flex-col gap-3">
+                          <a href="https://instagram.com/unlckd_brand" target="_blank" rel="noreferrer" className="flex items-center gap-3 text-gray-200 hover:text-brand-primary transition-colors">
+                            <Instagram className="w-5 h-5" />
+                            <span>@unlckd_brand</span>
+                          </a>
+                          <a href="https://facebook.com/unlckdbrand" target="_blank" rel="noreferrer" className="flex items-center gap-3 text-gray-200 hover:text-brand-primary transition-colors">
+                            <Facebook className="w-5 h-5" />
+                            <span>unlckdbrand</span>
+                          </a>
+                        </div>
+                      </div>
+                    </Card>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="pt-12 pb-8 text-center text-gray-500 text-xs uppercase tracking-widest font-medium">
+                    <p>&copy; {new Date().getFullYear()} UNLCKD PRO TRAINER. ALL RIGHTS RESERVED.</p>
+                  </div>
                 </div>
               </div>
             </motion.div>
