@@ -8,17 +8,28 @@ const app = initializeApp(firebaseConfig);
 // Try to initialize Firestore with safer settings if storage is blocked
 let firestoreDb;
 const isApple = /iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent);
+const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+const isIframe = (function() {
+  try {
+    return window.self !== window.top;
+  } catch (e) {
+    return true;
+  }
+})();
 
 try {
   // Test if we can access the storage system at all
   localStorage.getItem('test'); 
   
-  if (isApple) {
-    // Proactively use long polling for Apple devices to avoid Websocket/gRPC issues in iframes
+  if (isMobile || (isApple && isIframe)) {
+    // Proactively use long polling for ALL mobile devices and Apple iframes
+    // to avoid common network/firewall issues with gRPC/WebSockets (code=unavailable)
+    console.info("Firestore: Using Long Polling mode for mobile/Safari compatibility.");
     firestoreDb = initializeFirestore(app, {
       experimentalForceLongPolling: true,
     }, firebaseConfig.firestoreDatabaseId);
   } else {
+    // Normal connection for desktop/standard browsers
     firestoreDb = getFirestore(app, firebaseConfig.firestoreDatabaseId);
   }
 } catch (e) {

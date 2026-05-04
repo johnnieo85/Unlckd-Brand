@@ -700,13 +700,12 @@ export default function App() {
         if (error.code === 'auth/redirect-cancelled-by-user') return;
         
         if (error.code === 'auth/internal-error' && error.message?.includes('partition')) {
-          setAuthError("Browser security prevented the login. Try 'Open in Standard Tab' or use Email login.");
+          setAuthError("Browser privacy settings blocked the login. Please try Email login or turn off 'Prevent Cross-Site Tracking' in your browser settings.");
           setIsAuthModalOpen(true);
-        } else if (error.code === 'auth/unauthorized-domain') {
-          handleAuthError(error);
+        } else if (error.code === 'auth/network-request-failed') {
+          setAuthError("Network error during login. Please check your connection on your mobile device.");
           setIsAuthModalOpen(true);
         } else {
-          // General redirect error handler
           handleAuthError(error);
           setIsAuthModalOpen(true);
         }
