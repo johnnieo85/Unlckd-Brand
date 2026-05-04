@@ -638,6 +638,28 @@ export default function App() {
   const [isStorageBlocked, setIsStorageBlocked] = useState(false);
 
   useEffect(() => {
+    // Force a one-time logout and session clear for the 6-digit PIN security update
+    const PIN_VERSION = 'v2_6mapin';
+    const currentVersion = localStorage.getItem('unlckd_gym_version');
+    
+    if (currentVersion !== PIN_VERSION) {
+      const performGlobalReset = async () => {
+        try {
+          await signOut(auth);
+          localStorage.clear();
+          sessionStorage.clear();
+          localStorage.setItem('unlckd_gym_version', PIN_VERSION);
+          console.info("Security Update: Sessions cleared for 6-digit PIN migration.");
+          window.location.reload();
+        } catch (e) {
+          localStorage.setItem('unlckd_gym_version', PIN_VERSION);
+        }
+      };
+      performGlobalReset();
+    }
+  }, []);
+
+  useEffect(() => {
     // Check if localStorage and IndexedDB are available
     const checkStorage = async () => {
       let storageOk = false;
