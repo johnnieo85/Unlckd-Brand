@@ -5,7 +5,9 @@ import {
   Dumbbell, 
   Lock, 
   LogOut,
-  LogIn
+  LogIn,
+  Instagram,
+  Facebook
 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Card';
@@ -59,11 +61,20 @@ export const Header: React.FC<HeaderProps> = ({
             href="https://unlckdbrand.com/unlckd-pro-trainer" 
             target="_blank" 
             rel="noopener noreferrer"
-            className="hidden sm:flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-full text-xs font-bold text-gray-300 hover:bg-white/10 transition-all hover:text-brand-primary"
+            className="hidden lg:flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-full text-xs font-bold text-gray-300 hover:bg-white/10 transition-all hover:text-brand-primary"
           >
             Get Access
             <ExternalLink className="w-3 h-3" />
           </a>
+
+          <div className="hidden sm:flex items-center gap-3 pr-2 mr-2 border-r border-white/10">
+            <a href="https://instagram.com/unlckd_brand" target="_blank" rel="noreferrer" className="text-gray-400 hover:text-brand-primary transition-colors" title="Instagram">
+              <Instagram className="w-4 h-4" />
+            </a>
+            <a href="https://facebook.com/unlckdbrand" target="_blank" rel="noreferrer" className="text-gray-400 hover:text-brand-primary transition-colors" title="Facebook">
+              <Facebook className="w-4 h-4" />
+            </a>
+          </div>
 
           {user ? (
             <>
