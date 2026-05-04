@@ -1314,8 +1314,8 @@ export const ProGym = ({
 
   const handlePinSetup = async () => {
     if (!userProfile) return;
-    if (pinSetup.pin.length < 4) {
-      setError('PIN must be at least 4 digits.');
+    if (pinSetup.pin.length !== 6) {
+      setError('PIN must be exactly 6 digits.');
       return;
     }
     if (pinSetup.pin !== pinSetup.confirm) {
@@ -1449,13 +1449,13 @@ export const ProGym = ({
               ) : isSettingPin ? (
                 <div className="space-y-4">
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 ml-1">New 4-6 Digit PIN</label>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 ml-1">New 6-Digit PIN</label>
                     <Input
                       type="password"
                       inputMode="numeric"
                       pattern="[0-9]*"
                       autoComplete="one-time-code"
-                      placeholder="••••"
+                      placeholder="••••••"
                       value={pinSetup.pin}
                       onChange={(e) => setPinSetup(prev => ({ ...prev, pin: e.target.value.replace(/\D/g, '') }))}
                       className="text-center text-2xl tracking-[1em] font-mono bg-white/5 border-white/10"
@@ -1469,7 +1469,7 @@ export const ProGym = ({
                       inputMode="numeric"
                       pattern="[0-9]*"
                       autoComplete="one-time-code"
-                      placeholder="••••"
+                      placeholder="••••••"
                       value={pinSetup.confirm}
                       onChange={(e) => setPinSetup(prev => ({ ...prev, confirm: e.target.value.replace(/\D/g, '') }))}
                       className="text-center text-2xl tracking-[1em] font-mono bg-white/5 border-white/10"
@@ -1501,7 +1501,7 @@ export const ProGym = ({
                     inputMode="numeric"
                     pattern="[0-9]*"
                     autoComplete="one-time-code"
-                    placeholder="••••"
+                    placeholder="••••••"
                     value={pinEntry}
                     onChange={(e) => setPinEntry(e.target.value.replace(/\D/g, ''))}
                     onKeyDown={(e) => e.key === 'Enter' && handlePinSubmit()}

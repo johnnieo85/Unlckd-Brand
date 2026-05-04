@@ -638,17 +638,41 @@ export default function App() {
   const [isStorageBlocked, setIsStorageBlocked] = useState(false);
 
   useEffect(() => {
-    // Check if localStorage is available
-    try {
-      const test = 'test';
-      localStorage.setItem(test, test);
-      localStorage.removeItem(test);
-      setIsStorageBlocked(false);
-    } catch (e) {
-      console.warn("Local storage is blocked by browser security settings.");
-      setIsStorageBlocked(true);
-      setShowSafariShield(true);
-    }
+    // Check if localStorage and IndexedDB are available
+    const checkStorage = async () => {
+      let storageOk = false;
+      let idbOk = false;
+
+      try {
+        const test = 'test_' + Math.random();
+        localStorage.setItem(test, test);
+        localStorage.removeItem(test);
+        storageOk = true;
+      } catch (e) {
+        storageOk = false;
+      }
+
+      try {
+        const dbName = 'test_idb_' + Math.random();
+        const request = indexedDB.open(dbName);
+        request.onsuccess = () => {
+          indexedDB.deleteDatabase(dbName);
+        };
+        idbOk = true;
+      } catch (e) {
+        idbOk = false;
+      }
+
+      if (!storageOk || !idbOk) {
+        console.warn("Storage or IndexedDB is blocked by browser security settings.");
+        setIsStorageBlocked(true);
+        setShowSafariShield(true);
+      } else {
+        setIsStorageBlocked(false);
+      }
+    };
+
+    checkStorage();
   }, []);
 
   useEffect(() => {
@@ -683,6 +707,8 @@ export default function App() {
     // Handle redirect result for mobile/Apple devices
     // Wrap in a safe check to avoid "Operation is insecure" on Safari iframes
     const checkRedirect = async () => {
+      // Small delay to allow Safari storage to initialize
+      await new Promise(resolve => setTimeout(resolve, 500));
       try {
         const result = await getRedirectResult(auth);
         if (result?.user) {
@@ -781,33 +807,47 @@ export default function App() {
     }, 20000);
 
     try {
+      if (isStorageBlocked) {
+        setAuthError("Storage is blocked. Please disable Private Mode or settings like 'Block All Cookies' to sign in.");
+        setShowSafariShield(true);
+        setIsSigningIn(false);
+        return;
+      }
+
       if (isIframe) {
         // If we're in an iframe, we strongly suggest opening in a new tab
-        setAuthError("Safari/Privacy restrictions block login in this frame. Please use the link below to open in a new tab.");
+        setAuthError("Sign-in is blocked in this view. Please use the 'Open in Standard Tab' button below.");
         setShowSafariShield(true);
         setIsSigningIn(false);
         return;
       }
       
-      // Try Popup first as it's more reliable for immediate user feedback
-      // even on Safari top-level (if it works)
-      await signInWithPopup(auth, provider);
-      setIsAuthModalOpen(false);
-    } catch (error: any) {
-      console.error("Google Auth Error:", error);
-      
-      // Fallback to redirect ONLY if popup fails and it's Safari top-level
-      if (!isIframe && isAppleDevice && (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/internal-error' || error.name === 'SecurityError')) {
-        try {
-          setAuthError("Popup failed. Using redirect mode instead...");
+      // On Safari, popups are often more reliable than redirects IF they aren't blocked.
+      // But they must be triggered by a direct user gesture.
+      try {
+        await signInWithPopup(auth, provider);
+        setIsAuthModalOpen(false);
+      } catch (popupError: any) {
+        // If popup was blocked or failed, try redirect as fallback on Apple devices
+        if (isAppleDevice && (
+          popupError.code === 'auth/popup-blocked' || 
+          popupError.code === 'auth/popup-closed-by-user' ||
+          popupError.code === 'auth/internal-error' ||
+          popupError.name === 'SecurityError'
+        )) {
+          console.info("Popup failed/blocked, attempting redirect fallback...");
+          setAuthError("Sign-in popup was blocked. Redirecting instead...");
+          
+          // Small delay to let the user read the message
+          await new Promise(resolve => setTimeout(resolve, 1500));
           await signInWithRedirect(auth, provider);
           return;
-        } catch (redirectError) {
-          handleAuthError(redirectError);
         }
-      } else {
-        handleAuthError(error);
+        throw popupError;
       }
+    } catch (error: any) {
+      console.error("Google Auth Error:", error);
+      handleAuthError(error);
     } finally {
       clearTimeout(timeout);
       if (!(isAppleDevice && !isIframe)) {
@@ -862,13 +902,10 @@ export default function App() {
     let message = "Authentication failed. Please try again.";
     
     if (isSecurityError && isAppleDevice) {
-      message = isIframe 
-        ? "Safari blocks login in this preview window. Please use the 'Open in a new tab' link at the bottom."
-        : "Safari security settings (ITP) are blocking the connection. Try checking 'Block All Cookies' or 'Private Browsing' settings.";
-      
-      // If it's a security error in a new tab, suggest email login
-      if (!isIframe) {
-        message += " Alternatively, use Email/Password login which is more resilient.";
+      if (isIframe) {
+        message = "Safari security blocks login in this preview. Use 'Open in Standard Tab' below.";
+      } else {
+        message = "Storage restriction detected. Please: 1. Turn OFF 'Private Browsing' 2. Go to Settings > Safari > Advanced and Turn OFF 'Block All Cookies'.";
       }
     } else {
       switch (error?.code) {
@@ -1118,26 +1155,38 @@ export default function App() {
     <div className="min-h-screen bg-brand-dark text-gray-100 selection:bg-brand-primary selection:text-white relative overflow-x-hidden">
       {showSafariShield && (
         <div className={cn(
-          "fixed top-0 left-0 right-0 z-[100] py-2 px-4 text-center text-xs font-bold shadow-lg flex items-center justify-center gap-3 transition-colors",
-          isStorageBlocked ? "bg-rose-500 text-white" : "bg-brand-primary text-brand-dark"
+          "fixed top-0 left-0 right-0 z-[100] py-2 px-4 text-center text-xs font-bold shadow-lg flex flex-col md:flex-row items-center justify-center gap-2 md:gap-4 transition-colors",
+          isStorageBlocked ? "bg-rose-600 text-white" : "bg-brand-primary text-brand-dark"
         )}>
-          <ShieldAlert className="w-4 h-4" />
-          <span>
-            {isStorageBlocked 
-              ? "Storage is BLOCKED by your browser. Sign-in cannot persist. Please disable Private Mode or use another browser." 
-              : "Safari security settings (ITP) may block login in this frame."}
-          </span>
-          <a 
-            href={window.location.href} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="bg-brand-dark text-white px-3 py-1 rounded-full text-[10px] hover:bg-black transition-colors whitespace-nowrap"
-          >
-            Open Top-Level Link
-          </a>
-          <button onClick={() => setShowSafariShield(false)} className="opacity-50 hover:opacity-100 ml-2">
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 shrink-0" />
+            <span>
+              {isStorageBlocked 
+                ? "BROWSER SECURITY BLOCKED STORAGE: Use a non-private tab & ensure 'Block All Cookies' is OFF in Safari Settings." 
+                : "SAFARI SECURITY DETECTED: If login fails, check Settings > Safari > Advanced and ensure 'Block All Cookies' is OFF."}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <a 
+              href={window.location.href} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="bg-brand-dark text-white px-3 py-1 rounded-full text-[10px] hover:bg-black transition-colors whitespace-nowrap"
+            >
+              Open in Standard Tab
+            </a>
+            <button 
+              onClick={() => {
+                window.location.reload();
+              }}
+              className="bg-white/20 hover:bg-white/40 text-current px-3 py-1 rounded-full text-[10px] transition-colors whitespace-nowrap"
+            >
+              Retry
+            </button>
+            <button onClick={() => setShowSafariShield(false)} className="opacity-50 hover:opacity-100 p-1">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
       <SecurityGuard />
@@ -3361,30 +3410,35 @@ export default function App() {
                 </div>
 
                 {/iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent) && !(/Chrome/i.test(navigator.userAgent)) && (
-                  <div className="bg-brand-primary/10 rounded-xl p-4 border border-brand-primary/20 space-y-2">
-                    <p className="text-[10px] font-bold text-brand-primary uppercase tracking-widest flex items-center justify-center gap-2">
+                  <div className="bg-brand-primary/10 rounded-xl p-4 border border-brand-primary/20 space-y-3">
+                    <div className="flex items-center justify-center gap-2 text-brand-primary">
                       <ShieldAlert className="w-3 h-3" />
-                      Browser Security Notice
-                    </p>
-                    <p className="text-[10px] text-gray-400 leading-relaxed">
+                      <p className="text-[10px] font-bold uppercase tracking-widest">
+                        Browser Security Notice
+                      </p>
+                    </div>
+                    <p className="text-[10px] text-gray-400 leading-relaxed px-2">
                       {isStorageBlocked 
-                        ? "Your browser is blocking essential storage (likely Private Mode or strict ITP). Sign-in cannot persist. Try disabling Private Mode or using a different browser."
-                        : "Safari's strict privacy rules often block sign-in popups in this preview frame."}
+                        ? "Your browser is blocking essential storage (Private Mode or 'Block All Cookies'). Sign-in WILL FAIL unless you use a standard tab and allow cookies."
+                        : "Safari's strict privacy rules (ITP) often block sign-in popups in this preview frame."}
                     </p>
-                    <div className="flex flex-col gap-2 pt-1">
+                    <div className="flex flex-col gap-2 pt-1 px-2">
                       <a 
                         href={window.location.href} 
                         target="_blank" 
                         rel="noopener noreferrer" 
                         className="inline-block bg-brand-primary text-brand-dark px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-white transition-colors"
                       >
-                        Open in New Tab
+                        Open in Standard Tab
                       </a>
-                      {isStorageBlocked && (
-                        <p className="text-[8px] text-gray-500 italic">
-                          If the new tab still fails, check your "Block All Cookies" settings in Safari.
-                        </p>
-                      )}
+                      <button
+                        onClick={() => {
+                          window.location.reload();
+                        }}
+                        className="text-[9px] text-gray-500 hover:text-white underline font-medium"
+                      >
+                        I've fixed my settings, refresh page
+                      </button>
                     </div>
                   </div>
                 )}
