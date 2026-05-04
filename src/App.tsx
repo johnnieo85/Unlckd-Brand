@@ -634,9 +634,6 @@ export default function App() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
-  const [showSafariShield, setShowSafariShield] = useState(false);
-  const [isStorageBlocked, setIsStorageBlocked] = useState(false);
-  const isIframe = typeof window !== 'undefined' && window.self !== window.top;
 
   useEffect(() => {
     // Force a one-time logout and session clear for the 6-digit PIN security update
@@ -674,62 +671,6 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    // Check if localStorage and IndexedDB are available
-    const checkStorage = async () => {
-      let storageOk = false;
-      let idbOk = false;
-
-      try {
-        const test = 'test_' + Math.random();
-        localStorage.setItem(test, test);
-        localStorage.removeItem(test);
-        storageOk = true;
-      } catch (e) {
-        storageOk = false;
-      }
-
-      try {
-        const dbName = 'test_idb_' + Math.random();
-        const request = indexedDB.open(dbName);
-        request.onsuccess = () => {
-          indexedDB.deleteDatabase(dbName);
-        };
-        idbOk = true;
-      } catch (e) {
-        idbOk = false;
-      }
-
-      if (!storageOk || !idbOk) {
-        console.warn("Storage or IndexedDB is blocked by browser security settings.");
-        setIsStorageBlocked(true);
-        setShowSafariShield(true);
-      } else {
-        setIsStorageBlocked(false);
-      }
-    };
-
-    checkStorage();
-  }, []);
-
-  useEffect(() => {
-    // Detect Safari security errors globally
-    const handleGlobalError = (event: any) => {
-      const error = event.error || event.reason;
-      if (error?.message?.includes('insecure') || error?.name === 'SecurityError') {
-        setShowSafariShield(true);
-      }
-    };
-
-    window.addEventListener('error', handleGlobalError);
-    window.addEventListener('unhandledrejection', handleGlobalError);
-
-    return () => {
-      window.removeEventListener('error', handleGlobalError);
-      window.removeEventListener('unhandledrejection', handleGlobalError);
-    };
-  }, []);
-
-  useEffect(() => {
     if (user && savedReports.length > 0) {
       // Use the absolute latest report that is opted-in for Gym Hub import
       const reportForGym = savedReports.find(r => r.userData?.syncToGymHub !== false);
@@ -741,31 +682,16 @@ export default function App() {
 
   useEffect(() => {
     // Handle redirect result for mobile/Apple devices
-    // Wrap in a safe check to avoid "Operation is insecure" on Safari iframes
     const checkRedirect = async () => {
-      // Small delay to allow Safari storage to initialize
-      await new Promise(resolve => setTimeout(resolve, 500));
       try {
         const result = await getRedirectResult(auth);
         if (result?.user) {
           setIsAuthModalOpen(false);
         }
       } catch (error: any) {
-        // Only report if it's not a security error we expect in an iframe
-        const isSecurityError = 
-          error?.message?.includes('insecure') || 
-          error?.name === 'SecurityError' || 
-          error?.code === 'auth/internal-error' ||
-          error?.message?.includes('partition');
-          
-        if (!isSecurityError && error.code !== 'auth/redirect-cancelled-by-user') {
+        if (error.code !== 'auth/redirect-cancelled-by-user') {
           console.error("Redirect auth error:", error);
-          if (error?.message?.includes('insecure')) {
-            const isApple = /iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent);
-            if (isApple) setAuthError("Safari security restrictions detected. Use the 'Open in a new tab' link below.");
-          } else {
-            handleAuthError(error);
-          }
+          handleAuthError(error);
         }
       }
     };
@@ -819,18 +745,9 @@ export default function App() {
   };
 
   const handleGoogleSignIn = async () => {
-    const isAppleDevice = /iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent) && !(/Chrome/i.test(navigator.userAgent));
-    const isIframe = window.self !== window.top;
-    
     setIsSigningIn(true);
     setAuthError(null);
     const provider = new GoogleAuthProvider();
-    
-    // If we're in a Safari iframe, we know it will likely fail.
-    // Show the shield but don't return, let them try or read the message.
-    if (isAppleDevice && isIframe) {
-      setShowSafariShield(true);
-    }
     
     // Force prompt for account selection to avoid "stuck" silent failures
     provider.setCustomParameters({ prompt: 'select_account' });
@@ -841,57 +758,31 @@ export default function App() {
     }, 20000);
 
     try {
-      if (isIframe) {
-        // Warn but allow attempt
-        console.info("Auth: Iframe detected. Popups/Redirects might be restricted.");
-        
-        try {
-          await signInWithPopup(auth, provider);
-          setIsAuthModalOpen(false);
-          setIsSigningIn(false);
-          return;
-        } catch (popupError: any) {
-          console.warn("Auth: Popup failed in iframe:", popupError);
-          // Redirect in iframe is a guaranteed 403 from Google
-          setAuthError("Google Sign-In is blocked in this preview. For security, please use Email login or click 'Open in Standard Tab' below.");
-          setShowSafariShield(true);
-          setIsSigningIn(false);
-          return;
-        }
-      }
-      
-      if (isStorageBlocked) {
-        console.warn("Storage is blocked. Proceeding with in-memory persistence.");
-        // We don't return here anymore, allowing Firebase's inMemoryPersistence to take over
-      }
-      
-      // On Safari, popups are often more reliable than redirects IF they aren't blocked.
-      // But they must be triggered by a direct user gesture.
+      // Standard popup sign-in
       try {
         await signInWithPopup(auth, provider);
         setIsAuthModalOpen(false);
       } catch (popupError: any) {
-        // If popup was blocked or failed, try redirect as fallback ONLY if not in an iframe
-        // Google explicitly blocks OAuth redirects inside iframes (results in 403)
+        console.warn("Google Sign-In Popup error:", popupError);
+        
+        // If popup was blocked or closed, try redirect as fallback
         if (popupError.code === 'auth/popup-blocked' || 
             popupError.code === 'auth/popup-closed-by-user' ||
             popupError.code === 'auth/internal-error' ||
             popupError.name === 'SecurityError') {
           
-          if (isIframe) {
-            console.warn("Popup blocked in iframe. Redirect forbidden to avoid 403.");
-            setAuthError("Sign-in popup was blocked. Google security forbids redirects inside this preview. Please click 'Open in Standard Tab' below.");
-            setIsSigningIn(false);
-            return;
-          }
-
-          console.info("Auth: Popup failed or closed, attempting redirect fallback...");
-          setAuthError("Sign-in popup was blocked or closed. Switching to redirect...");
+          setAuthError("Sign-in popup issue detected. Checking browser permissions...");
           
-          // Small delay to let the user read the message
-          await new Promise(resolve => setTimeout(resolve, 1500));
-          await signInWithRedirect(auth, provider);
-          return;
+          // Small delay to let the user see the message
+          await new Promise(resolve => setTimeout(resolve, 800));
+          
+          try {
+            await signInWithRedirect(auth, provider);
+            return;
+          } catch (redirectError: any) {
+            console.error("Redirect shift failed:", redirectError);
+            throw redirectError;
+          }
         }
         throw popupError;
       }
@@ -926,58 +817,38 @@ export default function App() {
 
   const handleAuthError = (error: any) => {
     setIsSigningIn(false);
-    
-    const isSecurityError = 
-      error?.message?.includes('insecure') || 
-      error?.name === 'SecurityError' || 
-      error?.code === 'auth/internal-error' ||
-      error?.message?.includes('partition');
-      
-    const isAppleDevice = /iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent) && !(/Chrome/i.test(navigator.userAgent));
-    const isIframe = window.self !== window.top;
-    
-    if (isSecurityError) {
-      setShowSafariShield(true);
-    }
+    console.error("Auth detailed error:", error);
 
     if (error?.code === 'auth/popup-closed-by-user') {
-      if (isAppleDevice && isIframe) {
-        setAuthError("Safari security often blocks login in this preview. Use 'Open in Standard Tab' or Email login.");
-      } else {
-        setAuthError("The sign-in popup was closed. Please try again or use the Email/Password option.");
-      }
+      setAuthError("The sign-in popup was closed before completion. Please try again.");
       return;
     }
     
     let message = "Authentication failed. Please try again.";
     
-    if (isSecurityError && isAppleDevice) {
-      if (isIframe) {
-        message = "Safari security blocks Google login in this preview. Please use Email/Password login or click 'Open in Standard Tab' below.";
-      } else {
-        message = "Storage restriction detected. For a guaranteed login, we recommend using Email/Password or disabling 'Private Browsing' in Safari.";
-      }
-    } else {
-      switch (error?.code) {
-        case 'auth/popup-blocked':
-          message = "Popup was blocked. Please enable popups or use the 'Open in a new tab' link below.";
-          break;
-        case 'auth/unauthorized-domain':
-          message = "Unauthorized Domain: Please add this URL to your Firebase Authorized Domains list in the Firebase Console.";
-          break;
-        case 'auth/network-request-failed':
-          message = "Network error. Please check your connection.";
-          break;
-        case 'auth/user-not-found':
-        case 'auth/wrong-password':
-        case 'auth/invalid-credential':
-          message = "Invalid email or password.";
-          break;
-      }
+    switch (error?.code) {
+      case 'auth/popup-blocked':
+        message = "Popup was blocked by your browser. Please enable popups for this site.";
+        break;
+      case 'auth/unauthorized-domain':
+        message = "Unauthorized Domain: This URL is not on your Firebase Authorized Domains list. Please add it in the Firebase Console (Authentication > Settings).";
+        break;
+      case 'auth/network-request-failed':
+        message = "Network error. Please check your connection and try again.";
+        break;
+      case 'auth/user-not-found':
+      case 'auth/wrong-password':
+      case 'auth/invalid-credential':
+        message = "Invalid email or password. Please check your credentials.";
+        break;
+      case 'auth/internal-error':
+        if (error.message?.includes('partition')) {
+          message = "Browser cross-site restrictions (Partitioned Cookies) detected. Try using a non-private window or another browser.";
+        }
+        break;
     }
     
     setAuthError(message);
-    console.error("Auth detailed error:", error);
   };
 
   const handleSignIn = () => {
@@ -1203,43 +1074,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-brand-dark text-gray-100 selection:bg-brand-primary selection:text-white relative overflow-x-hidden">
-      {showSafariShield && (
-        <div className={cn(
-          "fixed top-0 left-0 right-0 z-[100] py-2 px-4 text-center text-xs font-bold shadow-lg flex flex-col md:flex-row items-center justify-center gap-2 md:gap-4 transition-colors",
-          isStorageBlocked ? "bg-rose-600 text-white" : "bg-brand-primary text-brand-dark"
-        )}>
-          <div className="flex items-center gap-2">
-            <ShieldAlert className="w-4 h-4 shrink-0" />
-            <span>
-              {isStorageBlocked 
-                ? "BROWSER SECURITY BLOCKED STORAGE: Use a non-private tab & ensure 'Block All Cookies' is OFF in Safari Settings." 
-                : "SAFARI SECURITY DETECTED: If login fails, check Settings > Safari > Advanced and ensure 'Block All Cookies' is OFF."}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <a 
-              href={window.location.href} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="bg-brand-dark text-white px-3 py-1 rounded-full text-[10px] hover:bg-black transition-colors whitespace-nowrap"
-            >
-              Open in Standard Tab
-            </a>
-            <button 
-              onClick={() => {
-                window.location.reload();
-              }}
-              className="bg-white/20 hover:bg-white/40 text-current px-3 py-1 rounded-full text-[10px] transition-colors whitespace-nowrap"
-            >
-              Retry
-            </button>
-            <button onClick={() => setShowSafariShield(false)} className="opacity-50 hover:opacity-100 p-1">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      )}
-      <SecurityGuard />
       {/* Background decorative elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-brand-primary/10 blur-[120px] rounded-full" />
@@ -3458,42 +3292,6 @@ export default function App() {
                     Note: Pro membership is required for premium features.
                   </p>
                 </div>
-
-                {(isIframe || (/iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent) && !(/Chrome/i.test(navigator.userAgent)))) && (
-                  <div className="bg-brand-primary/10 rounded-xl p-4 border border-brand-primary/20 space-y-3">
-                    <div className="flex items-center justify-center gap-2 text-brand-primary">
-                      <ShieldAlert className="w-3 h-3" />
-                      <p className="text-[10px] font-bold uppercase tracking-widest">
-                        Preview Security Notice
-                      </p>
-                    </div>
-                    <p className="text-[10px] text-gray-400 leading-relaxed px-2">
-                      {isIframe 
-                        ? "Google security forbids sign-in redirects in this preview window. If Google login fails, please use Email login or open the app in a standard tab."
-                        : (isStorageBlocked 
-                            ? "Your browser is blocking essential storage. Sign-in WILL FAIL unless you use a standard tab or log in with Email/Password."
-                            : "Safari's strict privacy rules (ITP) may block Google popups. If you have issues, use Email/Password login or open in a standard tab.")}
-                    </p>
-                    <div className="flex flex-col gap-2 pt-1 px-2">
-                      <a 
-                        href={window.location.href} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="inline-block bg-brand-primary text-brand-dark px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-white transition-colors"
-                      >
-                        Open in Standard Tab
-                      </a>
-                      <button
-                        onClick={() => {
-                          window.location.reload();
-                        }}
-                        className="text-[9px] text-gray-500 hover:text-white underline font-medium"
-                      >
-                        I've fixed my settings, refresh page
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
             </motion.div>
           </div>
