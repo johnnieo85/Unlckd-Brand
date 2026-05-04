@@ -748,49 +748,53 @@ export default function App() {
     setIsSigningIn(true);
     setAuthError(null);
     const provider = new GoogleAuthProvider();
-    
-    // Force prompt for account selection to avoid "stuck" silent failures
     provider.setCustomParameters({ prompt: 'select_account' });
-
-    // Safety timeout
-    const timeout = setTimeout(() => {
-      setIsSigningIn(false);
-    }, 20000);
+    
+    // Check if we are in an iframe (AI Studio preview)
+    const isIframe = window.self !== window.top;
 
     try {
-      // Standard popup sign-in
+      if (!isIframe) {
+        // In a standard tab, Redirect is much more robust than Popup (especially on mobile/Safari)
+        console.info("Auth: Using Redirect for standard tab...");
+        await signInWithRedirect(auth, provider);
+        return; // Redirect reloads the page
+      }
+
+      // If in Iframe, we MUST try Popup because Redirect is typically blocked in frames
+      console.info("Auth: In iframe, attempting Popup...");
       try {
         await signInWithPopup(auth, provider);
         setIsAuthModalOpen(false);
       } catch (popupError: any) {
-        console.warn("Google Sign-In Popup error:", popupError);
+        console.warn("Google Sign-In Popup failed:", popupError);
         
-        // If popup was blocked or closed, try redirect as fallback
+        // Handle specific popup failures
         if (popupError.code === 'auth/popup-blocked' || 
             popupError.code === 'auth/popup-closed-by-user' ||
-            popupError.code === 'auth/internal-error' ||
-            popupError.name === 'SecurityError') {
+            popupError.code === 'auth/cancelled-popup-request') {
           
-          setAuthError("Sign-in popup issue detected. Checking browser permissions...");
-          
-          // Small delay to let the user see the message
-          await new Promise(resolve => setTimeout(resolve, 800));
-          
-          try {
-            await signInWithRedirect(auth, provider);
-            return;
-          } catch (redirectError: any) {
-            console.error("Redirect shift failed:", redirectError);
-            throw redirectError;
-          }
+          setAuthError("Google Login was blocked by your browser's security or closed. In this preview window, we recommend using Email login or clicking 'Open in Standard Tab' below.");
+        } else {
+          throw popupError;
         }
-        throw popupError;
       }
     } catch (error: any) {
       console.error("Google Auth Error:", error);
-      handleAuthError(error);
+      
+      if (error.code === 'auth/unauthorized-domain') {
+        const hostname = window.location.hostname;
+        setAuthError(`Domain Not Authorized: Please add '${hostname}' to your Firebase Authorized Domains list (Firebase Console > Auth > Settings).`);
+      } else if (error.code === 'auth/popup-blocked') {
+        setAuthError("Sign-in popup was blocked. Please enable popups or try Email login.");
+      } else if (error.code === 'auth/popup-closed-by-user') {
+        setAuthError("The sign-in process was interrupted. If this keeps happening, use Email login or check your 'Authorized Domains' in Firebase.");
+      } else if (error.code === 'auth/internal-error' && error.message?.includes('partition')) {
+        setAuthError("Browser security (Partitioned Cookies) blocked the sign-in. Use a non-private window or Email login.");
+      } else {
+        handleAuthError(error);
+      }
     } finally {
-      clearTimeout(timeout);
       setIsSigningIn(false);
     }
   };
@@ -820,7 +824,12 @@ export default function App() {
     console.error("Auth detailed error:", error);
 
     if (error?.code === 'auth/popup-closed-by-user') {
-      setAuthError("The sign-in popup was closed before completion. Please try again.");
+      const isIframe = window.self !== window.top;
+      if (isIframe) {
+        setAuthError("The sign-in window was closed or blocked. In this preview, security rules may prevent the login. Try Email login or 'Open in Standard Tab'.");
+      } else {
+        setAuthError("The sign-in process was interrupted. If the window closed by itself, ensure this domain is added to 'Authorized Domains' in your Firebase Console.");
+      }
       return;
     }
     
@@ -831,7 +840,7 @@ export default function App() {
         message = "Popup was blocked by your browser. Please enable popups for this site.";
         break;
       case 'auth/unauthorized-domain':
-        message = "Unauthorized Domain: This URL is not on your Firebase Authorized Domains list. Please add it in the Firebase Console (Authentication > Settings).";
+        message = `Domain Not Authorized: Please add '${window.location.hostname}' to your Firebase Authorized Domains list (Firebase Console > Authentication > Settings).`;
         break;
       case 'auth/network-request-failed':
         message = "Network error. Please check your connection and try again.";
@@ -3216,9 +3225,23 @@ export default function App() {
               </div>
 
               {authError && (
-                <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-sm text-red-500 flex items-center gap-3">
-                  <Info className="w-4 h-4 shrink-0" />
-                  {authError}
+                <div className="mb-6 overflow-hidden">
+                  <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-sm text-red-500 flex flex-col gap-3">
+                    <div className="flex items-center gap-3">
+                      <Info className="w-4 h-4 shrink-0" />
+                      <span className="flex-1">{authError}</span>
+                    </div>
+                    {window.self !== window.top && (
+                      <a 
+                        href={window.location.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-red-500 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest text-center hover:bg-red-600 transition-colors"
+                      >
+                        Open in Standard Tab
+                      </a>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -3277,7 +3300,28 @@ export default function App() {
                 )}
               </Button>
 
+              {isSigningIn && !authEmail && (
+                <p className="mt-4 text-[10px] text-center text-gray-500 animate-pulse">
+                  Opening Google login window... If it doesn't appear, check your popup blocker.
+                </p>
+              )}
+
               <div className="mt-8 text-center space-y-6">
+                {window.self !== window.top && (
+                  <div className="p-3 bg-brand-primary/5 rounded-xl border border-brand-primary/10">
+                    <p className="text-[10px] text-gray-500 mb-2">
+                      Experiencing issues? Preview frames can restrict Google logins.
+                    </p>
+                    <a 
+                      href={window.location.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] font-bold text-brand-primary hover:underline uppercase tracking-wider"
+                    >
+                      Open in Standard Tab
+                    </a>
+                  </div>
+                )}
                 <div className="pt-4 border-t border-white/5 space-y-2">
                   <p className="text-sm text-gray-400">
                     {isSignUp ? "Already have an account?" : "No password set up yet?"} {' '}
