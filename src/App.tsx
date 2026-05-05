@@ -126,7 +126,9 @@ const RatingTable = ({ title, ratings = [], summary, photo }: { title: string; r
         {summary && (
           <div className="p-6 bg-brand-primary/5 border border-brand-primary/10 rounded-2xl text-sm text-gray-300 leading-relaxed italic relative overflow-hidden print:bg-gray-50 print:border-gray-200 print:text-gray-700">
             <div className="absolute top-0 left-0 w-1 h-full bg-brand-primary/40 print:bg-gray-400" />
-            "{summary}"
+            <div className="markdown-body">
+              <ReactMarkdown>{summary}</ReactMarkdown>
+            </div>
           </div>
         )}
       </div>
@@ -224,7 +226,9 @@ const ProgressComparison = ({ title, ratings = [], summary, beforePhoto, afterPh
         {summary && (
           <div className="p-6 bg-brand-primary/5 border border-brand-primary/10 rounded-2xl text-sm text-gray-300 leading-relaxed italic relative overflow-hidden print:bg-gray-50 print:border-gray-200 print:text-gray-700">
             <div className="absolute top-0 left-0 w-1 h-full bg-brand-primary/40 print:bg-gray-400" />
-            "{summary}"
+            <div className="markdown-body">
+              <ReactMarkdown>{summary}</ReactMarkdown>
+            </div>
           </div>
         )}
       </div>
@@ -589,6 +593,7 @@ export default function App() {
     afterWeight: ''
   });
   const [report, setReport] = useState<AssessmentResult | null>(null);
+  const [viewingDate, setViewingDate] = useState<Date>(new Date());
   const [loadingMessage, setLoadingMessage] = useState('Analyzing your physique...');
   const [user, setUser] = useState(auth.currentUser);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -916,6 +921,7 @@ export default function App() {
     setPhotos(saved.photos);
     if (saved.progressPhotos) setProgressPhotos(saved.progressPhotos);
     setReport(saved.report);
+    setViewingDate(saved.timestamp?.toDate ? saved.timestamp.toDate() : new Date());
     setStep('report');
   };
 
@@ -978,6 +984,7 @@ export default function App() {
         invalidLinksContext
       );
       setReport(result);
+      setViewingDate(new Date());
       
       const currentAuthUser = auth.currentUser;
       if (currentAuthUser) {
@@ -1255,7 +1262,9 @@ export default function App() {
                             </h3>
                           </div>
                           <p className="text-[10px] text-gray-500 font-mono">
-                            {saved.timestamp?.toDate ? saved.timestamp.toDate().toLocaleDateString() : 'Recent'}
+                            {saved.timestamp?.toDate 
+                              ? `${saved.timestamp.toDate().toLocaleDateString()} ${saved.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` 
+                              : 'Recent'}
                           </p>
                         </div>
                         <p className="text-sm text-gray-400 line-clamp-2 font-light italic">
@@ -1594,21 +1603,24 @@ export default function App() {
                     value={userData.name}
                     onChange={e => setUserData({...userData, name: e.target.value})}
                   />
-                  <Input 
-                    label="Location" 
-                    placeholder="e.g. London, UK" 
-                    required 
-                    value={userData.location}
-                    onChange={e => setUserData({...userData, location: e.target.value})}
-                  />
-                  <Input 
-                    label="Occupation" 
-                    placeholder="e.g. Software Engineer" 
-                    required 
-                    value={userData.occupation}
-                    onChange={e => setUserData({...userData, occupation: e.target.value})}
-                  />
-
+                  {path !== 'progress' && (
+                    <>
+                      <Input 
+                        label="Location" 
+                        placeholder="e.g. London, UK" 
+                        required 
+                        value={userData.location}
+                        onChange={e => setUserData({...userData, location: e.target.value})}
+                      />
+                      <Input 
+                        label="Occupation" 
+                        placeholder="e.g. Software Engineer" 
+                        required 
+                        value={userData.occupation}
+                        onChange={e => setUserData({...userData, occupation: e.target.value})}
+                      />
+                    </>
+                  )}
                   <Input 
                     label="Age" 
                     type="number" 
@@ -1740,24 +1752,6 @@ export default function App() {
                     />
                   )}
 
-                  <Input 
-                    label="Plan Start Date" 
-                    type="date" 
-                    required 
-                    value={userData.planStartDate}
-                    onChange={e => setUserData({...userData, planStartDate: e.target.value})}
-                  />
-                  <Select 
-                    label="Plan Duration"
-                    options={[
-                      {label: '7 Days', value: '7-day'},
-                      {label: '2 Weeks', value: '2-week'},
-                      {label: '4 Weeks', value: '4-week'},
-                      {label: '12 Weeks', value: '12-week'}
-                    ]}
-                    value={userData.planDuration}
-                    onChange={e => setUserData({...userData, planDuration: e.target.value as any})}
-                  />
                   {path === 'full' && (
                     <div className="md:col-span-2 pt-2 border-t border-white/[0.03]">
                       <Checkbox 
@@ -1773,29 +1767,33 @@ export default function App() {
                   )}
                 </div>
 
-                {(path !== 'meal' && path !== 'assessment' && path !== 'progress') && (
+                {(path !== 'meal' && path !== 'assessment') && (
                   <>
-                    <Input 
-                      label="Primary Goal"
-                      placeholder="e.g. Lose 5kg fat while maintaining muscle" 
-                      required 
-                      value={userData.goals}
-                      onChange={e => setUserData({...userData, goals: e.target.value})}
-                    />
-                    <Input 
-                      label="Current Workout" 
-                      placeholder="Describe your current routine or 'None'" 
-                      required
-                      value={userData.currentWorkout}
-                      onChange={e => setUserData({...userData, currentWorkout: e.target.value})}
-                    />
-                    <Input 
-                      label="Event Focus" 
-                      placeholder="e.g. Wedding in 3 months, Beach holiday" 
-                      required
-                      value={userData.eventFocus}
-                      onChange={e => setUserData({...userData, eventFocus: e.target.value})}
-                    />
+                    {path !== 'progress' && (
+                      <>
+                        <Input 
+                          label="Primary Goal"
+                          placeholder="e.g. Lose 5kg fat while maintaining muscle" 
+                          required 
+                          value={userData.goals}
+                          onChange={e => setUserData({...userData, goals: e.target.value})}
+                        />
+                        <Input 
+                          label="Current Workout" 
+                          placeholder="Describe your current routine or 'None'" 
+                          required
+                          value={userData.currentWorkout}
+                          onChange={e => setUserData({...userData, currentWorkout: e.target.value})}
+                        />
+                        <Input 
+                          label="Event Focus" 
+                          placeholder="e.g. Wedding in 3 months, Beach holiday" 
+                          required
+                          value={userData.eventFocus}
+                          onChange={e => setUserData({...userData, eventFocus: e.target.value})}
+                        />
+                      </>
+                    )}
 
                     {(path === 'workout' || path === 'full' || path === 'progress') && (
                       <Input 
@@ -1805,6 +1803,29 @@ export default function App() {
                         value={userData.injuries}
                         onChange={e => setUserData({...userData, injuries: e.target.value})}
                       />
+                    )}
+
+                    {path !== 'progress' && (
+                      <>
+                        <Input 
+                          label="Plan Start Date" 
+                          type="date" 
+                          required 
+                          value={userData.planStartDate}
+                          onChange={e => setUserData({...userData, planStartDate: e.target.value})}
+                        />
+                        <Select 
+                          label="Plan Duration"
+                          options={[
+                            {label: '7 Days', value: '7-day'},
+                            {label: '2 Weeks', value: '2-week'},
+                            {label: '4 Weeks', value: '4-week'},
+                            {label: '12 Weeks', value: '12-week'}
+                          ]}
+                          value={userData.planDuration}
+                          onChange={e => setUserData({...userData, planDuration: e.target.value as any})}
+                        />
+                      </>
                     )}
                   </>
                 )}
@@ -2288,12 +2309,15 @@ export default function App() {
                           path === 'workout' ? 'Workout Plan' :
                           'Transformation Report' 
                         },
-                        { label: 'Date', value: new Date().toLocaleDateString() },
-                        { label: 'Unique ID', value: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) },
+                        { label: 'Date', value: viewingDate.toLocaleDateString() },
+                        { label: 'Time', value: viewingDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) },
+                        { label: 'Unique ID', value: viewingDate.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) },
                         { label: 'Age / Sex', value: `${userData.age} / ${userData.sex.charAt(0).toUpperCase() + userData.sex.slice(1)}` },
                         { label: 'Height / Weight', value: `${userData.height} ${userData.heightUnit} / ${userData.weight} ${userData.weightUnit}` },
-                        { label: 'Location', value: userData.location },
-                        { label: 'Occupation', value: userData.occupation },
+                        ...(path !== 'progress' ? [
+                          { label: 'Location', value: userData.location },
+                          { label: 'Occupation', value: userData.occupation }
+                        ] : []),
                         ...(path !== 'meal' ? [{ label: 'Current Workout', value: userData.currentWorkout || 'None' }] : []),
                         ...(path === 'meal' 
                           ? [{ 
@@ -2782,10 +2806,10 @@ export default function App() {
                             week.days.forEach((day, dayIdx) => {
                               const planDateData = getPlanDate(week.week, day.day, dayIdx);
                               content += `${(planDateData.weekday || day.day || '').toUpperCase()}${planDateData.date ? ` [${planDateData.date}]` : ''}\n`;
-                              content += `Breakfast: ${day.breakfast || 'N/A'}${day.breakfastUrl ? ` (${day.breakfastUrl})` : ''}\n`;
-                              content += `Lunch: ${day.lunch || 'N/A'}${day.lunchUrl ? ` (${day.lunchUrl})` : ''}\n`;
-                              content += `Dinner: ${day.dinner || 'N/A'}${day.dinnerUrl ? ` (${day.dinnerUrl})` : ''}\n`;
-                              content += `Snack: ${day.snack || 'N/A'}${day.snackUrl ? ` (${day.snackUrl})` : ''}\n`;
+                              content += `Breakfast: ${day.breakfast || 'N/A'}\n`;
+                              content += `Lunch: ${day.lunch || 'N/A'}\n`;
+                              content += `Dinner: ${day.dinner || 'N/A'}\n`;
+                              content += `Snack: ${day.snack || 'N/A'}\n`;
                               content += `\n`;
                             });
                             content += `\n`;
@@ -2845,57 +2869,45 @@ export default function App() {
                                      <span className="text-[10px] text-gray-500 font-mono mt-0.5">{planDateData.date}</span>
                                    </div>
                                  </td>
-                                <td className="px-4 py-4 border-r border-gray-800 text-gray-300">
-  <div className="flex flex-col gap-1">
-    <span className="font-medium text-gray-100">{day.breakfast}</span>
-    <a 
-      href={`https://www.pinterest.com/search/pins/?q=${encodeURIComponent(day.breakfast + ' healthy recipe')}`}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-[10px] text-brand-primary hover:underline flex items-center gap-1 font-bold"
-    >
-      View Pinterest Search <ExternalLink className="w-2 h-2" />
-    </a>
-  </div>
+                                <td className="px-4 py-4 border-r border-gray-800 text-gray-300 text-center">
+                                  <a 
+                                    href={`https://www.pinterest.com/search/pins/?q=${encodeURIComponent(day.breakfast + ' healthy recipe')}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="font-medium text-gray-100 hover:text-brand-primary transition-colors hover:underline"
+                                  >
+                                    {day.breakfast}
+                                  </a>
+                                </td>
+<td className="px-4 py-4 border-r border-gray-800 text-gray-300 text-center">
+  <a 
+    href={`https://www.pinterest.com/search/pins/?q=${encodeURIComponent(day.lunch + ' healthy recipe')}`}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="font-medium text-gray-100 hover:text-brand-primary transition-colors hover:underline"
+  >
+    {day.lunch}
+  </a>
 </td>
-<td className="px-4 py-4 border-r border-gray-800 text-gray-300">
-  <div className="flex flex-col gap-1">
-    <span className="font-medium text-gray-100">{day.lunch}</span>
-    <a 
-      href={`https://www.pinterest.com/search/pins/?q=${encodeURIComponent(day.lunch + ' healthy recipe')}`}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-[10px] text-brand-primary hover:underline flex items-center gap-1 font-bold"
-    >
-      View Pinterest Search <ExternalLink className="w-2 h-2" />
-    </a>
-  </div>
+<td className="px-4 py-4 border-r border-gray-800 text-gray-300 text-center">
+  <a 
+    href={`https://www.pinterest.com/search/pins/?q=${encodeURIComponent(day.dinner + ' healthy recipe')}`}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="font-medium text-gray-100 hover:text-brand-primary transition-colors hover:underline"
+  >
+    {day.dinner}
+  </a>
 </td>
-<td className="px-4 py-4 border-r border-gray-800 text-gray-300">
-  <div className="flex flex-col gap-1">
-    <span className="font-medium text-gray-100">{day.dinner}</span>
-    <a 
-      href={`https://www.pinterest.com/search/pins/?q=${encodeURIComponent(day.dinner + ' healthy recipe')}`}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-[10px] text-brand-primary hover:underline flex items-center gap-1 font-bold"
-    >
-      View Pinterest Search <ExternalLink className="w-2 h-2" />
-    </a>
-  </div>
-</td>
-<td className="px-4 py-4 text-gray-300">
-  <div className="flex flex-col gap-1">
-    <span className="font-medium text-gray-100">{day.snack}</span>
-    <a 
-      href={`https://www.pinterest.com/search/pins/?q=${encodeURIComponent(day.snack + ' healthy idea')}`}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-[10px] text-brand-primary hover:underline flex items-center gap-1 font-bold"
-    >
-      View Pinterest Search <ExternalLink className="w-2 h-2" />
-    </a>
-  </div>
+<td className="px-4 py-4 text-gray-300 text-center">
+  <a 
+    href={`https://www.pinterest.com/search/pins/?q=${encodeURIComponent(day.snack + ' healthy idea')}`}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="font-medium text-gray-100 hover:text-brand-primary transition-colors hover:underline"
+  >
+    {day.snack}
+  </a>
 </td>
                               </tr>
                                );

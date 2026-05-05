@@ -159,7 +159,8 @@ async function generatePhysiqueAnalysis(
     Compare current photos with previous ones. Identify changes in muscle density, body fat, and posture.
     Before Weight: ${p.beforeWeight} ${userData.weightUnit} (Date: ${p.beforeDate})
     After Weight: ${p.afterWeight} ${userData.weightUnit} (Date: ${p.afterDate})
-    Evaluate the weight change in relation to the physique changes seen.
+    
+    CRITICAL: Assess the difference between the photos, positive or negative. Explicitly mention what has improved or declined in each specific view. Focus on "Then vs Now" details.
     `;
   }
 
@@ -179,6 +180,11 @@ async function generatePhysiqueAnalysis(
     1. Height/Weight Assessment: Analyze the user's weight relative to their height. Determine if their current weight is optimal, overweight, or underweight for their frame and fitness goals.
     2. Detailed Ratings & Summaries for ALL views (Front, Back, Left, Right).
     Note: The goal is ${userData.goals}.
+
+    LINK QUALITY PROTOCOL:
+    - If you reference any specific exercises or movements in your summaries, you MUST hyperlink them using Markdown: [Exercise Name](VideoURL).
+    - Use this YouTube search link: https://www.youtube.com/results?search_query=[EXERCISE+NAME]+exercise+tutorial
+    - NEVER provide raw URLs in parentheses like "Exercise Name (URL)". ONLY use Markdown links where the name is the clickable text.
     
     STRICT EXCLUSION: Do NOT include any grocery lists or meal plan details in this specific analysis.
   `;
@@ -290,7 +296,9 @@ async function generateHealthAndSupport(
     LINK QUALITY PROTOCOL:
     - For EVERY exercise demonstration mentioned, you MUST use this YouTube search link: https://www.youtube.com/results?search_query=[EXERCISE+NAME]+exercise+tutorial
     - For EVERY nutrition or recipe mention, you MUST use this Pinterest search link: https://www.pinterest.com/search/pins/?q=[MEAL+NAME]+healthy+recipe
-    - NEVER provide direct URLs to specific websites or video IDs. ALWAYS use the search result links above.
+    - NEVER provide raw URLs in parentheses like "(https://...)". 
+    - You MUST use Markdown hyperlinks: [Exercise/Meal Name](SearchURL).
+    - Only the Name should be clickable. No visible plain-text URLs on the report.
   `;
 
   const response = await withRetry(() => ai.models.generateContent({
@@ -305,11 +313,13 @@ async function generateHealthAndSupport(
         - Every single meal or ingredient mentioned in your summaries/strategies MUST be a specific, individually listed item that will appear in the final plan.
         - NEVER use generic advice. Reference at least 5-7 specific meals by name and provide their verified search links using the pattern [Meal Name](SearchURL).
         - Use the search tool to verify every single meal link leads to a high-quality recipe.
+        - NO RAW URLS as text. Only use Markdown: [Meal Name](Link).
         
         WORKOUT PROTOCOL:
         - When discussing training strategy, reference specific, individual exercises (e.g., "Incorporate [Romanian Deadlifts](VideoURL) for posterior chain...").
-        - Link to verified demonstrations for every exercise mentioned.
+        - Link to verified demonstrations for every exercise mentioned using Markdown: [Exercise Name](Link).
         - Ensure all references are to individual movements, NOT generic "workout focuses".
+        - NO RAW URLS as text. Only use Markdown: [Exercise Name](Link).
       `,
       responseMimeType: "application/json",
       tools: [{ googleSearch: {} }],
@@ -453,6 +463,7 @@ async function generateWorkoutPlan(
       - For EVERY exercise (warmUp and mainWork), you MUST set "videoUrl" to a YouTube search result link: https://www.youtube.com/results?search_query=[EXERCISE+NAME]+exercise+tutorial
       - Replace [EXERCISE+NAME] with the actual name of the exercise, URL-encoded where necessary.
       - NEVER provide direct URLs to specific YouTube videos or hallucinate video IDs.
+      - Each exercise Name in the output will be hyperlinked by the UI. 
       
       STRUCTURE & COMPLETENESS:
       - Each week MUST contain exactly 7 day objects (Monday through Sunday).
@@ -578,6 +589,7 @@ async function generateMealPlan(
       - For EVERY meal recommendation, you MUST set the corresponding URL field (breakfastUrl, lunchUrl, dinnerUrl, snackUrl) to a Pinterest search result link: https://www.pinterest.com/search/pins/?q=[MEAL+NAME]+healthy+recipe
       - Replace [MEAL+NAME] with the actual name of the meal, URL-encoded where necessary.
       - NEVER provide direct URLs to specific recipe websites. 
+      - Each meal Name in the output will be hyperlinked by the UI.
       
       COMPLETENESS & VARIETY:
       - EVERY single day MUST have unique breakfast, lunch, dinner, and snack recommendations.
