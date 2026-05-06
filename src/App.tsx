@@ -598,6 +598,76 @@ export default function App() {
   const [user, setUser] = useState(auth.currentUser);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
+  const [selectedFaq, setSelectedFaq] = useState<any>(null);
+
+  const faqs = [
+    {
+      id: 'iphone',
+      title: 'Trouble Accessing on iPhone?',
+      icon: Smartphone,
+      content: (
+        <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
+          <p>If you can access from other devices but not your iPhone, try these steps:</p>
+          <ul className="list-disc pl-5 space-y-2">
+            <li><span className="text-gray-200">Try Cellular Data:</span> Turn off Wi-Fi in Settings. If it works, the issue is your Wi-Fi configuration.</li>
+            <li><span className="text-gray-200">Disable Wi-Fi Privacy:</span> Settings → Wi-Fi → (i) → Toggle off <b>Private Wi-Fi Address</b> and <b>Limit IP Tracking</b>.</li>
+            <li><span className="text-gray-200">Clear Safari Cache:</span> Settings → Apps → Safari → Advanced → Website Data → Delete data for this site.</li>
+            <li><span className="text-gray-200">Check VPN/iCloud:</span> Ensure VPN is OFF and disable <b>iCloud Private Relay</b> in Name → iCloud.</li>
+            <li><span className="text-gray-200">Change DNS:</span> Settings → Wi-Fi → (i) → Configure DNS → Manual. Add <code className="bg-white/5 px-1 rounded text-brand-primary">1.1.1.1</code> and <code className="bg-white/5 px-1 rounded text-brand-primary">8.8.8.8</code>.</li>
+          </ul>
+        </div>
+      )
+    },
+    {
+      id: 'troubleshooting',
+      title: 'General Troubleshooting',
+      icon: ShieldCheck,
+      content: (
+        <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
+          <p>For login issues and blank pages:</p>
+          <ul className="list-disc pl-5 space-y-2">
+            <li><span className="text-gray-200">Incognito Mode:</span> Avoid Private/Incognito tabs as browsers block the security tokens needed for login.</li>
+            <li><span className="text-gray-200">Google Auth:</span> If a popup is blocked, use <b>Email Login</b> or click <b>"Open in Standard Tab"</b>.</li>
+            <li><span className="text-gray-200">Network Reset:</span> If connectivity persists, Settings → General → Transfer or Reset → Reset Network Settings.</li>
+            <li><span className="text-gray-200">Persistent Issues:</span> Note the specific error (e.g. 403 Forbidden) and contact support with a screenshot.</li>
+          </ul>
+        </div>
+      )
+    },
+    {
+      id: 'pin-reset',
+      title: 'Reset my Gym Hub PIN?',
+      icon: Lock,
+      content: (
+        <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
+          <p>To reset your Gym Hub PIN, open the Gym Hub and select the gear icon in the top-right corner of the screen.</p>
+          <p>From there, choose the option to update or reset your PIN, then enter a new PIN you’ll remember.</p>
+          <p>If you are a new customer, your default PIN is: <code className="bg-white/5 px-1.5 py-0.5 rounded text-brand-primary font-mono font-bold">123456</code></p>
+          <p className="text-[10px] uppercase tracking-widest opacity-60">We recommend changing this immediately after your first login for better account security.</p>
+        </div>
+      )
+    },
+    {
+      id: 'community',
+      title: 'Join the Community',
+      icon: Users,
+      content: (
+        <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
+          <p>Follow us for training tips, athlete highlights, and community updates:</p>
+          <div className="flex flex-col gap-3">
+            <a href="https://instagram.com/unlckd_brand" target="_blank" rel="noreferrer" className="flex items-center gap-3 text-gray-200 hover:text-brand-primary transition-colors">
+              <Instagram className="w-5 h-5" />
+              <span>@unlckd_brand</span>
+            </a>
+            <a href="https://facebook.com/unlckdbrand" target="_blank" rel="noreferrer" className="flex items-center gap-3 text-gray-200 hover:text-brand-primary transition-colors">
+              <Facebook className="w-5 h-5" />
+              <span>unlckdbrand</span>
+            </a>
+          </div>
+        </div>
+      )
+    }
+  ];
   const [isPremium, setIsPremium] = useState<boolean>(false);
   const [showGymAuth, setShowGymAuth] = useState(false);
   const [gymAuthPin, setGymAuthPin] = useState('');
@@ -1517,59 +1587,73 @@ export default function App() {
                     <p className="text-gray-400 max-w-xl mx-auto">Solutions for common access issues and technical questions.</p>
                   </div>
                   
-                  <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
-                    <Card className="p-8 bg-white/[0.02] border-white/5 hover:border-brand-primary/30 transition-all space-y-4">
-                      <div className="w-10 h-10 rounded-lg bg-brand-primary/10 flex items-center justify-center">
-                        <Smartphone className="w-5 h-5 text-brand-primary" />
-                      </div>
-                      <h3 className="text-xl font-bold font-display italic uppercase">Trouble Accessing on iPhone?</h3>
-                      <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
-                        <p>If you can access from other devices but not your iPhone, try these steps:</p>
-                        <ul className="list-disc pl-5 space-y-2">
-                          <li><span className="text-gray-200">Try Cellular Data:</span> Turn off Wi-Fi in Settings. If it works, the issue is your Wi-Fi configuration.</li>
-                          <li><span className="text-gray-200">Disable Wi-Fi Privacy:</span> Settings → Wi-Fi → (i) → Toggle off <b>Private Wi-Fi Address</b> and <b>Limit IP Tracking</b>.</li>
-                          <li><span className="text-gray-200">Clear Safari Cache:</span> Settings → Apps → Safari → Advanced → Website Data → Delete data for this site.</li>
-                          <li><span className="text-gray-200">Check VPN/iCloud:</span> Ensure VPN is OFF and disable <b>iCloud Private Relay</b> in Name → iCloud.</li>
-                          <li><span className="text-gray-200">Change DNS:</span> Settings → Wi-Fi → (i) → Configure DNS → Manual. Add <code className="bg-white/5 px-1 rounded text-brand-primary">1.1.1.1</code> and <code className="bg-white/5 px-1 rounded text-brand-primary">8.8.8.8</code>.</li>
-                        </ul>
-                      </div>
-                    </Card>
-
-                    <Card className="p-8 bg-white/[0.02] border-white/5 hover:border-brand-primary/30 transition-all space-y-4">
-                      <div className="w-10 h-10 rounded-lg bg-brand-primary/10 flex items-center justify-center">
-                        <ShieldCheck className="w-5 h-5 text-brand-primary" />
-                      </div>
-                      <h3 className="text-xl font-bold font-display italic uppercase">General Troubleshooting</h3>
-                      <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
-                        <p>For login issues and blank pages:</p>
-                        <ul className="list-disc pl-5 space-y-2">
-                          <li><span className="text-gray-200">Incognito Mode:</span> Avoid Private/Incognito tabs as browsers block the security tokens needed for login.</li>
-                          <li><span className="text-gray-200">Google Auth:</span> If a popup is blocked, use <b>Email Login</b> or click <b>"Open in Standard Tab"</b>.</li>
-                          <li><span className="text-gray-200">Network Reset:</span> If connectivity persists, Settings → General → Transfer or Reset → Reset Network Settings.</li>
-                          <li><span className="text-gray-200">Persistent Issues:</span> Note the specific error (e.g. 403 Forbidden) and contact support with a screenshot.</li>
-                        </ul>
-                      </div>
-                    </Card>
-                    <Card className="p-8 bg-white/[0.02] border-white/5 hover:border-brand-primary/30 transition-all space-y-4">
-                      <div className="w-10 h-10 rounded-lg bg-brand-primary/10 flex items-center justify-center">
-                        <Users className="w-5 h-5 text-brand-primary" />
-                      </div>
-                      <h3 className="text-xl font-bold font-display italic uppercase">Join the Community</h3>
-                      <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
-                        <p>Follow us for training tips, athlete highlights, and community updates:</p>
-                        <div className="flex flex-col gap-3">
-                          <a href="https://instagram.com/unlckd_brand" target="_blank" rel="noreferrer" className="flex items-center gap-3 text-gray-200 hover:text-brand-primary transition-colors">
-                            <Instagram className="w-5 h-5" />
-                            <span>@unlckd_brand</span>
-                          </a>
-                          <a href="https://facebook.com/unlckdbrand" target="_blank" rel="noreferrer" className="flex items-center gap-3 text-gray-200 hover:text-brand-primary transition-colors">
-                            <Facebook className="w-5 h-5" />
-                            <span>unlckdbrand</span>
-                          </a>
+                  <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                    {faqs.map((faq) => (
+                      <button
+                        key={faq.id}
+                        onClick={() => setSelectedFaq(faq)}
+                        className="w-full text-left p-6 bg-white/[0.02] border border-white/5 rounded-2xl hover:border-brand-primary/30 transition-all flex items-center gap-4 group"
+                      >
+                        <div className="w-10 h-10 rounded-lg bg-brand-primary/10 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                          <faq.icon className="w-5 h-5 text-brand-primary" />
                         </div>
-                      </div>
-                    </Card>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-lg font-bold font-display italic uppercase truncate tracking-tight text-white">{faq.title}</h3>
+                          <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mt-0.5">Click for Details</p>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-gray-600 group-hover:text-brand-primary transition-colors" />
+                      </button>
+                    ))}
                   </div>
+
+                  {/* FAQ Detail Modal */}
+                  <AnimatePresence>
+                    {selectedFaq && (
+                      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <motion.div 
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          onClick={() => setSelectedFaq(null)}
+                          className="absolute inset-0 bg-brand-dark/90 backdrop-blur-md" 
+                        />
+                        <motion.div 
+                          initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                          className="relative w-full max-w-xl bg-brand-surface border border-white/10 rounded-3xl shadow-2xl overflow-hidden"
+                        >
+                          <div className="p-8 space-y-6">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 rounded-xl bg-brand-primary/10 flex items-center justify-center">
+                                  <selectedFaq.icon className="w-6 h-6 text-brand-primary" />
+                                </div>
+                                <h3 className="text-2xl font-display font-bold italic uppercase tracking-tight text-white">{selectedFaq.title}</h3>
+                              </div>
+                              <button 
+                                onClick={() => setSelectedFaq(null)}
+                                className="p-2 hover:bg-white/5 rounded-full transition-colors"
+                              >
+                                <X className="w-6 h-6 text-gray-500" />
+                              </button>
+                            </div>
+
+                            <div className="content">
+                              {selectedFaq.content}
+                            </div>
+
+                            <button
+                              onClick={() => setSelectedFaq(null)}
+                              className="w-full py-4 bg-brand-primary text-brand-dark font-black uppercase tracking-tighter rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all"
+                            >
+                              Close Information
+                            </button>
+                          </div>
+                        </motion.div>
+                      </div>
+                    )}
+                  </AnimatePresence>
 
                   {/* Footer */}
                   <div className="pt-12 pb-8 text-center text-gray-500 text-xs uppercase tracking-widest font-medium">
