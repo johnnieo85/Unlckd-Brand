@@ -3193,29 +3193,25 @@ export const ProGym = ({
               <h3 className="font-bold text-gray-100 uppercase tracking-widest text-sm">May Badge Goal</h3>
             </div>
             
-            {userProfile?.monthlyGoal ? (
-              <div className="space-y-4">
-                <div>
-                  <h4 className="text-2xl font-display font-black text-white">{userProfile.monthlyGoal.title}</h4>
-                  <p className="text-gray-400 mt-2 text-sm leading-relaxed">{userProfile.monthlyGoal.description}</p>
-                </div>
-                
-                <div className="flex items-center justify-between pt-4 border-t border-white/5">
-                  <div className="space-y-1">
-                    <span className="text-[10px] text-gray-500 uppercase font-black tracking-widest">Deadline</span>
-                    <p className="text-gray-200 text-sm font-mono">{new Date(userProfile.monthlyGoal.deadline).toLocaleDateString()}</p>
-                  </div>
-                  <Badge className={cn(
-                    "px-4 py-2 rounded-xl border-none font-black uppercase tracking-tighter",
-                    userProfile.monthlyGoal.completed ? "bg-brand-primary text-brand-dark" : "bg-white/5 text-gray-500"
-                  )}>
-                    {userProfile.monthlyGoal.completed ? "Mission Complete" : "In Progress"}
-                  </Badge>
-                </div>
+            <div className="space-y-4">
+              <div>
+                <h4 className="text-2xl font-display font-black text-white">The "Stepper" May Mission</h4>
+                <p className="text-gray-400 mt-2 text-sm leading-relaxed">Achieve 10,000 steps daily for at least 75% of May. This is a community-wide focus for all UNLCKD members.</p>
               </div>
-            ) : (
-              <p className="text-gray-500 italic">No monthly goal set for this period.</p>
-            )}
+              
+              <div className="flex items-center justify-between pt-4 border-t border-white/5">
+                <div className="space-y-1">
+                  <span className="text-[10px] text-gray-500 uppercase font-black tracking-widest">Deadline</span>
+                  <p className="text-gray-200 text-sm font-mono">5/31/2026</p>
+                </div>
+                <Badge className={cn(
+                  "px-4 py-2 rounded-xl border-none font-black uppercase tracking-tighter",
+                  userProfile?.badges?.find(b => b.id === 'stepper') ? "bg-brand-primary text-brand-dark" : "bg-white/5 text-gray-500"
+                )}>
+                  {userProfile?.badges?.find(b => b.id === 'stepper') ? "Mission Complete" : "In Progress"}
+                </Badge>
+              </div>
+            </div>
           </div>
           
           <div className="mt-8 p-6 bg-brand-primary/5 border border-brand-primary/10 rounded-2xl flex items-center gap-4">
@@ -3225,7 +3221,7 @@ export const ProGym = ({
              <div>
                 <p className="text-[10px] text-brand-primary font-black uppercase tracking-widest">May Victory Reward</p>
                 <h5 className="text-lg font-display font-bold text-white tracking-tight">The "Stepper" May Badge</h5>
-                <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mt-1">Achieve {log?.stepGoal?.toLocaleString() || '10,000'} steps daily for at least 75% of May</p>
+                <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mt-1">Achieve 10,000 steps daily for at least 75% of May</p>
              </div>
           </div>
         </Card>
@@ -3248,7 +3244,7 @@ export const ProGym = ({
                 userProfile?.badges?.find(b => b.id === 'stepper') 
                   ? "bg-brand-primary/10 border-brand-primary/40" 
                   : "bg-white/5 border-white/5 opacity-40 grayscale"
-              )} title={`Complete ${log?.stepGoal?.toLocaleString() || '10,000'} steps for 75% of May`}>
+              )} title={`Complete 10,000 steps for 75% of May`}>
                  <div className="w-12 h-12 rounded-full bg-brand-primary/20 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
                     <Footprints className="w-6 h-6 text-brand-primary" />
                  </div>
@@ -3330,8 +3326,8 @@ export const ProGym = ({
               const isCurrentMonth = reportDate.getMonth() === new Date().getMonth() && reportDate.getFullYear() === new Date().getFullYear();
               const daysToConsider = isCurrentMonth ? new Date().getDate() : daysInMonth;
               
-              const defaultStepGoal = latestReport ? parseStepGoal(latestReport.report.stepGoals) : 10000;
-              const stepCompliance = reportLogs.filter(l => l.steps >= (l.stepGoal || defaultStepGoal)).length;
+              const defaultStepGoal = 10000;
+              const stepCompliance = reportLogs.filter(l => l.steps >= 10000).length;
               const waterCompliance = reportLogs.reduce((acc, l) => acc + (l.water >= l.waterGoal ? 1 : 0), 0);
               const weightCompliance = new Set(
                 measurements
@@ -3498,8 +3494,8 @@ export const ProGym = ({
                               const isCurrentMonth = reportDate.getMonth() === new Date().getMonth() && reportDate.getFullYear() === new Date().getFullYear();
                               const daysToConsider = isCurrentMonth ? new Date().getDate() : daysInMonth;
                               
-                              const reportStepGoal = latestReport ? parseStepGoal(latestReport.report.stepGoals) : 10000;
-                              const stepCompletions = reportLogs.filter(l => l.steps >= (l.stepGoal || reportStepGoal)).length;
+                              const reportStepGoal = 10000;
+                              const stepCompletions = reportLogs.filter(l => l.steps >= 10000).length;
                               const stepPercentage = Math.round((stepCompletions / Math.max(1, daysToConsider)) * 100);
                               
                               const waterCompletions = reportLogs.filter(l => l.water >= l.waterGoal).length;
@@ -3508,7 +3504,7 @@ export const ProGym = ({
                               return (
                                 <>
                                   <div className="sticky left-0 z-20 bg-brand-surface flex items-center justify-between gap-3 pl-3 pr-4 min-w-0 h-10 border-r border-white/10 shadow-[4px_0_12px_rgba(0,0,0,0.4)]">
-                                    <span className="text-xs font-bold text-gray-100 truncate flex-1">{Math.round((log.stepGoal || 10000) / 1000)}K Step Goal</span>
+                                    <span className="text-xs font-bold text-gray-100 truncate flex-1">10K Step Goal</span>
                                     <span className="text-[10px] font-mono font-black text-emerald-500 shrink-0 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">{stepPercentage}%</span>
                                   </div>
                                   {Array.from({ length: daysInMonth }).map((_, i) => {
