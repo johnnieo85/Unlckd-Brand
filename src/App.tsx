@@ -681,8 +681,8 @@ export default function App() {
 
   useEffect(() => {
     if (user && savedReports.length > 0) {
-      // Use the absolute latest report that is opted-in for Gym Hub import
-      const reportForGym = savedReports.find(r => r.userData?.syncToGymHub !== false);
+      // Use the absolute latest Transformation Report that is opted-in for Gym Hub import
+      const reportForGym = savedReports.find(r => r.path === 'full' && r.userData?.syncToGymHub !== false);
       setLatestReport(reportForGym || null);
     } else {
       setLatestReport(null);
@@ -994,8 +994,8 @@ export default function App() {
           await loadHistory();
           console.log("Report saved and history reloaded successfully");
 
-          // Auto-sync to Gym Hub if requested
-          if (userData.syncToGymHub) {
+          // Auto-sync to Gym Hub if requested (only for Transformation Reports)
+          if (path === 'full' && userData.syncToGymHub) {
             setLoadingMessage('Syncing plan to Gym Hub...');
             const reports = await historyService.getReports();
             const newlySaved = reports.find(r => r.id === savedId);
