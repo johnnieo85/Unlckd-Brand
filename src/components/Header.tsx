@@ -7,7 +7,8 @@ import {
   LogOut,
   LogIn,
   Instagram,
-  Facebook
+  Facebook,
+  Settings
 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Card';
@@ -30,6 +31,7 @@ export interface HeaderProps {
   handleSignIn: () => void;
   handleSignOut: () => void;
   setShowGymAuth: (show: boolean) => void;
+  onShowAccount: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -44,7 +46,8 @@ export const Header: React.FC<HeaderProps> = ({
   loadHistory,
   handleSignIn,
   handleSignOut,
-  setShowGymAuth
+  setShowGymAuth,
+  onShowAccount
 }) => {
   return (
     <header className="fixed top-0 w-full z-50 bg-brand-dark/40 backdrop-blur-xl border-b border-white/5 no-print">
@@ -131,9 +134,14 @@ export const Header: React.FC<HeaderProps> = ({
                     {isPremium && <span className="text-brand-primary ml-1 text-[10px] font-black">(premium)</span>}
                   </p>
                 </div>
-                <Button variant="ghost" size="icon" onClick={handleSignOut} className="hover:bg-white/5 text-gray-400 hover:text-white">
-                  <LogOut className="w-4 h-4" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="icon" onClick={onShowAccount} className="hover:bg-white/5 text-gray-400 hover:text-white" title="Account Settings">
+                    <Settings className="w-4 h-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={handleSignOut} className="hover:bg-white/5 text-gray-400 hover:text-white" title="Sign Out">
+                    <LogOut className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
             </>
           ) : (
