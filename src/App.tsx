@@ -60,7 +60,7 @@ import { Path, UserData, Photos, ProgressPhotos, AssessmentResult, Rating, Saved
 import { generateTransformationReport } from './services/gemini';
 import { getLevelInfo } from './lib/levels';
 import { auth } from './lib/firebase';
-import { onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, setPersistence, browserSessionPersistence } from 'firebase/auth';
+import { onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, setPersistence, browserSessionPersistence, sendPasswordResetEmail, updatePassword } from 'firebase/auth';
 import { historyService } from './services/historyService';
 import { ensureUserProfile, checkUserAccess, unlockPremium } from './services/accessService';
 
@@ -599,6 +599,12 @@ export default function App() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
   const [selectedFaq, setSelectedFaq] = useState<any>(null);
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+  const [resetEmailSent, setResetEmailSent] = useState(false);
+  const [accountError, setAccountError] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [passwordUpdated, setPasswordUpdated] = useState(false);
 
   const faqs = [
     {
@@ -888,6 +894,60 @@ export default function App() {
       handleAuthError(error);
     } finally {
       setIsSigningIn(false);
+    }
+  };
+
+  const handleResetPasswordRequested = async () => {
+    if (!user?.email) return;
+    setAccountError(null);
+    try {
+      await sendPasswordResetEmail(auth, user.email);
+      setResetEmailSent(true);
+      setTimeout(() => setResetEmailSent(false), 5000);
+    } catch (error: any) {
+      console.error("Reset password error:", error);
+      setAccountError(error.message || "Failed to send reset email");
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!authEmail) {
+      setAuthError("Please enter your email address first.");
+      return;
+    }
+    setAuthError(null);
+    try {
+      await sendPasswordResetEmail(auth, authEmail);
+      setAuthError("Password reset email sent! Check your inbox.");
+    } catch (error: any) {
+      setAuthError(error.message || "Failed to send reset email.");
+    }
+  };
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !newPassword) return;
+    if (newPassword.length < 6) {
+      setAccountError("Password must be at least 6 characters.");
+      return;
+    }
+
+    setIsUpdatingPassword(true);
+    setAccountError(null);
+    try {
+      await updatePassword(user, newPassword);
+      setPasswordUpdated(true);
+      setNewPassword('');
+      setTimeout(() => setPasswordUpdated(false), 5000);
+    } catch (error: any) {
+      console.error("Update password error:", error);
+      if (error.code === 'auth/requires-recent-login') {
+        setAccountError("For security, please sign out and sign back in before changing your password.");
+      } else {
+        setAccountError(error.message || "Failed to update password");
+      }
+    } finally {
+      setIsUpdatingPassword(false);
     }
   };
 
@@ -1204,6 +1264,7 @@ export default function App() {
         handleSignIn={handleSignIn}
         handleSignOut={handleSignOut}
         setShowGymAuth={setShowGymAuth}
+        onShowAccount={() => setIsAccountModalOpen(true)}
       />
 
       <main className="relative pt-32 pb-20 px-6 max-w-6xl mx-auto">
@@ -1648,6 +1709,129 @@ export default function App() {
                               className="w-full py-4 bg-brand-primary text-brand-dark font-black uppercase tracking-tighter rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all"
                             >
                               Close Information
+                            </button>
+                          </div>
+                        </motion.div>
+                      </div>
+                    )}
+                  </AnimatePresence>
+                  
+                  {/* Account Settings Modal */}
+                  <AnimatePresence>
+                    {isAccountModalOpen && (
+                      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <motion.div 
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          onClick={() => setIsAccountModalOpen(false)}
+                          className="absolute inset-0 bg-brand-dark/90 backdrop-blur-md" 
+                        />
+                        <motion.div 
+                          initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                          className="relative w-full max-w-md bg-brand-surface border border-white/10 rounded-3xl shadow-2xl overflow-hidden"
+                        >
+                          <div className="p-8 space-y-6">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 rounded-xl bg-brand-primary/10 flex items-center justify-center">
+                                  <User className="w-6 h-6 text-brand-primary" />
+                                </div>
+                                <h3 className="text-2xl font-display font-bold italic uppercase tracking-tight text-white">Account Settings</h3>
+                              </div>
+                              <button 
+                                onClick={() => setIsAccountModalOpen(false)}
+                                className="p-2 hover:bg-white/5 rounded-full transition-colors"
+                              >
+                                <X className="w-6 h-6 text-gray-500" />
+                              </button>
+                            </div>
+
+                            <div className="space-y-4">
+                              <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
+                                <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mb-1">Email Address</p>
+                                <p className="text-white font-medium">{user?.email}</p>
+                              </div>
+
+                              <div className="pt-4 border-t border-white/5 space-y-4">
+                                <h4 className="text-sm font-bold text-gray-200 uppercase tracking-wider">Security</h4>
+                                
+                                {user?.providerData.some(p => p.providerId === 'password') ? (
+                                  <div className="space-y-4">
+                                    <form onSubmit={handleUpdatePassword} className="space-y-3">
+                                      <div className="relative">
+                                        <input
+                                          type="password"
+                                          placeholder="Enter New Password"
+                                          value={newPassword}
+                                          onChange={(e) => setNewPassword(e.target.value)}
+                                          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-brand-primary/50 transition-all"
+                                          minLength={6}
+                                        />
+                                      </div>
+                                      <button
+                                        type="submit"
+                                        disabled={isUpdatingPassword || !newPassword}
+                                        className="w-full py-3 bg-white/10 hover:bg-white/15 text-white font-bold uppercase tracking-widest text-[10px] rounded-xl transition-all disabled:opacity-50"
+                                      >
+                                        {isUpdatingPassword ? "Updating..." : "Update Password Now"}
+                                      </button>
+                                    </form>
+
+                                    {passwordUpdated && (
+                                      <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-2 text-emerald-500">
+                                        <CheckCircle2 className="w-4 h-4 shrink-0" />
+                                        <p className="text-[10px] font-bold">Password updated successfully!</p>
+                                      </div>
+                                    )}
+
+                                    <div className="relative py-2">
+                                      <div className="absolute inset-0 flex items-center">
+                                        <div className="w-full border-t border-white/5"></div>
+                                      </div>
+                                      <div className="relative flex justify-center text-[8px] uppercase tracking-widest text-gray-600 font-black">
+                                        <span className="bg-brand-surface px-2">Or Use Email Link</span>
+                                      </div>
+                                    </div>
+
+                                    {resetEmailSent ? (
+                                      <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-3 text-emerald-500">
+                                        <CheckCircle2 className="w-5 h-5 shrink-0" />
+                                        <p className="text-xs font-bold leading-relaxed">Password reset email sent! Please check your inbox.</p>
+                                      </div>
+                                    ) : (
+                                      <button
+                                        onClick={handleResetPasswordRequested}
+                                        className="w-full py-3 bg-transparent border border-white/5 text-gray-500 hover:text-gray-300 font-bold uppercase tracking-widest text-[10px] rounded-xl transition-all flex items-center justify-center gap-2"
+                                      >
+                                        <RotateCcw className="w-3 h-3" />
+                                        Send Reset Email Instead
+                                      </button>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="p-4 bg-brand-primary/10 border border-brand-primary/20 rounded-xl flex items-center gap-3 text-gray-300">
+                                    <Info className="w-5 h-5 shrink-0 text-brand-primary" />
+                                    <p className="text-[10px] font-bold uppercase leading-relaxed">You are signed in via Google. Please manage your security settings through your Google Account.</p>
+                                  </div>
+                                )}
+                                
+                                {accountError && (
+                                  <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 text-red-500">
+                                    <ShieldAlert className="w-5 h-5 shrink-0" />
+                                    <p className="text-xs font-bold leading-relaxed">{accountError}</p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <button
+                              onClick={() => setIsAccountModalOpen(false)}
+                              className="w-full py-4 bg-brand-primary text-brand-dark font-black uppercase tracking-tighter rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all"
+                            >
+                              Close Settings
                             </button>
                           </div>
                         </motion.div>
@@ -3444,7 +3628,18 @@ export default function App() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-gray-500 ml-1">Password</label>
+                  <div className="flex items-center justify-between ml-1">
+                    <label className="text-xs font-bold uppercase tracking-widest text-gray-500">Password</label>
+                    {!isSignUp && (
+                      <button 
+                        type="button"
+                        onClick={handleForgotPassword}
+                        className="text-[10px] uppercase font-black tracking-widest text-brand-primary/60 hover:text-brand-primary transition-colors"
+                      >
+                        Forgot Password?
+                      </button>
+                    )}
+                  </div>
                   <Input 
                     type="password" 
                     placeholder="••••••••"
