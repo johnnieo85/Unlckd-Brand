@@ -47,7 +47,8 @@ import {
   Smartphone,
   ShieldCheck,
   Facebook,
-  Users
+  Users,
+  Apple
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Button } from './components/ui/Button';
@@ -60,7 +61,7 @@ import { Path, UserData, Photos, ProgressPhotos, AssessmentResult, Rating, Saved
 import { generateTransformationReport } from './services/gemini';
 import { getLevelInfo } from './lib/levels';
 import { auth } from './lib/firebase';
-import { onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, setPersistence, browserSessionPersistence, sendPasswordResetEmail, updatePassword } from 'firebase/auth';
+import { onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, OAuthProvider, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, setPersistence, browserSessionPersistence, sendPasswordResetEmail, updatePassword } from 'firebase/auth';
 import { historyService } from './services/historyService';
 import { ensureUserProfile, checkUserAccess, unlockPremium } from './services/accessService';
 
@@ -897,6 +898,55 @@ export default function App() {
     }
   };
 
+  const handleAppleSignIn = async () => {
+    setIsSigningIn(true);
+    setAuthError(null);
+    const provider = new OAuthProvider('apple.com');
+    provider.addScope('email');
+    provider.addScope('name');
+    
+    const isIframe = (function() {
+      try {
+        return window.self !== window.top;
+      } catch (e) {
+        return true;
+      }
+    })();
+
+    try {
+      console.info("Auth: Attempting Apple Popup login...");
+      try {
+        await signInWithPopup(auth, provider);
+        setIsAuthModalOpen(false);
+        setAuthError(null);
+      } catch (popupError: any) {
+        console.warn("Auth: Apple Popup login failed:", popupError);
+        
+        if (popupError.code === 'auth/popup-blocked' || 
+            popupError.code === 'auth/popup-closed-by-user' ||
+            popupError.code === 'auth/cancelled-popup-request') {
+          
+          if (!isIframe) {
+            console.info("Auth: Apple Popup blocked/closed, falling back to Redirect...");
+            setAuthError("Popup blocked. Redirecting to secure login...");
+            await new Promise(resolve => setTimeout(resolve, 800));
+            await signInWithRedirect(auth, provider);
+            return;
+          }
+
+          setAuthError("Apple login window was closed or blocked. Try 'Open in Standard Tab' or Email sign-in.");
+        } else {
+          throw popupError;
+        }
+      }
+    } catch (error: any) {
+      console.error("Auth: Master Apple Auth Error:", error);
+      handleAuthError(error);
+    } finally {
+      setIsSigningIn(false);
+    }
+  };
+
   const handleResetPasswordRequested = async () => {
     if (!user?.email) return;
     setAccountError(null);
@@ -1008,6 +1058,9 @@ export default function App() {
       case 'auth/wrong-password':
       case 'auth/invalid-credential':
         message = "Invalid email or password. Please check your credentials.";
+        break;
+      case 'auth/operation-not-allowed':
+        message = "Apple Sign-In is not enabled on this Firebase project. Go to Firebase Console > Authentication > Sign-in method and enable Apple.";
         break;
       case 'auth/internal-error':
         if (error.message?.includes('partition')) {
@@ -3666,25 +3719,43 @@ export default function App() {
                 </div>
               </div>
 
-              <Button 
-                variant="outline" 
-                onClick={handleGoogleSignIn}
-                className="w-full h-12 border-white/5 hover:bg-white/5 gap-3"
-                disabled={isSigningIn}
-              >
-                {isSigningIn && !authEmail ? (
-                  <Loader2 className="w-5 h-5 animate-spin mx-auto" />
-                ) : (
-                  <>
-                    <img src="https://www.google.com/favicon.ico" alt="Google" className="w-4 h-4" />
-                    Google Account
-                  </>
-                )}
-              </Button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Button 
+                  variant="outline" 
+                  onClick={handleGoogleSignIn}
+                  className="w-full h-12 border-white/5 hover:bg-white/5 gap-3"
+                  disabled={isSigningIn}
+                >
+                  {isSigningIn && !authEmail ? (
+                    <Loader2 className="w-5 h-5 animate-spin mx-auto" />
+                  ) : (
+                    <>
+                      <img src="https://www.google.com/favicon.ico" alt="Google" className="w-4 h-4" />
+                      Google
+                    </>
+                  )}
+                </Button>
+
+                <Button 
+                  variant="outline" 
+                  onClick={handleAppleSignIn}
+                  className="w-full h-12 border-white/5 hover:bg-white/5 gap-3"
+                  disabled={isSigningIn}
+                >
+                  {isSigningIn && !authEmail ? (
+                    <Loader2 className="w-5 h-5 animate-spin mx-auto" />
+                  ) : (
+                    <>
+                      <Apple className="w-4 h-4" />
+                      Apple ID
+                    </>
+                  )}
+                </Button>
+              </div>
 
               {isSigningIn && !authEmail && (
                 <p className="mt-4 text-[10px] text-center text-gray-500 animate-pulse">
-                  Opening Google login window... If it doesn't appear, check your popup blocker.
+                  Opening login window... If it doesn't appear, check your popup blocker.
                 </p>
               )}
 
