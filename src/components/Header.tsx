@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'motion/react';
 import { 
   ExternalLink, 
   History, 
@@ -129,10 +130,33 @@ export const Header: React.FC<HeaderProps> = ({
                     )}
                     <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Signed In As</p>
                   </div>
-                  <p className="text-xs text-gray-300 font-medium truncate max-w-[120px]">
-                    {user.displayName || user.email}
-                    {isPremium && <span className="text-brand-primary ml-1 text-[10px] font-black">(premium)</span>}
-                  </p>
+                  <motion.div 
+                    initial={false}
+                    animate={isPremium ? {
+                      textShadow: [
+                        "0 0 5px rgba(251, 191, 36, 0.4)",
+                        "0 0 15px rgba(251, 191, 36, 0.8)",
+                        "0 0 5px rgba(251, 191, 36, 0.4)"
+                      ],
+                      scale: [1, 1.02, 1]
+                    } : {}}
+                    transition={{
+                      duration: 3,
+                      repeat: Infinity,
+                      ease: "easeInOut"
+                    }}
+                    className={cn(
+                      "text-xs font-medium truncate max-w-[160px] flex items-center justify-end gap-1.5",
+                      isPremium ? "text-amber-400" : "text-gray-300"
+                    )}
+                  >
+                    <span>{user.displayName || user.email}</span>
+                    {isPremium && (
+                      <span className="bg-amber-400/20 px-1.5 py-0.5 rounded border border-amber-400/30 text-[9px] font-black tracking-tighter uppercase leading-none">
+                        Premium
+                      </span>
+                    )}
+                  </motion.div>
                 </div>
                 <div className="flex items-center gap-1">
                   <Button variant="ghost" size="icon" onClick={onShowAccount} className="hover:bg-white/5 text-gray-400 hover:text-white" title="Account Settings">
