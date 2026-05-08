@@ -290,6 +290,11 @@ async function generateHealthAndSupport(
     - The user has: ${userData.gymAccess === 'none' ? 'NO EQUIPMENT' : userData.gymAccess === 'home' ? 'BASIC HOME GYM' : 'FULL COMMERCIAL GYM'}.
     ${userData.gymAccess === 'none' ? '- CRITICAL: Since the user has NO EQUIPMENT, any recommended workouts or exercises MUST be 100% bodyweight-only (Calisthenics, HIIT bodyweight, plyometrics). No weights or machines.' : ''}
 
+    INJURY PROTOCOL:
+    - Review the user's injuries: ${userData.injuries || 'None reported'}.
+    - If an injury is explicitly described as occurring MORE than 3 years ago (e.g., "ACL tear in 2018", "Back pain 5 years ago"), do NOT let it significantly restrict the training recommendations or health outlook. Treat the area as recovered while maintaining reasonable safety advice.
+    - Only major, recent, or chronic recurring injuries should dictate strict movement exclusions.
+
     FOCUS: 
     1. Health Metrics (BMI, Body Fat, Calorie Targets).
     2. Daily Life (Sleep, Water, Steps).
@@ -467,6 +472,11 @@ async function generateWorkoutPlan(
       GYM ACCESS PROTOCOL:
       - The user has: ${userData.gymAccess === 'none' ? 'NO EQUIPMENT' : userData.gymAccess === 'home' ? 'BASIC HOME GYM' : 'FULL COMMERCIAL GYM'}.
       ${userData.gymAccess === 'none' ? '- CRITICAL: Since the user has NO EQUIPMENT, you MUST design the entire plan using ONLY bodyweight exercises (Calisthenics, HIIT bodyweight workouts, plyometrics). Do NOT include any exercises requiring dumbbells, barbells, or machines.' : ''}
+
+      INJURY PROTOCOL:
+      - Consider User Injuries: ${userData.injuries || 'None'}.
+      - EXCEPTION: If an injury is explicitly dated or described as being OLDER than 3 years, do NOT consider it a major limitation. Design a standard, high-performance plan for that area.
+      - Older injuries should be seen as recovered unless stated as "chronic" or "currently active".
 
       ${invalidLinksContext ? `FIX MODE: The following links from a previous generation were flagged as invalid or problematic. Please search for BETTER, high-quality alternatives for these specific movements/recipes:\n${invalidLinksContext}` : ""}
 
