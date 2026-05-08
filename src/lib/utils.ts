@@ -28,3 +28,56 @@ export function downloadFile(filename: string, content: string, type: string = '
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
+
+export const safeStorage = {
+  get: (key: string, type: 'local' | 'session' = 'local') => {
+    try {
+      const storage = type === 'local' ? window.localStorage : window.sessionStorage;
+      return storage.getItem(key);
+    } catch (e) {
+      console.warn(`SafeStorage: Access denied for ${type}Storage.getItem(${key})`);
+      return null;
+    }
+  },
+  set: (key: string, value: string, type: 'local' | 'session' = 'local') => {
+    try {
+      const storage = type === 'local' ? window.localStorage : window.sessionStorage;
+      storage.setItem(key, value);
+      return true;
+    } catch (e) {
+      console.warn(`SafeStorage: Access denied for ${type}Storage.setItem(${key})`);
+      return false;
+    }
+  },
+  remove: (key: string, type: 'local' | 'session' = 'local') => {
+    try {
+      const storage = type === 'local' ? window.localStorage : window.sessionStorage;
+      storage.removeItem(key);
+      return true;
+    } catch (e) {
+      console.warn(`SafeStorage: Access denied for ${type}Storage.removeItem(${key})`);
+      return false;
+    }
+  },
+  clear: (type: 'local' | 'session' = 'local') => {
+    try {
+      const storage = type === 'local' ? window.localStorage : window.sessionStorage;
+      storage.clear();
+      return true;
+    } catch (e) {
+      console.warn(`SafeStorage: Access denied for ${type}Storage.clear()`);
+      return false;
+    }
+  },
+  isAvailable: (type: 'local' | 'session' = 'local') => {
+    try {
+      const storage = type === 'local' ? window.localStorage : window.sessionStorage;
+      const testKey = '__storage_test__';
+      storage.setItem(testKey, testKey);
+      storage.removeItem(testKey);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+};

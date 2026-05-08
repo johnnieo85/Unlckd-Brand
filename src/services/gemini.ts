@@ -108,10 +108,12 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 8, delay = 10000): P
   try {
     return await fn();
   } catch (error: any) {
-    const errorMsg = error.message?.toLowerCase() || '';
+    const errorMsg = (error instanceof Error ? error.message : String(error)).toLowerCase();
     const isRateLimit = 
       errorMsg.includes('429') || 
       errorMsg.includes('quota') || 
+      errorMsg.includes('quota_exceeded') ||
+      errorMsg.includes('limit') ||
       errorMsg.includes('throttle') ||
       errorMsg.includes('throttled') ||
       errorMsg.includes('resource_exhausted');
@@ -126,6 +128,7 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 8, delay = 10000): P
       errorMsg.includes('xhr error') ||
       errorMsg.includes('status: unknown') ||
       error.status === 'UNAVAILABLE' ||
+      errorMsg.includes('load failed') ||
       errorMsg.includes('fetch failed');
 
     if (retries > 0 && isRetryable) {

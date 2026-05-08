@@ -2,6 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, setPersistence, browserLocalPersistence, inMemoryPersistence } from 'firebase/auth';
 import { doc, getDocFromServer, initializeFirestore, memoryLocalCache, getFirestore } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
+import { safeStorage } from './utils';
 
 const app = initializeApp(firebaseConfig);
 
@@ -17,10 +18,7 @@ const isIframe = (function() {
   }
 })();
 
-try {
-  // Test if we can access the storage system at all
-  localStorage.getItem('test'); 
-  
+if (safeStorage.isAvailable('local')) {
   if (isMobile || (isApple && isIframe)) {
     // Proactively use long polling for ALL mobile devices and Apple iframes
     // to avoid common network/firewall issues with gRPC/WebSockets (code=unavailable)
@@ -32,8 +30,8 @@ try {
     // Normal connection for desktop/standard browsers
     firestoreDb = getFirestore(app, firebaseConfig.firestoreDatabaseId);
   }
-} catch (e) {
-  console.warn("Storage blocked or Standard Firestore initialization failed, using safe memory mode:", e);
+} else {
+  console.warn("Storage blocked or Standard Firestore initialization failed, using safe memory mode");
   // Force memory-only cache and long polling if storage/IndexedDB is blocked
   firestoreDb = initializeFirestore(app, {
     localCache: memoryLocalCache(),
