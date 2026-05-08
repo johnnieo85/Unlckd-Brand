@@ -1125,6 +1125,12 @@ export default function App() {
       return;
     }
 
+    if (selectedPath === 'progress' && !isPremium) {
+      // Progress Engine is restricted to premium members
+      alert("Weekly Progress Engine is a Premium feature. Please upgrade your membership to access.");
+      return;
+    }
+
     setPath(selectedPath);
     setStep('intake');
   };
@@ -1174,7 +1180,7 @@ export default function App() {
     ] : [
       'Analyzing your physique data...',
       'Calculating optimal macros...',
-      'Designing your 12-week training split...',
+      `Designing your ${userData.planDuration || '12-week'} training split...`,
       'Curating your personalized meal plan...',
       'Finalizing your transformation report...'
     ];
@@ -1662,7 +1668,10 @@ export default function App() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Featured: Pro Gym Hub */}
                   <Card 
-                    className="p-8 bg-brand-primary/5 border-2 animate-pulse-border transition-all cursor-pointer group relative overflow-hidden" 
+                    className={cn(
+                      "p-8 bg-brand-primary/5 border-2 transition-all cursor-pointer group relative overflow-hidden",
+                      isPremium ? "border-amber-400/50 shadow-[0_0_15px_rgba(251,191,36,0.2)]" : "border-brand-primary/20 animate-pulse-border"
+                    )} 
                     onClick={() => {
                       if (!user) {
                         handleSignIn();
@@ -1679,6 +1688,34 @@ export default function App() {
                       }
                     }}
                   >
+                    {isPremium && (
+                      <motion.div
+                        animate={{
+                          opacity: [0.1, 0.3, 0.1],
+                        }}
+                        transition={{
+                          duration: 4,
+                          repeat: Infinity,
+                          ease: "easeInOut"
+                        }}
+                        className="absolute inset-0 bg-amber-400/10 pointer-events-none"
+                      />
+                    )}
+                    <motion.div
+                      animate={{
+                        boxShadow: [
+                          "0 0 0px rgba(251, 191, 36, 0)",
+                          "0 0 20px rgba(251, 191, 36, 0.3)",
+                          "0 0 0px rgba(251, 191, 36, 0)"
+                        ]
+                      }}
+                      transition={{
+                        duration: 3,
+                        repeat: Infinity,
+                        ease: "easeInOut"
+                      }}
+                      className="absolute inset-0 rounded-xl"
+                    />
                     <div className="absolute inset-0 bg-brand-primary/5 group-hover:bg-brand-primary/10 transition-colors" />
                     <div className="absolute top-0 right-0 w-64 h-64 bg-brand-primary/10 blur-3xl -mr-32 -mt-32 group-hover:bg-brand-primary/20 transition-colors" />
                     <div className="absolute bottom-0 left-0 w-64 h-64 bg-brand-primary/5 blur-3xl -ml-32 -mb-32 group-hover:bg-brand-primary/10 transition-colors" />
@@ -1755,15 +1792,55 @@ export default function App() {
                     </div>
                   </Card>
 
-                  <Card className="p-6 bg-white/[0.02] backdrop-blur-sm border-white/5 hover:border-brand-primary/50 transition-all cursor-pointer group relative overflow-hidden" onClick={() => handleStart('progress')}>
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/5 blur-3xl -mr-16 -mt-16 group-hover:bg-brand-primary/10 transition-colors" />
+                  <Card 
+                    className={cn(
+                      "p-6 bg-white/[0.02] backdrop-blur-sm border-white/5 transition-all group relative overflow-hidden",
+                      isPremium ? "hover:border-amber-400/50 cursor-pointer shadow-[0_0_15px_rgba(251,191,36,0.1)]" : "opacity-60 cursor-not-allowed bg-white/5 border-white/10"
+                    )} 
+                    onClick={() => handleStart('progress')}
+                  >
+                    {isPremium && (
+                      <motion.div
+                        animate={{
+                          boxShadow: [
+                            "0 0 0px rgba(251, 191, 36, 0)",
+                            "0 0 15px rgba(251, 191, 36, 0.2)",
+                            "0 0 0px rgba(251, 191, 36, 0)"
+                          ],
+                          borderColor: [
+                            "rgba(251, 191, 36, 0.1)",
+                            "rgba(251, 191, 36, 0.5)",
+                            "rgba(251, 191, 36, 0.1)"
+                          ]
+                        }}
+                        transition={{
+                          duration: 3,
+                          repeat: Infinity,
+                          ease: "easeInOut"
+                        }}
+                        className="absolute inset-0 rounded-xl border"
+                      />
+                    )}
+                    <div className={cn(
+                      "absolute top-0 right-0 w-32 h-32 blur-3xl -mr-16 -mt-16 transition-colors",
+                      isPremium ? "bg-brand-primary/5 group-hover:bg-brand-primary/10" : "bg-gray-500/5"
+                    )} />
                     <div className="flex flex-col items-center text-center gap-4 relative z-10">
-                      <div className="w-12 h-12 rounded-xl bg-brand-primary/10 flex items-center justify-center group-hover:scale-110 group-hover:bg-brand-primary/20 transition-all duration-500">
-                        <Activity className="w-6 h-6 text-brand-primary" />
+                      <div className={cn(
+                        "w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-500",
+                        isPremium ? "bg-brand-primary/10 group-hover:scale-110 group-hover:bg-brand-primary/20" : "bg-gray-500/20"
+                      )}>
+                        <Activity className={cn("w-6 h-6", isPremium ? "text-brand-primary" : "text-gray-500")} />
                       </div>
                       <div>
                         <h3 className="font-display font-bold text-lg tracking-tight">Progress Engine</h3>
                         <p className="text-xs text-gray-500 mt-1 leading-relaxed">Weekly photo comparison and feedback.</p>
+                        {!isPremium && (
+                          <div className="mt-4 flex items-center justify-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-amber-500/80">
+                            <Zap className="w-3 h-3 fill-amber-500" />
+                            Premium Locked
+                          </div>
+                        )}
                       </div>
                     </div>
                   </Card>
@@ -2683,14 +2760,14 @@ export default function App() {
                       path === 'workout' ? 'UNLCKD Workout Plan' : 
                       path === 'progress' ? 'UNLCKD Weekly Comparison Report' :
                       path === 'assessment' ? 'UNLCKD Physique Assessment' :
-                      'UNLCKD 12-Week Transformation Report'
+                      `UNLCKD ${userData.planDuration?.replace('-week', ' Week') || '12-Week'} Transformation Report`
                     )}
                   </h1>
                   <p className="text-gray-500">
                     {path === 'meal' ? 'Nutrition Strategy, Meal Plan, and Grocery List' :
                      path === 'workout' ? 'Training Plan, Recovery, and Hydration Strategy' :
                      path === 'assessment' ? 'Physique Analysis and Body Composition Assessment' :
-                     'Complete 12-Week Transformation Blueprint'}
+                     `Complete ${(userData.planDuration?.replace('-week', ' Week') || '12-Week')} Transformation Blueprint`}
                   </p>
                 </div>
 
@@ -3054,7 +3131,8 @@ export default function App() {
                     {report.workoutPlan && (
                       <button 
                         onClick={() => {
-                          let content = `UNLCKD PRO TRAINER - 12-WEEK TRAINING PLAN\n`;
+                          const numWeeks = parseInt(userData.planDuration || '12');
+                          let content = `UNLCKD PRO TRAINER - ${numWeeks}-WEEK TRAINING PLAN\n`;
                           content += `==========================================\n\n`;
                           
                           report.workoutPlan.forEach(week => {
@@ -3192,7 +3270,8 @@ export default function App() {
                     {report.mealPlan && (
                       <button 
                         onClick={() => {
-                          let content = `UNLCKD PRO TRAINER - 12-WEEK MEAL PLAN\n`;
+                          const numWeeks = parseInt(userData.planDuration || '12');
+                          let content = `UNLCKD PRO TRAINER - ${numWeeks}-WEEK MEAL PLAN\n`;
                           content += `======================================\n\n`;
                           
                           report.mealPlan.forEach(week => {
@@ -3600,7 +3679,7 @@ export default function App() {
             
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8 w-full max-w-2xl">
               {[
-                { icon: Zap, label: '12-Week Programming', desc: 'Periodized S&C cycles' },
+                { icon: Zap, label: 'Dynamic Programming', desc: 'Periodized S&C cycles' },
                 { icon: Youtube, label: 'Form Tutorials', desc: 'High-authority guidance' },
                 { icon: Activity, label: 'Precision Logging', desc: 'Sets, reps, weight & time' },
                 { icon: LineChart, label: 'Visual Analytics', desc: 'Chart your progression' },

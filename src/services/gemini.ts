@@ -298,7 +298,7 @@ async function generateHealthAndSupport(
     FOCUS: 
     1. Health Metrics (BMI, Body Fat, Calorie Targets).
     2. Daily Life (Sleep, Water, Steps).
-    ${includeGrocery ? `3. Comprehensive Nutrition strategy for the full 12-week duration. This strategy MUST reference at least 5 key specific meals or ingredients that appear in the meal plan, including their names and verified links. 4. Grocery store recommendation.` : "3. Motivation and general Nutrition strategies."}
+    ${includeGrocery ? `3. Comprehensive Nutrition strategy for the full ${userData.planDuration || '12-week'} duration. This strategy MUST reference at least 5 key specific meals or ingredients that appear in the meal plan, including their names and verified links. 4. Grocery store recommendation.` : "3. Motivation and general Nutrition strategies."}
     
     UNIT ALIGNMENT: 
     - If user weight is in 'lbs', use US Imperial units for food: oz, lbs, cups, tsp, tbsp.
@@ -462,10 +462,11 @@ async function generateWorkoutPlan(
   invalidLinksContext?: string
 ): Promise<Partial<AssessmentResult>> {
   const workoutPlan: any[] = [];
+  const numWeeks = parseInt(userData.planDuration || '12');
   
   const fetchBatch = async (startWeek: number, endWeek: number): Promise<any[]> => {
     const prompt = `
-      Design Weeks ${startWeek} through ${endWeek} of an elite 12-week workout plan for "UNLCKD Pro Trainer".
+      Design Weeks ${startWeek} through ${endWeek} of an elite ${numWeeks}-week workout plan for "UNLCKD Pro Trainer".
       User: ${userData.name}, Goal: ${userData.goals}.
       Current Range: Weeks ${startWeek}-${endWeek}.
       
@@ -574,8 +575,8 @@ async function generateWorkoutPlan(
     }
   };
 
-  // Process in 12 batches of 1 week to stay within search tool quotas and prevent RPC timeouts
-  const batches = Array.from({ length: 12 }, (_, i) => [i + 1, i + 1]);
+  // Process in 1-week batches to stay within search tool quotas and prevent RPC timeouts
+  const batches = Array.from({ length: numWeeks }, (_, i) => [i + 1, i + 1]);
   
   for (const [start, end] of batches) {
     const batch = await fetchBatch(start, end);
@@ -598,10 +599,11 @@ async function generateMealPlan(
   invalidLinksContext?: string
 ): Promise<Partial<AssessmentResult>> {
   const mealPlan: any[] = [];
+  const numWeeks = parseInt(userData.planDuration || '12');
 
   const fetchBatch = async (startWeek: number, endWeek: number): Promise<any[]> => {
     const prompt = `
-      Generate Weeks ${startWeek} through ${endWeek} of a personalized 12-week meal plan for UNLCKD Pro Trainer.
+      Generate Weeks ${startWeek} through ${endWeek} of a personalized ${numWeeks}-week meal plan for UNLCKD Pro Trainer.
       User: ${userData.name}, Preferences: ${userData.caloriePreference}, Allergies: ${userData.allergies}.
       
       ${invalidLinksContext ? `FIX MODE: The following links from a previous generation were flagged as invalid or problematic. Please search for BETTER, high-quality alternatives for these specific meals:\n${invalidLinksContext}` : ""}
@@ -683,8 +685,17 @@ async function generateMealPlan(
     }
   };
 
-  // Process in 6 batches of 2 weeks to reduce request count and prevent RPC timeouts
-  const batches = [[1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12]];
+  // Define batches based on requested duration
+  const batches: number[][] = [];
+  if (numWeeks <= 4) {
+    // For 2 or 4 week plans, process in single week batches for maximum quality
+    for (let i = 1; i <= numWeeks; i++) {
+      batches.push([i, i]);
+    }
+  } else {
+    // For 12 week plans, use 2-week batches
+    batches.push([1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12]);
+  }
 
   for (const [start, end] of batches) {
     const batch = await fetchBatch(start, end);
@@ -806,7 +817,8 @@ export async function generateTransformationReport(
     // 3. GENERATE MEAL PLAN
     if (['full', 'meal'].includes(path)) {
       try {
-        console.log("Generating 12-week meal plan...");
+        const numWeeks = parseInt(cleanUserData.planDuration || '12');
+        console.log(`Generating ${numWeeks}-week meal plan...`);
         // Cooldown after previous search-heavy steps
         await new Promise(resolve => setTimeout(resolve, 5000));
         const mealResult = await generateMealPlan(cleanUserData, isResubmit, invalidLinksContext);
@@ -815,7 +827,19 @@ export async function generateTransformationReport(
         // 4. GENERATE BATCHED GROCERY LISTS (Post-meal plan)
         if (mealResult.mealPlan && mealResult.mealPlan.length > 0) {
           console.log("Generating high-accuracy batched grocery lists...");
-          const groceryBatches = [[1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12]];
+          
+          // Define grocery batches based on duration
+          const groceryBatches: number[][] = [];
+          if (numWeeks <= 4) {
+            // For 2 or 4 week plans, just one or two batches
+            for (let i = 1; i <= numWeeks; i += 2) {
+              groceryBatches.push([i, Math.min(i + 1, numWeeks)]);
+            }
+          } else {
+            // For 12 week plans, use original 2-week batches
+            groceryBatches.push([1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12]);
+          }
+
           const allGroceries: any[] = [];
           
           for (const [start, end] of groceryBatches) {
@@ -889,18 +913,20 @@ export async function generateTransformationReport(
 
     // Validation checks for completeness
     const checks: { name: string; pass: boolean; error: string }[] = [];
+    const numWeeksExpected = parseInt(cleanUserData.planDuration || '12');
+
     if (['full', 'workout'].includes(path)) {
       checks.push({
-        name: "12-Week Workout Plan",
-        pass: (finalResult.workoutPlan?.length || 0) >= 12,
-        error: `Workout plan incomplete (${finalResult.workoutPlan?.length || 0}/12 weeks).`
+        name: `${numWeeksExpected}-Week Workout Plan`,
+        pass: (finalResult.workoutPlan?.length || 0) >= numWeeksExpected,
+        error: `Workout plan incomplete (${finalResult.workoutPlan?.length || 0}/${numWeeksExpected} weeks).`
       });
     }
     if (['full', 'meal'].includes(path)) {
       checks.push({
-        name: "12-Week Meal Plan",
-        pass: (finalResult.mealPlan?.length || 0) >= 12,
-        error: `Meal plan incomplete (${finalResult.mealPlan?.length || 0}/12 weeks).`
+        name: `${numWeeksExpected}-Week Meal Plan`,
+        pass: (finalResult.mealPlan?.length || 0) >= numWeeksExpected,
+        error: `Meal plan incomplete (${finalResult.mealPlan?.length || 0}/${numWeeksExpected} weeks).`
       });
     }
 
