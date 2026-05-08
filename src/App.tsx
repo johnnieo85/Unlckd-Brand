@@ -533,7 +533,8 @@ const LinkAuditModal = ({
 export default function App() {
   const [activeTab, setActiveTab] = useState<'reports' | 'gym'>('reports');
   const [latestReport, setLatestReport] = useState<SavedReport | null>(null);
-  const [step, setStep] = useState<'landing' | 'intake' | 'photos' | 'progress-photos' | 'processing' | 'report' | 'history' | 'no-access'>('landing');
+  const [step, setStep] = useState<'landing' | 'intake' | 'photos' | 'progress-photos' | 'processing' | 'report' | 'history' | 'no-access' | 'error'>('landing');
+  const [lastError, setLastError] = useState<string | null>(null);
   const [showLinkAudit, setShowLinkAudit] = useState(false);
 
   const LogoBranding = () => (
@@ -1136,6 +1137,13 @@ export default function App() {
 
   const [isResubmitting, setIsResubmitting] = useState(false);
 
+  const handleReportError = () => {
+    if (!lastError) return;
+    const subject = encodeURIComponent(`Error Report: UNLCKD Pro Trainer`);
+    const body = encodeURIComponent(`User Email: ${user?.email || 'N/A'}\nError: ${lastError}\nTime: ${new Date().toISOString()}\nPath: ${path}\n\nPlease describe what you were doing when the error occurred:`);
+    window.location.href = `mailto:support@unlckd.pro?subject=${subject}&body=${body}`;
+  };
+
   const processReport = async (isResubmit: boolean = false, invalidLinksContext?: string) => {
     setStep('processing');
     setIsResubmitting(isResubmit || !!invalidLinksContext);
@@ -1159,6 +1167,7 @@ export default function App() {
     }, 3000);
 
     try {
+      setLastError(null);
       const result = await generateTransformationReport(
         userData, 
         path === 'progress' ? progressPhotos : photos, 
@@ -1212,8 +1221,8 @@ export default function App() {
         }
       }
       
-      alert(errorMessage);
-      setStep('landing');
+      setLastError(errorMessage);
+      setStep('error');
     } finally {
       clearInterval(interval);
     }
@@ -1538,6 +1547,53 @@ export default function App() {
                   Note: After purchase, access is typically granted within 24 hours. Once your status is updated in the UNLCKD cloud, premium tools will automatically unlock.
                 </p>
               </div>
+            </motion.div>
+          )}
+
+          {step === 'error' && (
+            <motion.div
+              key="error"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="max-w-xl mx-auto py-12"
+            >
+              <Card className="p-12 text-center bg-red-500/5 border-red-500/20 rounded-3xl space-y-8">
+                <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mx-auto">
+                  <AlertCircle className="w-10 h-10 text-red-500" />
+                </div>
+                <div className="space-y-4">
+                  <h2 className="text-3xl font-display font-bold text-white uppercase tracking-tight">Generation Failed</h2>
+                  <div className="p-4 bg-black/20 rounded-xl border border-white/5 text-left font-mono text-xs text-red-400/80 leading-relaxed overflow-hidden break-words">
+                    {lastError || 'An unexpected error occurred during processing.'}
+                  </div>
+                  <p className="text-gray-400 text-sm">Our AI engine encountered a temporary roadblock or high traffic. Your progress hasn't been lost.</p>
+                </div>
+                <div className="pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Button 
+                    className="w-full bg-brand-primary text-brand-dark font-bold py-4 rounded-xl text-xs hover:bg-brand-primary/90 uppercase tracking-widest"
+                    onClick={() => processReport()}
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Try Again Now
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="w-full py-4 border-white/10 hover:bg-white/5 bg-white/5 rounded-xl text-white font-bold uppercase tracking-widest text-xs gap-2"
+                    onClick={handleReportError}
+                  >
+                    <ShieldAlert className="w-4 h-4 text-brand-primary" />
+                    Report Error
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    onClick={() => setStep('landing')} 
+                    className="sm:col-span-2 py-4 text-gray-500 hover:text-white transition-colors uppercase font-bold tracking-widest text-[10px]"
+                  >
+                    Return to Dashboard
+                  </Button>
+                </div>
+              </Card>
             </motion.div>
           )}
 
