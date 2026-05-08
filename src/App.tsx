@@ -54,7 +54,7 @@ import ReactMarkdown from 'react-markdown';
 import { Button } from './components/ui/Button';
 import { Input, Select, Checkbox } from './components/ui/Input';
 import { Card, Badge } from './components/ui/Card';
-import { cn, downloadFile, getLocalDateString, parseLocalDate } from './lib/utils';
+import { cn, downloadFile, getLocalDateString, parseLocalDate, safeStorage } from './lib/utils';
 import { getWeeklyQuote } from './constants/quotes';
 import { SecurityGuard } from './components/SecurityGuard';
 import { Path, UserData, Photos, ProgressPhotos, AssessmentResult, Rating, SavedReport, UserProfile } from './types';
@@ -727,30 +727,23 @@ export default function App() {
     const PIN_VERSION = 'v2_6mapin';
     
     // Check if localStorage is even accessible before trying to read/write version
-    let currentVersion = null;
-    let storageAvailable = false;
-    try {
-      currentVersion = localStorage.getItem('unlckd_gym_version');
-      storageAvailable = true;
-    } catch (e) {
-      console.warn("Auth: Storage blocked, skipping version-based reset.");
-    }
+    const currentVersion = safeStorage.get('unlckd_gym_version');
     
-    if (storageAvailable && currentVersion !== PIN_VERSION) {
+    if (currentVersion !== PIN_VERSION) {
       const performGlobalReset = async () => {
         try {
           await signOut(auth);
-          localStorage.clear();
-          sessionStorage.clear();
-          localStorage.setItem('unlckd_gym_version', PIN_VERSION);
+          safeStorage.clear('local');
+          safeStorage.clear('session');
+          safeStorage.set('unlckd_gym_version', PIN_VERSION, 'local');
           console.info("Security Update: Sessions cleared for 6-digit PIN migration.");
-          window.location.reload();
-        } catch (e) {
           try {
-            localStorage.setItem('unlckd_gym_version', PIN_VERSION);
-          } catch (storageErr) {
-            // Ignore if we can't even set the version
+            window.location.reload();
+          } catch (reloadErr) {
+            console.warn("Auth: Navigation blocked, user must manually refresh.");
           }
+        } catch (e) {
+          safeStorage.set('unlckd_gym_version', PIN_VERSION, 'local');
         }
       };
       performGlobalReset();
@@ -784,9 +777,14 @@ export default function App() {
         console.error("Auth: Redirect error caught:", error);
         
         // Handle common cross-site redirect failures
+        const isSecurityError = error?.message?.includes('insecure') || error?.name === 'SecurityError';
+        
         if (error.code === 'auth/redirect-cancelled-by-user') return;
         
-        if (error.code === 'auth/internal-error' && error.message?.includes('partition')) {
+        if (isSecurityError) {
+          setAuthError("Browser privacy settings blocked the login redirect. Please try Email login instead of Google, or open the app in a new tab.");
+          setIsAuthModalOpen(true);
+        } else if (error.code === 'auth/internal-error' && error.message?.includes('partition')) {
           setAuthError("Browser privacy settings blocked the login. Please try Email login or turn off 'Prevent Cross-Site Tracking' in your browser settings.");
           setIsAuthModalOpen(true);
         } else if (error.code === 'auth/network-request-failed') {
@@ -1044,6 +1042,13 @@ export default function App() {
     
     let message = "Authentication failed. Please try again.";
     
+    const isSecurityError = error?.message?.includes('insecure') || error?.name === 'SecurityError';
+    if (isSecurityError) {
+      message = "Browser security settings blocked this action. This often happens in iframes or Private Browsing mode. Try opening the app in a new tab or use Email/Password sign-in.";
+      setAuthError(message);
+      return;
+    }
+
     switch (error?.code) {
       case 'auth/popup-blocked':
         message = "Popup was blocked by your browser. Please enable popups for this site.";
@@ -1139,9 +1144,23 @@ export default function App() {
 
   const handleReportError = () => {
     if (!lastError) return;
-    const subject = encodeURIComponent(`Error Report: UNLCKD Pro Trainer`);
-    const body = encodeURIComponent(`User Email: ${user?.email || 'N/A'}\nError: ${lastError}\nTime: ${new Date().toISOString()}\nPath: ${path}\n\nPlease describe what you were doing when the error occurred:`);
-    window.location.href = `mailto:support@unlckd.pro?subject=${subject}&body=${body}`;
+    try {
+      const subject = encodeURIComponent(`Error Report: UNLCKD Pro Trainer`);
+      const body = encodeURIComponent(`User Email: ${user?.email || 'N/A'}\nError: ${lastError}\nTime: ${new Date().toISOString()}\nPath: ${path}\n\nPlease describe what you were doing when the error occurred:`);
+      const mailtoUrl = `mailto:unlocksupport@unlckdbrand.com?subject=${subject}&body=${body}`;
+      
+      // Creating a hidden anchor is more reliable in some iframes
+      const a = document.createElement('a');
+      a.href = mailtoUrl;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => document.body.removeChild(a), 100);
+    } catch (e) {
+      console.error("Failed to trigger mailto link:", e);
+      // If window.location.href or anchor click fails with "insecure", fallback to alert
+      alert(`We couldn't open your mail app. Please manually email unlocksupport@unlckdbrand.com with this error:\n\n${lastError}`);
+    }
   };
 
   const processReport = async (isResubmit: boolean = false, invalidLinksContext?: string) => {

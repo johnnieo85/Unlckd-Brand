@@ -60,7 +60,7 @@ import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { gymService } from '../services/gymService';
 import { DailyLog, SavedReport, Measurement, UserProfile, Badge as UserBadge } from '../types';
-import { cn, downloadFile, getLocalDateString, parseLocalDate } from '../lib/utils';
+import { cn, downloadFile, getLocalDateString, parseLocalDate, safeStorage } from '../lib/utils';
 import { getWeeklyQuote } from '../constants/quotes';
 import { updateGymPin, updateUserProfile } from '../services/accessService';
 import { 
@@ -266,12 +266,8 @@ export const ProGym = ({
 
   useEffect(() => {
     if (userProfile?.userId) {
-      try {
-        const unlocked = sessionStorage.getItem(`gym_hub_unlocked_${userProfile.userId}`) === 'true';
-        if (unlocked) setIsHubUnlocked(true);
-      } catch (e) {
-        console.warn("Storage access denied for Gym Hub unlock state:", e);
-      }
+      const unlocked = safeStorage.get(`gym_hub_unlocked_${userProfile.userId}`, 'session') === 'true';
+      if (unlocked) setIsHubUnlocked(true);
     }
   }, [userProfile?.userId]);
   
@@ -1309,11 +1305,7 @@ export const ProGym = ({
     if (!userProfile) return;
     if (pinEntry.trim() === userProfile.gymPin?.toString().trim()) {
       setIsHubUnlocked(true);
-      try {
-        sessionStorage.setItem(`gym_hub_unlocked_${userProfile.userId}`, 'true');
-      } catch (e) {
-        console.warn("Storage access denied for Gym Hub unlock:", e);
-      }
+      safeStorage.set(`gym_hub_unlocked_${userProfile.userId}`, 'true', 'session');
       setError('');
     } else {
       setError('Incorrect PIN. Please try again.');
@@ -1336,11 +1328,7 @@ export const ProGym = ({
       await updateGymPin(userProfile.userId, pinSetup.pin.trim());
       setIsHubUnlocked(true);
       setIsSettingPin(false);
-      try {
-        sessionStorage.setItem(`gym_hub_unlocked_${userProfile.userId}`, 'true');
-      } catch (e) {
-        console.warn("Storage access denied for Gym Hub unlock:", e);
-      }
+      safeStorage.set(`gym_hub_unlocked_${userProfile.userId}`, 'true', 'session');
       setError('');
       if (onProfileUpdate) onProfileUpdate();
       // In a real app, you might want to refresh the profile state here
@@ -1611,11 +1599,7 @@ export const ProGym = ({
               className="h-10 w-10 md:h-11 md:w-11 bg-white/5 border-white/10 hover:bg-white/10 rounded-xl md:rounded-2xl shrink-0"
               onClick={() => {
                 setIsHubUnlocked(false);
-                try {
-                  sessionStorage.removeItem(`gym_hub_unlocked_${userProfile?.userId}`);
-                } catch (e) {
-                  console.warn("Storage access denied for Gym Hub lock:", e);
-                }
+                safeStorage.remove(`gym_hub_unlocked_${userProfile?.userId}`, 'session');
               }}
               title="Lock Hub"
             >
