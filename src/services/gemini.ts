@@ -286,6 +286,10 @@ async function generateHealthAndSupport(
     User Data:
     ${JSON.stringify(userData, null, 2)}
     
+    GYM ACCESS PROTOCOL:
+    - The user has: ${userData.gymAccess === 'none' ? 'NO EQUIPMENT' : userData.gymAccess === 'home' ? 'BASIC HOME GYM' : 'FULL COMMERCIAL GYM'}.
+    ${userData.gymAccess === 'none' ? '- CRITICAL: Since the user has NO EQUIPMENT, any recommended workouts or exercises MUST be 100% bodyweight-only (Calisthenics, HIIT bodyweight, plyometrics). No weights or machines.' : ''}
+
     FOCUS: 
     1. Health Metrics (BMI, Body Fat, Calorie Targets).
     2. Daily Life (Sleep, Water, Steps).
@@ -460,6 +464,10 @@ async function generateWorkoutPlan(
       User: ${userData.name}, Goal: ${userData.goals}.
       Current Range: Weeks ${startWeek}-${endWeek}.
       
+      GYM ACCESS PROTOCOL:
+      - The user has: ${userData.gymAccess === 'none' ? 'NO EQUIPMENT' : userData.gymAccess === 'home' ? 'BASIC HOME GYM' : 'FULL COMMERCIAL GYM'}.
+      ${userData.gymAccess === 'none' ? '- CRITICAL: Since the user has NO EQUIPMENT, you MUST design the entire plan using ONLY bodyweight exercises (Calisthenics, HIIT bodyweight workouts, plyometrics). Do NOT include any exercises requiring dumbbells, barbells, or machines.' : ''}
+
       ${invalidLinksContext ? `FIX MODE: The following links from a previous generation were flagged as invalid or problematic. Please search for BETTER, high-quality alternatives for these specific movements/recipes:\n${invalidLinksContext}` : ""}
 
       LINK QUALITY PROTOCOL:
