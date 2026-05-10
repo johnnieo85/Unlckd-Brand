@@ -1642,24 +1642,38 @@ export default function App() {
                   The elite digital coach that turns your data and photos into a structured, professional transformation plan.
                 </p>
                 <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
-                  <a 
-                    href="https://unlckdbrand.com/unlckd-pro-trainer" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-8 py-4 bg-brand-primary text-brand-dark font-bold rounded-full hover:bg-brand-primary/90 transition-all hover:scale-105 hover:shadow-[0_0_20px_rgba(16,185,129,0.3)] shadow-lg shadow-brand-primary/10"
-                  >
-                    <Sparkles className="w-5 h-5" />
-                    Purchase Pro Access
-                  </a>
-                  <a 
-                    href="https://unlckdbrand.com/unlckd-pro-trainer-premium" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-8 py-4 bg-transparent border-2 border-[#D4AF37]/40 text-[#D4AF37] font-bold rounded-full hover:bg-[#D4AF37]/10 transition-all hover:scale-105 animate-gold-glow group"
-                  >
-                    <Trophy className="w-5 h-5 text-[#D4AF37] group-hover:rotate-12 transition-transform" />
-                    Upgrade to Premium
-                  </a>
+                  {!user ? (
+                    <>
+                      <a 
+                        href="https://unlckdbrand.com/unlckd-pro-trainer" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-8 py-4 bg-brand-primary text-brand-dark font-bold rounded-full hover:bg-brand-primary/90 transition-all hover:scale-105 hover:shadow-[0_0_20px_rgba(16,185,129,0.3)] shadow-lg shadow-brand-primary/10"
+                      >
+                        <Sparkles className="w-5 h-5" />
+                        Purchase Pro Access
+                      </a>
+                      <a 
+                        href="https://unlckdbrand.com/unlckd-pro-trainer-premium" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-8 py-4 bg-transparent border-2 border-[#D4AF37]/40 text-[#D4AF37] font-bold rounded-full hover:bg-[#D4AF37]/10 transition-all hover:scale-105 animate-gold-glow group"
+                      >
+                        <Trophy className="w-5 h-5 text-[#D4AF37] group-hover:rotate-12 transition-transform" />
+                        Purchase Premium
+                      </a>
+                    </>
+                  ) : !isPremium ? (
+                    <a 
+                      href="https://unlckdbrand.com/unlckd-pro-trainer-premium" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-8 py-4 bg-transparent border-2 border-[#D4AF37]/40 text-[#D4AF37] font-bold rounded-full hover:bg-[#D4AF37]/10 transition-all hover:scale-105 animate-gold-glow group"
+                    >
+                      <Trophy className="w-5 h-5 text-[#D4AF37] group-hover:rotate-12 transition-transform" />
+                      Upgrade to Premium
+                    </a>
+                  ) : null}
                 </div>
               </div>
 
