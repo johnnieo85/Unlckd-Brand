@@ -577,6 +577,7 @@ export default function App() {
     physicalActivity: 'moderate',
     desiredPhysicalActivity: 'high',
     planDuration: '12-week',
+    smartHomeGym: 'none',
     planStartDate: new Date().toISOString().split('T')[0],
     syncToGymHub: true
   });
@@ -2212,6 +2213,19 @@ export default function App() {
                         value={userData.gymAccess}
                         onChange={e => setUserData({...userData, gymAccess: e.target.value})}
                       />
+                      {(path === 'workout' || path === 'full') && (
+                        <Select 
+                          label="Smart Home Gym"
+                          options={[
+                            {label: 'None', value: 'none'},
+                            {label: 'Tonal', value: 'tonal'}, 
+                            {label: 'Speediance', value: 'speediance'},
+                            {label: 'Tempo', value: 'tempo'}
+                          ]} 
+                          value={userData.smartHomeGym}
+                          onChange={e => setUserData({...userData, smartHomeGym: e.target.value as any})}
+                        />
+                      )}
                       <Select 
                         label="Preferred Physique Style"
                         options={[
