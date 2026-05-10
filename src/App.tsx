@@ -1665,7 +1665,7 @@ export default function App() {
                     </>
                   ) : !isPremium ? (
                     <a 
-                      href="https://unlckdbrand.com/unlckd-pro-trainer-premium" 
+                      href="https://unlckdbrand.com/unlckd-pro-trainer-premium-upgrade" 
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-2 px-8 py-4 bg-transparent border-2 border-[#D4AF37]/40 text-[#D4AF37] font-bold rounded-full hover:bg-[#D4AF37]/10 transition-all hover:scale-105 animate-gold-glow group"
