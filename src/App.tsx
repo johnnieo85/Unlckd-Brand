@@ -3157,8 +3157,42 @@ export default function App() {
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <h2 className="text-3xl font-display font-bold text-brand-primary">Workout Plan</h2>
                     {report.workoutPlan && (
-                      <button 
-                        onClick={() => {
+                      <div className="flex flex-wrap items-center gap-3">
+                        {userData.smartHomeGym === 'tonal' && (
+                          <a 
+                            href="https://tonal.com/blogs/movements" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 border border-amber-500/30 text-amber-500 rounded-lg text-xs font-bold transition-all hover:bg-amber-500/20"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            Tonal Movement Library
+                          </a>
+                        )}
+                        {userData.smartHomeGym === 'speediance' && (
+                          <a 
+                            href="https://www.speediance.com/pages/speediance-gym-monster-movement-library?srsltid=AfmBOoo3U0D3Z0MW04zf3T0Rc4nBDKymmEl2_p4R0pEymJ-BVfEcaMPk&_su_rec=scLAYcaHvFiphvCHOQIGLeZtLFfz9GZXLZUJ1JbVtUoz9hB2oy4ViEpVsUIvsYzAwTH51GvYujIVDUt8eqToq89AHfc8p4ytUB1PLv3cv8TMlcxdhSC_HRPST5GQUhKar6sUDJ9YK7wectqHvq2tA6Hz5vbG3GsEj7hWz2aLKdKxBRTQNDgpJDWVNySGSMxvPogurLGOOItpPzSj7A0byTm5ia7N3CgQf5y2hwM_8uf8u0Z8XmD1Q1q-8iGFGtukY6AyGAx61zZtKJdIyl_I4r5G9r3I4sl_AtLzvcs4cbrarFqYStdpnG6ipEVmk2nWoi47zifkXg&_su_rec_id=76c8cc1d-54c3-4eaf-bcc9-8df2690d7684-1778418315#Strength" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 border border-amber-500/30 text-amber-500 rounded-lg text-xs font-bold transition-all hover:bg-amber-500/20"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            Speediance Movement Library
+                          </a>
+                        )}
+                        {userData.smartHomeGym === 'tempo' && (
+                          <a 
+                            href="https://app.tempo.fit/login" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 border border-amber-500/30 text-amber-500 rounded-lg text-xs font-bold transition-all hover:bg-amber-500/20"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            Tempo Login
+                          </a>
+                        )}
+                        <button 
+                          onClick={() => {
                           const numWeeks = parseInt(userData.planDuration || '12');
                           let content = `UNLCKD PRO TRAINER - ${numWeeks}-WEEK TRAINING PLAN\n`;
                           content += `==========================================\n\n`;
@@ -3197,7 +3231,8 @@ export default function App() {
                         <Download className="w-4 h-4" />
                         Download Plan (.txt)
                       </button>
-                    )}
+                    </div>
+                  )}
                   </div>
                   {report.workoutPlan?.map((week, weekIdx) => (
                     <div key={weekIdx} className="space-y-4">

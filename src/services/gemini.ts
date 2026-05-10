@@ -288,7 +288,11 @@ async function generateHealthAndSupport(
     
     GYM ACCESS PROTOCOL:
     - The user has: ${userData.gymAccess === 'none' ? 'NO EQUIPMENT' : userData.gymAccess === 'home' ? 'BASIC HOME GYM' : 'FULL COMMERCIAL GYM'}.
-    ${userData.smartHomeGym && userData.smartHomeGym !== 'none' ? `- SMART HOME GYM: The user has a ${userData.smartHomeGym.toUpperCase()} system. Focus any home-based advice and YouTube demonstrations on this equipment.` : ''}
+    ${userData.smartHomeGym && userData.smartHomeGym !== 'none' ? `- SMART HOME GYM: The user has a ${userData.smartHomeGym.toUpperCase()} system.
+      ${userData.smartHomeGym === 'tonal' ? '- TONAL RESOURCE: Direct users to https://tonal.com/blogs/movements for official movement tutorials.' : ''}
+      ${userData.smartHomeGym === 'speediance' ? '- SPEEDIANCE RESOURCE: Direct users to the Speediance Movement Library (https://www.speediance.com/pages/speediance-gym-monster-movement-library).' : ''}
+      ${userData.smartHomeGym === 'tempo' ? '- TEMPO RESOURCE: Note that users should log in at https://app.tempo.fit/login for movement tutorials.' : ''}
+      Focus any home-based advice and YouTube demonstrations on this equipment.` : ''}
     ${userData.gymAccess === 'none' ? '- CRITICAL: Since the user has NO EQUIPMENT, any recommended workouts or exercises MUST be 100% bodyweight-only (Calisthenics, HIIT bodyweight, plyometrics). No weights or machines.' : ''}
 
     INJURY PROTOCOL:
@@ -473,7 +477,11 @@ async function generateWorkoutPlan(
       
       GYM ACCESS PROTOCOL:
       - The user has: ${userData.gymAccess === 'none' ? 'NO EQUIPMENT' : userData.gymAccess === 'home' ? 'BASIC HOME GYM' : 'FULL COMMERCIAL GYM'}.
-      ${userData.smartHomeGym && userData.smartHomeGym !== 'none' ? `- SMART HOME GYM: The user is using a ${userData.smartHomeGym.toUpperCase()}. CRITICAL: You MUST prioritize exercises and programming specifically for the ${userData.smartHomeGym.toUpperCase()} system. For Tonal/Speediance/Tempo, use movements compatible with their digital weight/form tracking.` : ''}
+      ${userData.smartHomeGym && userData.smartHomeGym !== 'none' ? `- SMART HOME GYM: The user is using a ${userData.smartHomeGym.toUpperCase()}. 
+        ${userData.smartHomeGym === 'tonal' ? '- SOURCE MOVEMENTS: Prioritize exercises found in the Tonal Movement Library (https://tonal.com/blogs/movements).' : ''}
+        ${userData.smartHomeGym === 'speediance' ? '- SOURCE MOVEMENTS: Prioritize exercises found in the Speediance Movement Library (https://www.speediance.com/pages/speediance-gym-monster-movement-library).' : ''}
+        ${userData.smartHomeGym === 'tempo' ? '- TEMPO ACCESS: Direct users to login at https://app.tempo.fit/login for official movement tutorials.' : ''}
+        CRITICAL: You MUST prioritize exercises and programming specifically for the ${userData.smartHomeGym.toUpperCase()} system. For Tonal/Speediance/Tempo, use movements compatible with their digital weight/form tracking.` : ''}
       ${userData.gymAccess === 'none' ? '- CRITICAL: Since the user has NO EQUIPMENT, you MUST design the entire plan using ONLY bodyweight exercises (Calisthenics, HIIT bodyweight workouts, plyometrics). Do NOT include any exercises requiring dumbbells, barbells, or machines.' : ''}
 
       INJURY PROTOCOL:
@@ -805,7 +813,8 @@ export async function generateTransformationReport(
     // 2. GENERATE WORKOUT PLAN
     if (['full', 'workout'].includes(path)) {
       try {
-        console.log("Generating 12-week workout plan...");
+        const numWeeks = parseInt(cleanUserData.planDuration || '12');
+        console.log(`Generating ${numWeeks}-week workout plan...`);
         // Cooldown after previous search-heavy steps
         await new Promise(resolve => setTimeout(resolve, 5000));
         const workout = await generateWorkoutPlan(cleanUserData, isResubmit, invalidLinksContext);
