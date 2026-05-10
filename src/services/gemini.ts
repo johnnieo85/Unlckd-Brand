@@ -494,7 +494,7 @@ async function generateWorkoutPlan(
       LINK QUALITY PROTOCOL:
       - For EVERY exercise (warmUp and mainWork):
         ${userData.smartHomeGym === 'tonal' 
-          ? '- You MUST set "videoUrl" to: https://tonal.com/blogs/movements. (Do NOT use YouTube).' 
+          ? '- You MUST set "videoUrl" to: https://tonal.com/blogs/movements. (STRICT RULE: DO NOT link to YouTube for Tonal exercises. All exercises must be sourced from the Tonal library across pages 1 to 11).' 
           : `- You MUST set "videoUrl" to a YouTube search result link: https://www.youtube.com/results?search_query=[EXERCISE+NAME]+exercise+tutorial${userData.smartHomeGym && userData.smartHomeGym !== 'none' ? `+${userData.smartHomeGym}` : ''}`}
       - Replace [EXERCISE+NAME] with the actual name of the exercise, URL-encoded where necessary.
       - NEVER provide direct URLs to specific YouTube videos or hallucinate video IDs.
@@ -519,7 +519,8 @@ async function generateWorkoutPlan(
         contents: prompt,
         config: {
           systemInstruction: `Expert S&C Coach. JSON only. 
-          QUALITY CHECK PROTOCOL: Every videoUrl MUST be a formatted YouTube search result link as specified in the prompt.
+          QUALITY CHECK PROTOCOL: Every videoUrl MUST be formatted exactly as specified in the prompt.
+          ${userData.smartHomeGym === 'tonal' ? 'For Tonal exercises, you MUST link directly to https://tonal.com/blogs/movements and NOT YouTube.' : 'Every videoUrl MUST be a formatted YouTube search result link as specified in the prompt.'}
           Do NOT provide direct links to specific YouTube videos.
           Ensure exact requested weeks are provided.`,
           responseMimeType: "application/json",
