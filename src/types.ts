@@ -22,7 +22,6 @@ export interface UserData {
   physicalActivity: string;
   desiredPhysicalActivity: string;
   planDuration?: PlanDuration;
-  smartHomeGym?: 'none' | 'tonal' | 'speediance' | 'tempo';
   planStartDate?: string;
   syncToGymHub?: boolean;
 }

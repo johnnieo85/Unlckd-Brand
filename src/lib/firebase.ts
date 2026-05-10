@@ -18,26 +18,12 @@ const isIframe = (function() {
   }
 })();
 
-if (safeStorage.isAvailable('local')) {
-  if (isMobile || (isApple && isIframe)) {
-    // Proactively use long polling for ALL mobile devices and Apple iframes
-    // to avoid common network/firewall issues with gRPC/WebSockets (code=unavailable)
-    console.info("Firestore: Using Long Polling mode for mobile/Safari compatibility.");
-    firestoreDb = initializeFirestore(app, {
-      experimentalForceLongPolling: true,
-    }, firebaseConfig.firestoreDatabaseId);
-  } else {
-    // Normal connection for desktop/standard browsers
-    firestoreDb = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-  }
-} else {
-  console.warn("Storage blocked or Standard Firestore initialization failed, using safe memory mode");
-  // Force memory-only cache and long polling if storage/IndexedDB is blocked
-  firestoreDb = initializeFirestore(app, {
-    localCache: memoryLocalCache(),
-    experimentalForceLongPolling: true,
-  }, firebaseConfig.firestoreDatabaseId);
-}
+// Universal recommendation for AI Studio apps to avoid code=unavailable in nested iframes or proxies
+console.info("Firestore: Using Long Polling mode for maximum reliability in iFrame/AI Studio.");
+firestoreDb = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+  localCache: memoryLocalCache(), // safer default for sandboxed preview
+}, firebaseConfig.firestoreDatabaseId);
 
 export const db = firestoreDb;
 export const auth = getAuth(app);

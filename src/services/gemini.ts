@@ -22,46 +22,6 @@ const processPhoto = (data: string | null) => {
 };
 
 /**
- * Ensures all Tonal-related exercises point to the Tonal Movement Library instead of YouTube.
- */
-function ensureTonalLinks(obj: any): any {
-  if (!obj) return obj;
-
-  if (Array.isArray(obj)) {
-    return obj.map(item => ensureTonalLinks(item));
-  }
-
-  if (typeof obj === 'string') {
-    // Fix Tonal links in markdown strings: [Tonal Exercise Name](link)
-    // We catch any link if 'tonal' is in the text, or if the URL is a YouTube link for a Tonal exercise
-    return obj.replace(/\[([^\]]*tonal[^\]]*)\]\(([^)]+)\)/gi, (match, name, url) => {
-      return `[${name}](https://tonal.com/blogs/movements)`;
-    });
-  }
-
-  if (typeof obj === 'object') {
-    const newObj = { ...obj };
-    
-    // Check if this object has both name/exercises and videoUrl
-    if (newObj.name && typeof newObj.name === 'string' && newObj.videoUrl) {
-      if (newObj.name.toLowerCase().includes('tonal')) {
-          newObj.videoUrl = 'https://tonal.com/blogs/movements';
-      }
-    }
-
-    // Recurse through all properties
-    for (const key in newObj) {
-      if (Object.prototype.hasOwnProperty.call(newObj, key)) {
-        newObj[key] = ensureTonalLinks(newObj[key]);
-      }
-    }
-    return newObj;
-  }
-
-  return obj;
-}
-
-/**
  * Gets photo parts for Gemini prompt
  */
 const getPhotoParts = (path: string, photos: Photos | ProgressPhotos): any[] => {
@@ -227,9 +187,7 @@ async function generatePhysiqueAnalysis(
 
     LINK QUALITY PROTOCOL:
     - If you reference any specific exercises or movements in your summaries, you MUST hyperlink them using Markdown: [Exercise Name](VideoURL).
-    ${userData.smartHomeGym === 'tonal' 
-      ? '- For Tonal exercises, you MUST link directly to https://tonal.com/blogs/movements (sourcing only from the official movements found on pages 1-11). DO NOT use YouTube.' 
-      : '- Use this YouTube search link: https://www.youtube.com/results?search_query=[EXERCISE+NAME]+exercise+tutorial'}
+    - Use this YouTube search link: https://www.youtube.com/results?search_query=[EXERCISE+NAME]+exercise+tutorial
     - NEVER provide raw URLs in parentheses like "Exercise Name (URL)". ONLY use Markdown links where the name is the clickable text.
     
     STRICT EXCLUSION: Do NOT include any grocery lists or meal plan details in this specific analysis.
@@ -309,7 +267,7 @@ async function generatePhysiqueAnalysis(
   }));
 
   const result = safeParseJson(response.text || "{}");
-  return ensureTonalLinks(result);
+  return result;
 }
 
 /**
@@ -332,11 +290,6 @@ async function generateHealthAndSupport(
     
     GYM ACCESS PROTOCOL:
     - The user has: ${userData.gymAccess === 'none' ? 'NO EQUIPMENT' : userData.gymAccess === 'home' ? 'BASIC HOME GYM' : 'FULL COMMERCIAL GYM'}.
-    ${userData.smartHomeGym && userData.smartHomeGym !== 'none' ? `- SMART HOME GYM: The user has a ${userData.smartHomeGym.toUpperCase()} system.
-      ${userData.smartHomeGym === 'tonal' ? '- TONAL RESOURCE: Use EXACT exercise names from the Tonal Movement Library (https://tonal.com/blogs/movements). This is the source of truth for all movement guidance.' : ''}
-      ${userData.smartHomeGym === 'speediance' ? '- SPEEDIANCE RESOURCE: Use EXACT exercise names from the Speediance Movement Library (https://www.speediance.com/pages/speediance-gym-monster-movement-library). This is the source of truth for all movement guidance.' : ''}
-      ${userData.smartHomeGym === 'tempo' ? '- TEMPO RESOURCE: Note that users should log in at https://app.tempo.fit/login for official movement tutorials and use Tempo-approved nomenclature.' : ''}
-      CRITICAL: All workout guidance and search results MUST be synchronized with this specific ecosystem.` : ''}
     ${userData.gymAccess === 'none' ? '- CRITICAL: Since the user has NO EQUIPMENT, any recommended workouts or exercises MUST be 100% bodyweight-only (Calisthenics, HIIT bodyweight, plyometrics). No weights or machines.' : ''}
 
     INJURY PROTOCOL:
@@ -356,9 +309,7 @@ async function generateHealthAndSupport(
     
     LINK QUALITY PROTOCOL:
     - For EVERY exercise demonstration mentioned, you MUST use the appropriate link:
-      ${userData.smartHomeGym === 'tonal' 
-        ? 'For Tonal: https://tonal.com/blogs/movements (DO NOT use YouTube)' 
-        : 'For others: https://www.youtube.com/results?search_query=[EXERCISE+NAME]+exercise+tutorial'}
+      https://www.youtube.com/results?search_query=[EXERCISE+NAME]+exercise+tutorial
     - For EVERY nutrition or recipe mention, you MUST use this Pinterest search link: https://www.pinterest.com/search/pins/?q=[MEAL+NAME]+healthy+recipe
     - NEVER provide raw URLs in parentheses like "(https://...)". 
     - You MUST use Markdown hyperlinks: [Exercise/Meal Name](SearchURL).
@@ -504,8 +455,8 @@ async function generateHealthAndSupport(
 
   const result = safeParseJson(response.text || "{}");
   
-  // Apply Tonal link fix to all generated content
-  return ensureTonalLinks(result);
+  // Apply logic to all generated content
+  return result;
 }
 
 /**
@@ -528,11 +479,6 @@ async function generateWorkoutPlan(
       
       GYM ACCESS PROTOCOL:
       - The user has: ${userData.gymAccess === 'none' ? 'NO EQUIPMENT' : userData.gymAccess === 'home' ? 'BASIC HOME GYM' : 'FULL COMMERCIAL GYM'}.
-      ${userData.smartHomeGym && userData.smartHomeGym !== 'none' ? `- SMART HOME GYM: The user is using a ${userData.smartHomeGym.toUpperCase()}. 
-        ${userData.smartHomeGym === 'tonal' ? '- SOURCE MOVEMENTS: You MUST ONLY select exercises found in the official Tonal Movement Library at https://tonal.com/blogs/movements (spread across pages 1 to 11). Use the EXACT nomenclature found there (e.g., "Tonal Barbell Deadlift", "Tonal Handle Chest Press").' : ''}
-        ${userData.smartHomeGym === 'speediance' ? '- SOURCE MOVEMENTS: You MUST ONLY select exercises found in the official Speediance Movement Library (https://www.speediance.com/pages/speediance-gym-monster-movement-library). Use the EXACT nomenclature found on their platform.' : ''}
-        ${userData.smartHomeGym === 'tempo' ? '- TEMPO ACCESS: You MUST ONLY select exercises compatible with Tempo and direct users to login at https://app.tempo.fit/login for official movement tutorials.' : ''}
-        CRITICAL: Every exercise generated for this plan MUST follow the resource guidance for the ${userData.smartHomeGym.toUpperCase()} system to ensure form tracking compatibility.` : ''}
       ${userData.gymAccess === 'none' ? '- CRITICAL: Since the user has NO EQUIPMENT, you MUST design the entire plan using ONLY bodyweight exercises (Calisthenics, HIIT bodyweight workouts, plyometrics). Do NOT include any exercises requiring dumbbells, barbells, or machines.' : ''}
 
       INJURY PROTOCOL:
@@ -544,9 +490,7 @@ async function generateWorkoutPlan(
 
       LINK QUALITY PROTOCOL:
       - For EVERY exercise (warmUp and mainWork):
-        ${userData.smartHomeGym === 'tonal' 
-          ? '- You MUST set "videoUrl" to: https://tonal.com/blogs/movements. (STRICT RULE: DO NOT link to YouTube for Tonal exercises. All exercises must be sourced from the Tonal library across pages 1 to 11 at https://tonal.com/blogs/movements).' 
-          : `- You MUST set "videoUrl" to a YouTube search result link: https://www.youtube.com/results?search_query=[EXERCISE+NAME]+exercise+tutorial${userData.smartHomeGym && userData.smartHomeGym !== 'none' ? `+${userData.smartHomeGym}` : ''}`}
+        - You MUST set "videoUrl" to a YouTube search result link: https://www.youtube.com/results?search_query=[EXERCISE+NAME]+exercise+tutorial
       - Replace [EXERCISE+NAME] with the actual name of the exercise, URL-encoded where necessary.
       - NEVER provide direct URLs to specific YouTube videos or hallucinate video IDs.
       - Each exercise Name in the output will be hyperlinked by the UI. 
@@ -571,7 +515,7 @@ async function generateWorkoutPlan(
         config: {
           systemInstruction: `Expert S&C Coach. JSON only. 
           QUALITY CHECK PROTOCOL: Every videoUrl MUST be formatted exactly as specified in the prompt.
-          ${userData.smartHomeGym === 'tonal' ? 'For Tonal exercises, you MUST link directly to https://tonal.com/blogs/movements and NOT YouTube.' : 'Every videoUrl MUST be a formatted YouTube search result link as specified in the prompt.'}
+          Every videoUrl MUST be a formatted YouTube search result link as specified in the prompt.
           Do NOT provide direct links to specific YouTube videos.
           Ensure exact requested weeks are provided.`,
           responseMimeType: "application/json",
@@ -635,8 +579,7 @@ async function generateWorkoutPlan(
       const data = safeParseJson(response.text || "{}");
       const batchWorkoutPlan = data.workoutPlan || [];
 
-      // Apply Tonal link fix to the entire batch
-      return ensureTonalLinks(batchWorkoutPlan);
+      return batchWorkoutPlan;
     } catch (error) {
       console.error(`Error fetching workout weeks ${startWeek}-${endWeek}:`, error);
       throw error;
@@ -916,7 +859,7 @@ export async function generateTransformationReport(
     }
 
     // Final Validation & Cleanup
-    const finalResult = ensureTonalLinks(result) as AssessmentResult;
+    const finalResult = result as AssessmentResult;
     
     // Add report type metadata
     (finalResult as any).reportType = path === 'progress' ? 'Progress Comparison' : 
