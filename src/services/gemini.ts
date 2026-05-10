@@ -289,10 +289,10 @@ async function generateHealthAndSupport(
     GYM ACCESS PROTOCOL:
     - The user has: ${userData.gymAccess === 'none' ? 'NO EQUIPMENT' : userData.gymAccess === 'home' ? 'BASIC HOME GYM' : 'FULL COMMERCIAL GYM'}.
     ${userData.smartHomeGym && userData.smartHomeGym !== 'none' ? `- SMART HOME GYM: The user has a ${userData.smartHomeGym.toUpperCase()} system.
-      ${userData.smartHomeGym === 'tonal' ? '- TONAL RESOURCE: Direct users to https://tonal.com/blogs/movements for official movement tutorials.' : ''}
-      ${userData.smartHomeGym === 'speediance' ? '- SPEEDIANCE RESOURCE: Direct users to the Speediance Movement Library (https://www.speediance.com/pages/speediance-gym-monster-movement-library).' : ''}
-      ${userData.smartHomeGym === 'tempo' ? '- TEMPO RESOURCE: Note that users should log in at https://app.tempo.fit/login for movement tutorials.' : ''}
-      Focus any home-based advice and YouTube demonstrations on this equipment.` : ''}
+      ${userData.smartHomeGym === 'tonal' ? '- TONAL RESOURCE: Use EXACT exercise names from the Tonal Movement Library (https://tonal.com/blogs/movements). This is the source of truth for all movement guidance.' : ''}
+      ${userData.smartHomeGym === 'speediance' ? '- SPEEDIANCE RESOURCE: Use EXACT exercise names from the Speediance Movement Library (https://www.speediance.com/pages/speediance-gym-monster-movement-library). This is the source of truth for all movement guidance.' : ''}
+      ${userData.smartHomeGym === 'tempo' ? '- TEMPO RESOURCE: Note that users should log in at https://app.tempo.fit/login for official movement tutorials and use Tempo-approved nomenclature.' : ''}
+      CRITICAL: All workout guidance and search results MUST be synchronized with this specific ecosystem.` : ''}
     ${userData.gymAccess === 'none' ? '- CRITICAL: Since the user has NO EQUIPMENT, any recommended workouts or exercises MUST be 100% bodyweight-only (Calisthenics, HIIT bodyweight, plyometrics). No weights or machines.' : ''}
 
     INJURY PROTOCOL:
@@ -478,10 +478,10 @@ async function generateWorkoutPlan(
       GYM ACCESS PROTOCOL:
       - The user has: ${userData.gymAccess === 'none' ? 'NO EQUIPMENT' : userData.gymAccess === 'home' ? 'BASIC HOME GYM' : 'FULL COMMERCIAL GYM'}.
       ${userData.smartHomeGym && userData.smartHomeGym !== 'none' ? `- SMART HOME GYM: The user is using a ${userData.smartHomeGym.toUpperCase()}. 
-        ${userData.smartHomeGym === 'tonal' ? '- SOURCE MOVEMENTS: Prioritize exercises found in the Tonal Movement Library (https://tonal.com/blogs/movements).' : ''}
-        ${userData.smartHomeGym === 'speediance' ? '- SOURCE MOVEMENTS: Prioritize exercises found in the Speediance Movement Library (https://www.speediance.com/pages/speediance-gym-monster-movement-library).' : ''}
-        ${userData.smartHomeGym === 'tempo' ? '- TEMPO ACCESS: Direct users to login at https://app.tempo.fit/login for official movement tutorials.' : ''}
-        CRITICAL: You MUST prioritize exercises and programming specifically for the ${userData.smartHomeGym.toUpperCase()} system. For Tonal/Speediance/Tempo, use movements compatible with their digital weight/form tracking.` : ''}
+        ${userData.smartHomeGym === 'tonal' ? '- SOURCE MOVEMENTS: You MUST ONLY select exercises found in the official Tonal Movement Library (https://tonal.com/blogs/movements). Use the EXACT nomenclature found there (e.g., "Tonal Barbell Deadlift", "Tonal Handle Chest Press").' : ''}
+        ${userData.smartHomeGym === 'speediance' ? '- SOURCE MOVEMENTS: You MUST ONLY select exercises found in the official Speediance Movement Library (https://www.speediance.com/pages/speediance-gym-monster-movement-library). Use the EXACT nomenclature found on their platform.' : ''}
+        ${userData.smartHomeGym === 'tempo' ? '- TEMPO ACCESS: You MUST ONLY select exercises compatible with Tempo and direct users to login at https://app.tempo.fit/login for official movement tutorials.' : ''}
+        CRITICAL: Every exercise generated for this plan MUST follow the resource guidance for the ${userData.smartHomeGym.toUpperCase()} system to ensure form tracking compatibility.` : ''}
       ${userData.gymAccess === 'none' ? '- CRITICAL: Since the user has NO EQUIPMENT, you MUST design the entire plan using ONLY bodyweight exercises (Calisthenics, HIIT bodyweight workouts, plyometrics). Do NOT include any exercises requiring dumbbells, barbells, or machines.' : ''}
 
       INJURY PROTOCOL:
