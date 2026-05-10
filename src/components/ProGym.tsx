@@ -3182,7 +3182,7 @@ export const ProGym = ({
             <div className="space-y-4">
               <div>
                 <h4 className="text-2xl font-display font-black text-white">The "Stepper" May Mission</h4>
-                <p className="text-gray-400 mt-2 text-sm leading-relaxed">Achieve 10,000 steps daily for at least 75% of May. This is a community-wide focus for all UNLCKD members.</p>
+                <p className="text-gray-400 mt-2 text-sm leading-relaxed">Average 10,000 steps daily throughout the month of May. This is a community-wide focus for all UNLCKD members.</p>
               </div>
               
               <div className="flex items-center justify-between pt-4 border-t border-white/5">
@@ -3207,7 +3207,7 @@ export const ProGym = ({
              <div>
                 <p className="text-[10px] text-brand-primary font-black uppercase tracking-widest">May Victory Reward</p>
                 <h5 className="text-lg font-display font-bold text-white tracking-tight">The "Stepper" May Badge</h5>
-                <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mt-1">Achieve 10,000 steps daily for at least 75% of May</p>
+                <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mt-1">Average 10,000 steps daily throughout May</p>
              </div>
           </div>
         </Card>
@@ -3230,7 +3230,7 @@ export const ProGym = ({
                 userProfile?.badges?.find(b => b.id === 'stepper') 
                   ? "bg-brand-primary/10 border-brand-primary/40" 
                   : "bg-white/5 border-white/5 opacity-40 grayscale"
-              )} title={`Complete 10,000 steps for 75% of May`}>
+              )} title={`Average 10,000 steps daily throughout May`}>
                  <div className="w-12 h-12 rounded-full bg-brand-primary/20 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
                     <Footprints className="w-6 h-6 text-brand-primary" />
                  </div>
