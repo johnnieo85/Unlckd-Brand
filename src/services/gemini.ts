@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { UserData, Photos, ProgressPhotos, AssessmentResult } from "../types";
+import { getPlanDurationWeeks } from "../lib/utils";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
@@ -31,9 +32,9 @@ function ensureTonalLinks(obj: any): any {
   }
 
   if (typeof obj === 'string') {
-    // Fix Tonal/YouTube links in markdown strings
-    // Pattern: [Tonal Exercise Name](YouTubeURL)
-    return obj.replace(/\[([^\]]*tonal[^\]]*)\]\((https:\/\/www\.youtube\.com\/[^\)]+)\)/gi, (match, name, url) => {
+    // Fix Tonal links in markdown strings: [Tonal Exercise Name](link)
+    // We catch any link if 'tonal' is in the text, or if the URL is a YouTube link for a Tonal exercise
+    return obj.replace(/\[([^\]]*tonal[^\]]*)\]\(([^)]+)\)/gi, (match, name, url) => {
       return `[${name}](https://tonal.com/blogs/movements)`;
     });
   }
@@ -227,7 +228,7 @@ async function generatePhysiqueAnalysis(
     LINK QUALITY PROTOCOL:
     - If you reference any specific exercises or movements in your summaries, you MUST hyperlink them using Markdown: [Exercise Name](VideoURL).
     ${userData.smartHomeGym === 'tonal' 
-      ? '- For Tonal exercises, you MUST link directly to https://tonal.com/blogs/movements (sourcing from pages 1-11). DO NOT use YouTube.' 
+      ? '- For Tonal exercises, you MUST link directly to https://tonal.com/blogs/movements (sourcing only from the official movements found on pages 1-11). DO NOT use YouTube.' 
       : '- Use this YouTube search link: https://www.youtube.com/results?search_query=[EXERCISE+NAME]+exercise+tutorial'}
     - NEVER provide raw URLs in parentheses like "Exercise Name (URL)". ONLY use Markdown links where the name is the clickable text.
     
@@ -513,10 +514,11 @@ async function generateHealthAndSupport(
 async function generateWorkoutPlan(
   userData: UserData,
   isResubmit: boolean,
+  memberStatus: 'none' | 'premium' | 'pro',
   invalidLinksContext?: string
 ): Promise<Partial<AssessmentResult>> {
   const workoutPlan: any[] = [];
-  const numWeeks = parseInt(userData.planDuration || '12');
+  const numWeeks = getPlanDurationWeeks(userData.planDuration);
   
   const fetchBatch = async (startWeek: number, endWeek: number): Promise<any[]> => {
     const prompt = `
@@ -527,7 +529,7 @@ async function generateWorkoutPlan(
       GYM ACCESS PROTOCOL:
       - The user has: ${userData.gymAccess === 'none' ? 'NO EQUIPMENT' : userData.gymAccess === 'home' ? 'BASIC HOME GYM' : 'FULL COMMERCIAL GYM'}.
       ${userData.smartHomeGym && userData.smartHomeGym !== 'none' ? `- SMART HOME GYM: The user is using a ${userData.smartHomeGym.toUpperCase()}. 
-        ${userData.smartHomeGym === 'tonal' ? '- SOURCE MOVEMENTS: You MUST ONLY select exercises found in the official Tonal Movement Library (https://tonal.com/blogs/movements, spread across pages 1 to 11). Use the EXACT nomenclature found there (e.g., "Tonal Barbell Deadlift", "Tonal Handle Chest Press").' : ''}
+        ${userData.smartHomeGym === 'tonal' ? '- SOURCE MOVEMENTS: You MUST ONLY select exercises found in the official Tonal Movement Library at https://tonal.com/blogs/movements (spread across pages 1 to 11). Use the EXACT nomenclature found there (e.g., "Tonal Barbell Deadlift", "Tonal Handle Chest Press").' : ''}
         ${userData.smartHomeGym === 'speediance' ? '- SOURCE MOVEMENTS: You MUST ONLY select exercises found in the official Speediance Movement Library (https://www.speediance.com/pages/speediance-gym-monster-movement-library). Use the EXACT nomenclature found on their platform.' : ''}
         ${userData.smartHomeGym === 'tempo' ? '- TEMPO ACCESS: You MUST ONLY select exercises compatible with Tempo and direct users to login at https://app.tempo.fit/login for official movement tutorials.' : ''}
         CRITICAL: Every exercise generated for this plan MUST follow the resource guidance for the ${userData.smartHomeGym.toUpperCase()} system to ensure form tracking compatibility.` : ''}
@@ -543,7 +545,7 @@ async function generateWorkoutPlan(
       LINK QUALITY PROTOCOL:
       - For EVERY exercise (warmUp and mainWork):
         ${userData.smartHomeGym === 'tonal' 
-          ? '- You MUST set "videoUrl" to: https://tonal.com/blogs/movements. (STRICT RULE: DO NOT link to YouTube for Tonal exercises. All exercises must be sourced from the Tonal library across pages 1 to 11).' 
+          ? '- You MUST set "videoUrl" to: https://tonal.com/blogs/movements. (STRICT RULE: DO NOT link to YouTube for Tonal exercises. All exercises must be sourced from the Tonal library across pages 1 to 11 at https://tonal.com/blogs/movements).' 
           : `- You MUST set "videoUrl" to a YouTube search result link: https://www.youtube.com/results?search_query=[EXERCISE+NAME]+exercise+tutorial${userData.smartHomeGym && userData.smartHomeGym !== 'none' ? `+${userData.smartHomeGym}` : ''}`}
       - Replace [EXERCISE+NAME] with the actual name of the exercise, URL-encoded where necessary.
       - NEVER provide direct URLs to specific YouTube videos or hallucinate video IDs.
@@ -662,10 +664,11 @@ async function generateWorkoutPlan(
 async function generateMealPlan(
   userData: UserData,
   isResubmit: boolean,
+  memberStatus: 'none' | 'premium' | 'pro',
   invalidLinksContext?: string
 ): Promise<Partial<AssessmentResult>> {
   const mealPlan: any[] = [];
-  const numWeeks = parseInt(userData.planDuration || '12');
+  const numWeeks = getPlanDurationWeeks(userData.planDuration);
 
   const fetchBatch = async (startWeek: number, endWeek: number): Promise<any[]> => {
     const prompt = `
@@ -753,14 +756,9 @@ async function generateMealPlan(
 
   // Define batches based on requested duration
   const batches: number[][] = [];
-  if (numWeeks <= 4) {
-    // For 2 or 4 week plans, process in single week batches for maximum quality
-    for (let i = 1; i <= numWeeks; i++) {
-      batches.push([i, i]);
-    }
-  } else {
-    // For 12 week plans, use 2-week batches
-    batches.push([1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12]);
+  const batchSize = numWeeks <= 4 ? 1 : 2;
+  for (let i = 1; i <= numWeeks; i += batchSize) {
+    batches.push([i, Math.min(i + batchSize - 1, numWeeks)]);
   }
 
   for (const [start, end] of batches) {
@@ -869,11 +867,11 @@ export async function generateTransformationReport(
     // 2. GENERATE WORKOUT PLAN
     if (['full', 'workout'].includes(path)) {
       try {
-        const numWeeks = parseInt(cleanUserData.planDuration || '12');
+        const numWeeks = getPlanDurationWeeks(cleanUserData.planDuration);
         console.log(`Generating ${numWeeks}-week workout plan...`);
         // Cooldown after previous search-heavy steps
         await new Promise(resolve => setTimeout(resolve, 5000));
-        const workout = await generateWorkoutPlan(cleanUserData, isResubmit, invalidLinksContext);
+        const workout = await generateWorkoutPlan(cleanUserData, isResubmit, 'pro', invalidLinksContext);
         result = { ...result, ...workout };
       } catch (e) {
         console.error("Workout generation failed:", e);
@@ -884,27 +882,21 @@ export async function generateTransformationReport(
     // 3. GENERATE MEAL PLAN
     if (['full', 'meal'].includes(path)) {
       try {
-        const numWeeks = parseInt(cleanUserData.planDuration || '12');
+        const numWeeks = getPlanDurationWeeks(cleanUserData.planDuration);
         console.log(`Generating ${numWeeks}-week meal plan...`);
         // Cooldown after previous search-heavy steps
         await new Promise(resolve => setTimeout(resolve, 5000));
-        const mealResult = await generateMealPlan(cleanUserData, isResubmit, invalidLinksContext);
+        const mealResult = await generateMealPlan(cleanUserData, isResubmit, 'pro', invalidLinksContext);
         result = { ...result, ...mealResult };
         
         // 4. GENERATE BATCHED GROCERY LISTS (Post-meal plan)
         if (mealResult.mealPlan && mealResult.mealPlan.length > 0) {
           console.log("Generating high-accuracy batched grocery lists...");
           
-          // Define grocery batches based on duration
+          // Define grocery batches based on duration (2-week batches)
           const groceryBatches: number[][] = [];
-          if (numWeeks <= 4) {
-            // For 2 or 4 week plans, just one or two batches
-            for (let i = 1; i <= numWeeks; i += 2) {
-              groceryBatches.push([i, Math.min(i + 1, numWeeks)]);
-            }
-          } else {
-            // For 12 week plans, use original 2-week batches
-            groceryBatches.push([1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12]);
+          for (let i = 1; i <= numWeeks; i += 2) {
+            groceryBatches.push([i, Math.min(i + 1, numWeeks)]);
           }
 
           const allGroceries: any[] = [];
@@ -980,7 +972,7 @@ export async function generateTransformationReport(
 
     // Validation checks for completeness
     const checks: { name: string; pass: boolean; error: string }[] = [];
-    const numWeeksExpected = parseInt(cleanUserData.planDuration || '12');
+    const numWeeksExpected = getPlanDurationWeeks(cleanUserData.planDuration);
 
     if (['full', 'workout'].includes(path)) {
       checks.push({
