@@ -54,7 +54,7 @@ import ReactMarkdown from 'react-markdown';
 import { Button } from './components/ui/Button';
 import { Input, Select, Checkbox } from './components/ui/Input';
 import { Card, Badge } from './components/ui/Card';
-import { cn, downloadFile, getLocalDateString, parseLocalDate, safeStorage } from './lib/utils';
+import { cn, downloadFile, getLocalDateString, parseLocalDate, safeStorage, getPlanDurationWeeks } from './lib/utils';
 import { getWeeklyQuote } from './constants/quotes';
 import { SecurityGuard } from './components/SecurityGuard';
 import { Path, UserData, Photos, ProgressPhotos, AssessmentResult, Rating, SavedReport, UserProfile } from './types';
@@ -3193,7 +3193,7 @@ export default function App() {
                         )}
                         <button 
                           onClick={() => {
-                          const numWeeks = parseInt(userData.planDuration || '12');
+                          const numWeeks = getPlanDurationWeeks(userData.planDuration);
                           let content = `UNLCKD PRO TRAINER - ${numWeeks}-WEEK TRAINING PLAN\n`;
                           content += `==========================================\n\n`;
                           
@@ -3333,7 +3333,7 @@ export default function App() {
                     {report.mealPlan && (
                       <button 
                         onClick={() => {
-                          const numWeeks = parseInt(userData.planDuration || '12');
+                          const numWeeks = getPlanDurationWeeks(userData.planDuration);
                           let content = `UNLCKD PRO TRAINER - ${numWeeks}-WEEK MEAL PLAN\n`;
                           content += `======================================\n\n`;
                           

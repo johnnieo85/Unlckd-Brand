@@ -81,3 +81,13 @@ export const safeStorage = {
     }
   }
 };
+
+/**
+ * Helper to get the number of weeks for a plan duration string
+ */
+export function getPlanDurationWeeks(duration: string | undefined): number {
+  if (!duration) return 12;
+  if (duration === '7-day') return 1;
+  const match = duration.match(/(\d+)/);
+  return match ? parseInt(match[1]) : 12;
+}

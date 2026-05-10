@@ -1,6 +1,7 @@
 import { collection, doc, setDoc, getDoc, getDocs, query, orderBy, limit, Timestamp, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { DailyLog, Measurement, SavedReport } from '../types';
+import { getPlanDurationWeeks } from '../lib/utils';
 
 enum OperationType {
   CREATE = 'create',
@@ -214,12 +215,14 @@ export const gymService = {
     const user = auth.currentUser;
     if (!user || !report.userData?.planStartDate) return;
 
+    const numWeeks = getPlanDurationWeeks(report.userData.planDuration);
+
     // 1. Fresh hub: Clear ALL existing logs to start fresh
     await this.clearLogsFromDate();
 
     const startDate = report.userData.planStartDate;
 
-    // 2. Populate data for 12 weeks (84 days)
+    // 2. Populate data for the plan duration
     // We define helpers locally or pass them if needed. 
     // Here we need getLocalDateString and parseLocalDate equivalents or similar.
     const getLocalDateString = (date: Date) => {
@@ -245,7 +248,7 @@ export const gymService = {
       targetDate.setHours(0, 0, 0, 0);
       const diffTime = targetDate.getTime() - startD.getTime();
       const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-      const weekIdx = Math.max(0, Math.min(Math.floor(diffDays / 7), 11));
+      const weekIdx = Math.max(0, Math.min(Math.floor(diffDays / 7), numWeeks - 1));
       
       // Calculate day of plan (0-6) relative to start date
       const dOfPlan = diffDays % 7;
@@ -278,7 +281,7 @@ export const gymService = {
       targetDate.setHours(0, 0, 0, 0);
       const diffTime = targetDate.getTime() - startD.getTime();
       const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-      const weekIdx = Math.max(0, Math.min(Math.floor(diffDays / 7), 11));
+      const weekIdx = Math.max(0, Math.min(Math.floor(diffDays / 7), numWeeks - 1));
       const dOfPlan = diffDays % 7;
 
       const weekData = report.report.mealPlan[weekIdx] || report.report.mealPlan[0];
@@ -288,7 +291,7 @@ export const gymService = {
       return planDays[dOfPlan % planDays.length];
     };
 
-    const count = 84; // 12 weeks
+    const count = numWeeks * 7;
     const baseDate = parseLocalDate(startDate);
     
     for (let i = 0; i < count; i++) {

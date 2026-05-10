@@ -60,7 +60,7 @@ import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { gymService } from '../services/gymService';
 import { DailyLog, SavedReport, Measurement, UserProfile, Badge as UserBadge } from '../types';
-import { cn, downloadFile, getLocalDateString, parseLocalDate, safeStorage } from '../lib/utils';
+import { cn, downloadFile, getLocalDateString, parseLocalDate, safeStorage, getPlanDurationWeeks } from '../lib/utils';
 import { getWeeklyQuote } from '../constants/quotes';
 import { updateGymPin, updateUserProfile } from '../services/accessService';
 import { 
@@ -202,6 +202,7 @@ export const ProGym = ({
   onProfileUpdate?: () => void;
   onHomeClick?: () => void 
 }) => {
+  const numWeeks = getPlanDurationWeeks(latestReport?.userData?.planDuration);
   const [log, setLog] = useState<DailyLog | null>(null);
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [loading, setLoading] = useState(true);
@@ -313,7 +314,8 @@ export const ProGym = ({
 
   useEffect(() => {
     // Determine how many days to show. Minimum 14 or enough to cover today + buffer.
-    // If we have a report, we likely want to show the full 12 weeks (84 days).
+    // Use plan duration from report or default to 12 weeks.
+    const planDaysCount = numWeeks * 7;
     const baseStartDate = latestReport?.userData?.planStartDate 
       ? parseLocalDate(latestReport.userData.planStartDate)
       : (latestReport?.timestamp?.toDate ? latestReport.timestamp.toDate() : (latestReport?.timestamp ? new Date(latestReport.timestamp) : new Date()));
@@ -324,8 +326,8 @@ export const ProGym = ({
     const daysSinceStart = Math.ceil((new Date().getTime() - startD.getTime()) / (1000 * 60 * 60 * 24));
     
     // Always show at least 7 days before today and 7 days after today if no report.
-    // With report, show 84 days or more if program is longer.
-    const count = latestReport ? Math.max(84, daysSinceStart + 14) : 21;
+    // With report, show total plan days or more if program is longer.
+    const count = latestReport ? Math.max(planDaysCount, daysSinceStart + 14) : 21;
     
     if (calendarDates.length !== count) {
       const initial = Array.from({ length: count }).map((_, i) => {
@@ -446,7 +448,7 @@ export const ProGym = ({
     targetDate.setHours(0, 0, 0, 0);
     const diffTime = targetDate.getTime() - startD.getTime();
     const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-    return Math.max(0, Math.min(Math.floor(diffDays / 7), 11));
+    return Math.max(0, Math.min(Math.floor(diffDays / 7), numWeeks - 1));
   })() : 0;
 
   const currentWeekNumber = currentWeekIndex + 1;
