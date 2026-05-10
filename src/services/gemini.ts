@@ -21,6 +21,46 @@ const processPhoto = (data: string | null) => {
 };
 
 /**
+ * Ensures all Tonal-related exercises point to the Tonal Movement Library instead of YouTube.
+ */
+function ensureTonalLinks(obj: any): any {
+  if (!obj) return obj;
+
+  if (Array.isArray(obj)) {
+    return obj.map(item => ensureTonalLinks(item));
+  }
+
+  if (typeof obj === 'string') {
+    // Fix Tonal/YouTube links in markdown strings
+    // Pattern: [Tonal Exercise Name](YouTubeURL)
+    return obj.replace(/\[([^\]]*tonal[^\]]*)\]\((https:\/\/www\.youtube\.com\/[^\)]+)\)/gi, (match, name, url) => {
+      return `[${name}](https://tonal.com/blogs/movements)`;
+    });
+  }
+
+  if (typeof obj === 'object') {
+    const newObj = { ...obj };
+    
+    // Check if this object has both name/exercises and videoUrl
+    if (newObj.name && typeof newObj.name === 'string' && newObj.videoUrl) {
+      if (newObj.name.toLowerCase().includes('tonal')) {
+          newObj.videoUrl = 'https://tonal.com/blogs/movements';
+      }
+    }
+
+    // Recurse through all properties
+    for (const key in newObj) {
+      if (Object.prototype.hasOwnProperty.call(newObj, key)) {
+        newObj[key] = ensureTonalLinks(newObj[key]);
+      }
+    }
+    return newObj;
+  }
+
+  return obj;
+}
+
+/**
  * Gets photo parts for Gemini prompt
  */
 const getPhotoParts = (path: string, photos: Photos | ProgressPhotos): any[] => {
@@ -186,7 +226,9 @@ async function generatePhysiqueAnalysis(
 
     LINK QUALITY PROTOCOL:
     - If you reference any specific exercises or movements in your summaries, you MUST hyperlink them using Markdown: [Exercise Name](VideoURL).
-    - Use this YouTube search link: https://www.youtube.com/results?search_query=[EXERCISE+NAME]+exercise+tutorial
+    ${userData.smartHomeGym === 'tonal' 
+      ? '- For Tonal exercises, you MUST link directly to https://tonal.com/blogs/movements (sourcing from pages 1-11). DO NOT use YouTube.' 
+      : '- Use this YouTube search link: https://www.youtube.com/results?search_query=[EXERCISE+NAME]+exercise+tutorial'}
     - NEVER provide raw URLs in parentheses like "Exercise Name (URL)". ONLY use Markdown links where the name is the clickable text.
     
     STRICT EXCLUSION: Do NOT include any grocery lists or meal plan details in this specific analysis.
@@ -265,7 +307,8 @@ async function generatePhysiqueAnalysis(
     },
   }));
 
-  return safeParseJson(response.text || "{}");
+  const result = safeParseJson(response.text || "{}");
+  return ensureTonalLinks(result);
 }
 
 /**
@@ -311,7 +354,10 @@ async function generateHealthAndSupport(
     The user's weight unit is: ${userData.weightUnit || 'lbs'}.
     
     LINK QUALITY PROTOCOL:
-    - For EVERY exercise demonstration mentioned, you MUST use this YouTube search link: https://www.youtube.com/results?search_query=[EXERCISE+NAME]+exercise+tutorial
+    - For EVERY exercise demonstration mentioned, you MUST use the appropriate link:
+      ${userData.smartHomeGym === 'tonal' 
+        ? 'For Tonal: https://tonal.com/blogs/movements (DO NOT use YouTube)' 
+        : 'For others: https://www.youtube.com/results?search_query=[EXERCISE+NAME]+exercise+tutorial'}
     - For EVERY nutrition or recipe mention, you MUST use this Pinterest search link: https://www.pinterest.com/search/pins/?q=[MEAL+NAME]+healthy+recipe
     - NEVER provide raw URLs in parentheses like "(https://...)". 
     - You MUST use Markdown hyperlinks: [Exercise/Meal Name](SearchURL).
@@ -455,7 +501,10 @@ async function generateHealthAndSupport(
     },
   }));
 
-  return safeParseJson(response.text || "{}");
+  const result = safeParseJson(response.text || "{}");
+  
+  // Apply Tonal link fix to all generated content
+  return ensureTonalLinks(result);
 }
 
 /**
@@ -582,7 +631,10 @@ async function generateWorkoutPlan(
       }));
 
       const data = safeParseJson(response.text || "{}");
-      return data.workoutPlan || [];
+      const batchWorkoutPlan = data.workoutPlan || [];
+
+      // Apply Tonal link fix to the entire batch
+      return ensureTonalLinks(batchWorkoutPlan);
     } catch (error) {
       console.error(`Error fetching workout weeks ${startWeek}-${endWeek}:`, error);
       throw error;
@@ -872,7 +924,7 @@ export async function generateTransformationReport(
     }
 
     // Final Validation & Cleanup
-    const finalResult = result as AssessmentResult;
+    const finalResult = ensureTonalLinks(result) as AssessmentResult;
     
     // Add report type metadata
     (finalResult as any).reportType = path === 'progress' ? 'Progress Comparison' : 
