@@ -478,7 +478,7 @@ async function generateWorkoutPlan(
       GYM ACCESS PROTOCOL:
       - The user has: ${userData.gymAccess === 'none' ? 'NO EQUIPMENT' : userData.gymAccess === 'home' ? 'BASIC HOME GYM' : 'FULL COMMERCIAL GYM'}.
       ${userData.smartHomeGym && userData.smartHomeGym !== 'none' ? `- SMART HOME GYM: The user is using a ${userData.smartHomeGym.toUpperCase()}. 
-        ${userData.smartHomeGym === 'tonal' ? '- SOURCE MOVEMENTS: You MUST ONLY select exercises found in the official Tonal Movement Library (https://tonal.com/blogs/movements). Use the EXACT nomenclature found there (e.g., "Tonal Barbell Deadlift", "Tonal Handle Chest Press").' : ''}
+        ${userData.smartHomeGym === 'tonal' ? '- SOURCE MOVEMENTS: You MUST ONLY select exercises found in the official Tonal Movement Library (https://tonal.com/blogs/movements, spread across pages 1 to 11). Use the EXACT nomenclature found there (e.g., "Tonal Barbell Deadlift", "Tonal Handle Chest Press").' : ''}
         ${userData.smartHomeGym === 'speediance' ? '- SOURCE MOVEMENTS: You MUST ONLY select exercises found in the official Speediance Movement Library (https://www.speediance.com/pages/speediance-gym-monster-movement-library). Use the EXACT nomenclature found on their platform.' : ''}
         ${userData.smartHomeGym === 'tempo' ? '- TEMPO ACCESS: You MUST ONLY select exercises compatible with Tempo and direct users to login at https://app.tempo.fit/login for official movement tutorials.' : ''}
         CRITICAL: Every exercise generated for this plan MUST follow the resource guidance for the ${userData.smartHomeGym.toUpperCase()} system to ensure form tracking compatibility.` : ''}
@@ -492,7 +492,10 @@ async function generateWorkoutPlan(
       ${invalidLinksContext ? `FIX MODE: The following links from a previous generation were flagged as invalid or problematic. Please search for BETTER, high-quality alternatives for these specific movements/recipes:\n${invalidLinksContext}` : ""}
 
       LINK QUALITY PROTOCOL:
-      - For EVERY exercise (warmUp and mainWork), you MUST set "videoUrl" to a YouTube search result link: https://www.youtube.com/results?search_query=[EXERCISE+NAME]+exercise+tutorial${userData.smartHomeGym && userData.smartHomeGym !== 'none' ? `+${userData.smartHomeGym}` : ''}
+      - For EVERY exercise (warmUp and mainWork):
+        ${userData.smartHomeGym === 'tonal' 
+          ? '- You MUST set "videoUrl" to: https://tonal.com/blogs/movements. (Do NOT use YouTube).' 
+          : `- You MUST set "videoUrl" to a YouTube search result link: https://www.youtube.com/results?search_query=[EXERCISE+NAME]+exercise+tutorial${userData.smartHomeGym && userData.smartHomeGym !== 'none' ? `+${userData.smartHomeGym}` : ''}`}
       - Replace [EXERCISE+NAME] with the actual name of the exercise, URL-encoded where necessary.
       - NEVER provide direct URLs to specific YouTube videos or hallucinate video IDs.
       - Each exercise Name in the output will be hyperlinked by the UI. 
