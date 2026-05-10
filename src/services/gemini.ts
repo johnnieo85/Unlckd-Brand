@@ -288,6 +288,7 @@ async function generateHealthAndSupport(
     
     GYM ACCESS PROTOCOL:
     - The user has: ${userData.gymAccess === 'none' ? 'NO EQUIPMENT' : userData.gymAccess === 'home' ? 'BASIC HOME GYM' : 'FULL COMMERCIAL GYM'}.
+    ${userData.smartHomeGym && userData.smartHomeGym !== 'none' ? `- SMART HOME GYM: The user has a ${userData.smartHomeGym.toUpperCase()} system. Focus any home-based advice and YouTube demonstrations on this equipment.` : ''}
     ${userData.gymAccess === 'none' ? '- CRITICAL: Since the user has NO EQUIPMENT, any recommended workouts or exercises MUST be 100% bodyweight-only (Calisthenics, HIIT bodyweight, plyometrics). No weights or machines.' : ''}
 
     INJURY PROTOCOL:
@@ -472,6 +473,7 @@ async function generateWorkoutPlan(
       
       GYM ACCESS PROTOCOL:
       - The user has: ${userData.gymAccess === 'none' ? 'NO EQUIPMENT' : userData.gymAccess === 'home' ? 'BASIC HOME GYM' : 'FULL COMMERCIAL GYM'}.
+      ${userData.smartHomeGym && userData.smartHomeGym !== 'none' ? `- SMART HOME GYM: The user is using a ${userData.smartHomeGym.toUpperCase()}. CRITICAL: You MUST prioritize exercises and programming specifically for the ${userData.smartHomeGym.toUpperCase()} system. For Tonal/Speediance/Tempo, use movements compatible with their digital weight/form tracking.` : ''}
       ${userData.gymAccess === 'none' ? '- CRITICAL: Since the user has NO EQUIPMENT, you MUST design the entire plan using ONLY bodyweight exercises (Calisthenics, HIIT bodyweight workouts, plyometrics). Do NOT include any exercises requiring dumbbells, barbells, or machines.' : ''}
 
       INJURY PROTOCOL:
@@ -482,7 +484,7 @@ async function generateWorkoutPlan(
       ${invalidLinksContext ? `FIX MODE: The following links from a previous generation were flagged as invalid or problematic. Please search for BETTER, high-quality alternatives for these specific movements/recipes:\n${invalidLinksContext}` : ""}
 
       LINK QUALITY PROTOCOL:
-      - For EVERY exercise (warmUp and mainWork), you MUST set "videoUrl" to a YouTube search result link: https://www.youtube.com/results?search_query=[EXERCISE+NAME]+exercise+tutorial
+      - For EVERY exercise (warmUp and mainWork), you MUST set "videoUrl" to a YouTube search result link: https://www.youtube.com/results?search_query=[EXERCISE+NAME]+exercise+tutorial${userData.smartHomeGym && userData.smartHomeGym !== 'none' ? `+${userData.smartHomeGym}` : ''}
       - Replace [EXERCISE+NAME] with the actual name of the exercise, URL-encoded where necessary.
       - NEVER provide direct URLs to specific YouTube videos or hallucinate video IDs.
       - Each exercise Name in the output will be hyperlinked by the UI. 
