@@ -2319,15 +2319,15 @@ export const ProGym = ({
                       </div>
                     </div>
                     <div className="overflow-x-auto -mx-4 px-4 scrollbar-hide">
-                      <table className="w-full text-left min-w-[500px]">
+                      <table className="w-full text-left min-w-[650px]">
                         <thead className="text-[10px] uppercase tracking-widest text-gray-600 border-b border-white/5">
                           <tr>
                             <th className="pb-2 font-bold w-[40px] text-center px-0"></th>
                             <th className="pb-2 font-bold w-1/3">Exercise</th>
-                            <th className="pb-2 font-bold px-2 text-center">Sets</th>
-                            <th className="pb-2 font-bold px-2 text-center">Reps</th>
-                            <th className="pb-2 font-bold px-2 text-center">Time</th>
-                            <th className="pb-2 font-bold min-w-[80px] text-center">Weight ({measurementUnits.weight})</th>
+                            <th className="pb-2 font-bold px-2 text-center w-24">Sets</th>
+                            <th className="pb-2 font-bold px-2 text-center w-32">Reps</th>
+                            <th className="pb-2 font-bold px-2 text-center w-24">Time</th>
+                            <th className="pb-2 font-bold min-w-[100px] text-center">Weight ({measurementUnits.weight})</th>
                           </tr>
                         </thead>
                         <tbody className="text-xs">
@@ -2383,7 +2383,7 @@ export const ProGym = ({
                                   <input 
                                     type="text" 
                                     placeholder={sets || '2-3'}
-                                    className="w-10 bg-white/5 border border-white/10 rounded px-1.5 py-1 text-center font-mono text-white focus:border-brand-primary outline-none transition-colors"
+                                    className="w-20 bg-white/5 border border-white/10 rounded px-1.5 py-1 text-center font-mono text-white focus:border-brand-primary outline-none transition-colors"
                                     value={log?.workoutData?.[exerciseId]?.sets || ''}
                                     onChange={(e) => handleTrainingUpdate(exerciseId, 'sets', e.target.value)}
                                   />
@@ -2392,7 +2392,7 @@ export const ProGym = ({
                                   <input 
                                     type="text" 
                                     placeholder={reps || '12-15'}
-                                    className="w-10 bg-white/5 border border-white/10 rounded px-1.5 py-1 text-center font-mono text-white focus:border-brand-primary outline-none transition-colors"
+                                    className="w-28 bg-white/5 border border-white/10 rounded px-1.5 py-1 text-center font-mono text-white focus:border-brand-primary outline-none transition-colors"
                                     value={log?.workoutData?.[exerciseId]?.reps || ''}
                                     onChange={(e) => handleTrainingUpdate(exerciseId, 'reps', e.target.value)}
                                   />
@@ -2401,7 +2401,7 @@ export const ProGym = ({
                                   <input 
                                     type="text" 
                                     placeholder="0s"
-                                    className="w-12 bg-white/5 border border-white/10 rounded px-1.5 py-1 text-center font-mono text-white focus:border-brand-primary outline-none transition-colors"
+                                    className="w-20 bg-white/5 border border-white/10 rounded px-1.5 py-1 text-center font-mono text-white focus:border-brand-primary outline-none transition-colors"
                                     value={log?.workoutData?.[exerciseId]?.time || ''}
                                     onChange={(e) => handleTrainingUpdate(exerciseId, 'time', e.target.value)}
                                   />
@@ -2410,7 +2410,7 @@ export const ProGym = ({
                                   <input 
                                     type="text" 
                                     placeholder="0"
-                                    className="w-14 bg-white/5 border border-white/10 rounded px-1.5 py-1 text-center font-mono text-white focus:border-brand-primary outline-none transition-colors"
+                                    className="w-24 bg-white/5 border border-white/10 rounded px-1.5 py-1 text-center font-mono text-white focus:border-brand-primary outline-none transition-colors"
                                     value={log?.workoutData?.[exerciseId]?.weight || ''}
                                     onChange={(e) => handleTrainingUpdate(exerciseId, 'weight', e.target.value)}
                                   />
@@ -2439,15 +2439,15 @@ export const ProGym = ({
                     )}
                   </div>
                   <div className="overflow-x-auto -mx-4 px-4 scrollbar-hide">
-                    <table className="w-full text-left min-w-[500px]">
+                    <table className="w-full text-left min-w-[650px]">
                       <thead className="text-[10px] uppercase tracking-widest text-gray-600 border-b border-brand-primary/10">
                         <tr>
                           <th className="pb-2 font-bold w-[40px] text-center px-0"></th>
                           <th className="pb-2 font-bold w-1/3">Exercise Pattern</th>
-                          <th className="pb-2 font-bold px-2 text-center">Sets</th>
-                          <th className="pb-2 font-bold px-2 text-center">Reps</th>
-                          <th className="pb-2 font-bold px-2 text-center">Time</th>
-                          <th className="pb-2 font-bold min-w-[80px] text-center">Weight ({measurementUnits.weight})</th>
+                          <th className="pb-2 font-bold px-2 text-center w-24">Sets</th>
+                          <th className="pb-2 font-bold px-2 text-center w-32">Reps</th>
+                          <th className="pb-2 font-bold px-2 text-center w-24">Time</th>
+                          <th className="pb-2 font-bold min-w-[100px] text-center">Weight ({measurementUnits.weight})</th>
                         </tr>
                       </thead>
                       <tbody className="text-sm">
@@ -2471,8 +2471,8 @@ export const ProGym = ({
                                   >
                                     {isCompleted && <Check className="w-3 h-3" />}
                                   </button>
-                               </td>
-                               <td className="py-4 text-brand-primary font-bold">
+                                </td>
+                                <td className="py-4 text-brand-primary font-bold">
                                   {(log?.useManualWorkout || !latestReport) ? (
                                     <div className="flex items-center gap-2">
                                       <input 
@@ -2508,7 +2508,7 @@ export const ProGym = ({
                                 <input 
                                   type="text" 
                                   placeholder={sets || '3-4'}
-                                  className="w-10 bg-white/5 border border-white/10 rounded px-1 py-1 text-center font-mono text-white focus:border-brand-primary outline-none transition-colors"
+                                  className="w-20 bg-white/5 border border-white/10 rounded px-1 py-1 text-center font-mono text-white focus:border-brand-primary outline-none transition-colors"
                                   value={log?.workoutData?.[exerciseId]?.sets || ''}
                                   onChange={(e) => handleTrainingUpdate(exerciseId, 'sets', e.target.value)}
                                 />
@@ -2517,7 +2517,7 @@ export const ProGym = ({
                                  <input 
                                   type="text" 
                                   placeholder={reps || '8-12'}
-                                  className="w-10 bg-white/5 border border-white/10 rounded px-1 py-1 text-center font-mono text-white focus:border-brand-primary outline-none transition-colors"
+                                  className="w-28 bg-white/5 border border-white/10 rounded px-1 py-1 text-center font-mono text-white focus:border-brand-primary outline-none transition-colors"
                                   value={log?.workoutData?.[exerciseId]?.reps || ''}
                                   onChange={(e) => handleTrainingUpdate(exerciseId, 'reps', e.target.value)}
                                 />
@@ -2526,7 +2526,7 @@ export const ProGym = ({
                                  <input 
                                   type="text" 
                                   placeholder="0s"
-                                  className="w-12 bg-white/5 border border-white/10 rounded px-1 py-1 text-center font-mono text-white focus:border-brand-primary outline-none transition-colors"
+                                  className="w-20 bg-white/5 border border-white/10 rounded px-1 py-1 text-center font-mono text-white focus:border-brand-primary outline-none transition-colors"
                                   value={log?.workoutData?.[exerciseId]?.time || ''}
                                   onChange={(e) => handleTrainingUpdate(exerciseId, 'time', e.target.value)}
                                  />
@@ -2535,7 +2535,7 @@ export const ProGym = ({
                                 <input 
                                   type="text" 
                                   placeholder="0"
-                                  className="w-14 bg-white/5 border border-white/10 rounded px-1 py-1 text-center font-mono text-white focus:border-brand-primary outline-none transition-colors"
+                                  className="w-24 bg-white/5 border border-white/10 rounded px-1 py-1 text-center font-mono text-white focus:border-brand-primary outline-none transition-colors"
                                   value={log?.workoutData?.[exerciseId]?.weight || ''}
                                   onChange={(e) => handleTrainingUpdate(exerciseId, 'weight', e.target.value)}
                                 />
