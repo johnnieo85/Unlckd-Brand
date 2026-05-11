@@ -164,7 +164,11 @@ async function generatePhysiqueAnalysis(
     Before Weight: ${p.beforeWeight} ${userData.weightUnit} (Date: ${p.beforeDate})
     After Weight: ${p.afterWeight} ${userData.weightUnit} (Date: ${p.afterDate})
     
-    CRITICAL: Assess the difference between the photos, positive or negative. Explicitly mention what has improved or declined in each specific view. Focus on "Then vs Now" details.
+    CRITICAL: You are in PROGRESS ENGINE mode. This is a high-depth comparison. 
+    Assess the difference between the photos, positive or negative, with absolute precision. 
+    Explicitly mention what has improved or declined in each specific view (Front, Back, Side). 
+    Focus on "Then vs Now" granular details: muscle separation, vascularity changes, postural shifts, subcutaneous fat distribution, and structural density.
+    Don't just say what's there; say what CHANGED compared to the previous state.
     `;
   }
 
@@ -200,8 +204,8 @@ async function generatePhysiqueAnalysis(
       systemInstruction: `
         You are an elite physique assessor. Return ONLY valid JSON.
         CRITICAL: Never miss commas between items in arrays or objects.
-        STRICT LIMIT: Each text field must be under 100 characters. 
-        Be extremely concise.
+        ${path === 'progress' ? 'STRICT LIMIT: Each analysis field must be between 150-300 characters to provide high-depth feedback.' : 'STRICT LIMIT: Each text field must be under 200 characters.'}
+        Be descriptive and professional, providing specific technical observations.
       `,
       responseMimeType: "application/json",
       responseSchema: {

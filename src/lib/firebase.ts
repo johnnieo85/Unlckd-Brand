@@ -28,30 +28,6 @@ firestoreDb = initializeFirestore(app, {
 export const db = firestoreDb;
 export const auth = getAuth(app);
 
-// Connectivity Test & Fallback (Proactive)
-async function validateFirestoreConnection() {
-  try {
-    // Attempt a simple read from a dummy path to verify connectivity
-    await getDocFromServer(doc(db, '_connection_test', 'status'));
-    console.info("Firestore: Connection reached the backend.");
-  } catch (error: any) {
-    // If the error is permission-denied, it means the connection is actually working!
-    if (error.code === 'permission-denied' || error.message?.includes('permission-denied')) {
-      console.info("Firestore: Connection verified (received permission-denied as expected).");
-      return;
-    }
-
-    console.warn("Firestore: Initial connection failed or unreachable:", error);
-    
-    // If it's a connectivity/availability error, log it as a network issue
-    if (error.code === 'unavailable' || error.message?.includes('network')) {
-      console.error("Firestore: Backend is currently unavailable or network is blocked.");
-    }
-  }
-}
-
-validateFirestoreConnection();
-
 // Initialize persistence as early as possible and handle security errors
 const tryPersistence = async () => {
   try {
