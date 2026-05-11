@@ -1936,7 +1936,7 @@ export const ProGym = ({
                                 <div className="space-y-3">
                                   <div className="flex gap-2">
                                     {(() => {
-                                      const increments = log.waterUnit === 'oz' ? [16, 24, 32] : [500, 750, 1000];
+                                      const increments = log.waterUnit === 'oz' ? [16, 20, 32] : [500, 750, 1000];
                                       const baseMinus = log.waterUnit === 'oz' ? -16 : -500;
                                       return (
                                         <>
