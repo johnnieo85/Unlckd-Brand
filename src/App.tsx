@@ -2282,7 +2282,7 @@ export default function App() {
                       </>
                     )}
 
-                    {(path === 'workout' || path === 'full' || path === 'progress') && (
+                    {(path === 'workout' || path === 'full') && (
                       <Input 
                         label="Current or Past Injuries" 
                         placeholder="e.g. Lower back pain, ACL surgery 2 years ago, or 'None'" 
