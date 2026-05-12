@@ -685,8 +685,15 @@ export const ProGym = ({
 
   useEffect(() => {
     loadData(selectedDate);
-    refreshGlobalStats();
   }, [latestReport, selectedDate]);
+
+  // Use a debounced effect for global stats to avoid heavy reads on every minor change
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      refreshGlobalStats();
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [latestReport, userProfile?.userId]);
 
   const handleTrainingUpdate = (exerciseId: string, field: 'weight' | 'sets' | 'reps' | 'notes' | 'time' | 'completed', value: string | boolean) => {
     if (!log) return;
@@ -706,31 +713,34 @@ export const ProGym = ({
     
     let completedWorkouts = 0;
     if (isManual) {
-      // For manual sessions, completing at least one exercise counts as a successful workout day
       completedWorkouts = completed > 0 ? 1 : 0;
     } else {
-      // For guided sessions, only fully completing the prescribed plan counts
       completedWorkouts = (total > 0 && completed === total) ? 1 : 0;
     }
     
     const newLog = { ...log, workoutData: updatedWorkoutData, completedWorkouts };
     setLog(newLog);
-    
-    // Update local XP and streak immediately
-    refreshGlobalStats();
-    
-    gymService.updateDailyLog(selectedDate, { workoutData: updatedWorkoutData, completedWorkouts });
+    // Removed immediate service call to let the auto-save useEffect handle it with debounce
   };
 
   const refreshGlobalStats = async () => {
-    // Also refresh measurements to be sure
-    const allM = await gymService.getLatestMeasurements(1000);
+    if (!userProfile?.userId) return;
+
+    // Use a timestamp to prevent redundant fetches within a short window
+    const lastFetch = (window as any)._lastStatsFetch || 0;
+    if (Date.now() - lastFetch < 5000) { // 5 second cool-down
+       return;
+    }
+    (window as any)._lastStatsFetch = Date.now();
+
+    // Reduce measurement fetch depth
+    const allM = await gymService.getLatestMeasurements(30);
     setMeasurements(allM);
 
     // Calculate streak and XP from available logs
     const now = new Date();
     const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 90);
+    startDate.setDate(startDate.getDate() - 90); 
     
     const logs = await gymService.getLogsInRange(getLocalDateString(startDate), getLocalDateString(now));
     
@@ -740,7 +750,7 @@ export const ProGym = ({
     let calculatedTotalXP = 0;
     logs.forEach(l => {
       let sGoal = Number(l.stepGoal) || reportStepGoal;
-      if (sGoal > 50000) sGoal = reportStepGoal; // Sanity check for corrupted range parsing
+      if (sGoal > 50000) sGoal = reportStepGoal;
       
       const stepProg = Math.min((Number(l.steps) || 0) / sGoal, 1);
       const waterProg = Math.min((Number(l.water) || 0) / (Number(l.waterGoal) || 3000), 1);
@@ -748,8 +758,6 @@ export const ProGym = ({
       let dayXp = 0;
       dayXp += stepProg * 500;
       dayXp += waterProg * 300;
-      
-      // A day counts as "completed workout" if the flag is 1
       dayXp += (Number(l.completedWorkouts) || 0) * 1000;
       
       const workoutData = l.workoutData || {};
@@ -761,24 +769,22 @@ export const ProGym = ({
       const completedHabits = (l.habits ? Object.values(l.habits).filter(h => h).length : 0);
       dayXp += completedHabits * 200;
 
-      if (l.weight) dayXp += 250; // XP for weight logging consistency
+      if (l.weight) dayXp += 250;
       
       calculatedTotalXP += Math.round(dayXp);
     });
+    
     setTotalXP(calculatedTotalXP);
     
     // Streak Calculation (Consecutive Workout Days)
     const sortedLogs = [...logs].sort((a, b) => b.date.localeCompare(a.date));
     let streak = 0;
     
-    // Use local date strings for consistent comparison
     const todayStr = getLocalDateString(new Date());
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = getLocalDateString(yesterday);
 
-    // Filter logs that actually have intentional activity
-    // This prevents accidental streaks from empty logs or single accidental clicks
     const activeDays = Array.from(new Set(
       logs.filter(l => {
         const hasWorkout = (Number(l.completedWorkouts) || 0) > 0;
@@ -789,16 +795,12 @@ export const ProGym = ({
     if (activeDays.length > 0) {
       const latestActiveDate = activeDays[0];
       
-      // If the latest activity is not today or yesterday, the streak is broken
       if (latestActiveDate === todayStr || latestActiveDate === yesterdayStr) {
         streak = 1;
-        
         for (let i = 1; i < activeDays.length; i++) {
-          // Compare consecutive items in the sorted list
           const d1 = new Date(activeDays[i-1] + 'T12:00:00');
           const d2 = new Date(activeDays[i] + 'T12:00:00');
           const diffDays = Math.round((d1.getTime() - d2.getTime()) / (1000 * 60 * 60 * 24));
-          
           if (diffDays === 1) {
             streak++;
           } else {
@@ -809,7 +811,11 @@ export const ProGym = ({
     }
     
     setCurrentStreak(streak);
-    updateProfileXPAndStreak(calculatedTotalXP, streak);
+
+    // Only update profile if data actually changed significantly
+    if (Math.abs(calculatedTotalXP - (userProfile.xp || 0)) > 5 || streak !== userProfile.streak) {
+      updateProfileXPAndStreak(calculatedTotalXP, streak);
+    }
   };
 
   const updateProfileXPAndStreak = async (xp: number, streak: number) => {
@@ -830,14 +836,46 @@ export const ProGym = ({
   const handleGeneralNotesUpdate = (notes: string) => {
     if (!log) return;
     setLog({ ...log, generalNotes: notes });
-    gymService.updateDailyLog(selectedDate, { generalNotes: notes });
+    // Removed immediate service call to let the auto-save useEffect handle it with debounce
   };
+
+  // Auto-save log data with debounce to prevent quota issues from frequent updates
+  useEffect(() => {
+    if (!log || loading) return;
+    
+    const timer = setTimeout(async () => {
+      // Check if data actually changed significantly or if this is just an initial load
+      // We use a specific key in window to track the last saved state to avoid redundant writes
+      const lastData = (window as any)._lastSavedData;
+      const currentData = JSON.stringify({
+        w: log.workoutData,
+        n: log.generalNotes,
+        cw: log.completedWorkouts,
+        d: log.date
+      });
+
+      if (lastData === currentData) return;
+      (window as any)._lastSavedData = currentData;
+
+      try {
+        await gymService.updateDailyLog(selectedDate, {
+          workoutData: log.workoutData,
+          generalNotes: log.generalNotes,
+          completedWorkouts: log.completedWorkouts
+        });
+      } catch (e) {
+        console.error("Auto-save failed", e);
+      }
+    }, 2000);
+    
+    return () => clearTimeout(timer);
+  }, [log?.workoutData, log?.generalNotes, log?.completedWorkouts, selectedDate]);
 
   const loadData = async (date: string) => {
     setLoading(true);
     const [logData, measurementData, dayMeasurement] = await Promise.all([
       gymService.getDailyLog(date),
-      gymService.getLatestMeasurements(1000),
+      gymService.getLatestMeasurements(50),
       gymService.getMeasurement(date)
     ]);
 
