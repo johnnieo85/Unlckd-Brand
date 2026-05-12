@@ -1,4 +1,4 @@
-import { collection, doc, setDoc, getDoc, getDocs, query, orderBy, limit, Timestamp, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, getDoc, getDocs, query, orderBy, limit, Timestamp, updateDoc, deleteDoc, where } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { DailyLog, Measurement, SavedReport } from '../types';
 import { getPlanDurationWeeks } from '../lib/utils';
@@ -76,7 +76,7 @@ export const gymService = {
     }
   },
 
-  async getLatestMeasurements(limitCount = 1000): Promise<Measurement[]> {
+  async getLatestMeasurements(limitCount = 50): Promise<Measurement[]> {
     const user = auth.currentUser;
     if (!user) return [];
 
@@ -154,14 +154,13 @@ export const gymService = {
     try {
       const q = query(
         collection(db, 'users', user.uid, 'dailyLogs'),
+        where('date', '>=', startDate),
+        where('date', '<=', endDate),
         orderBy('date', 'desc')
       );
 
       const querySnapshot = await getDocs(q);
-      const logs = querySnapshot.docs.map(doc => doc.data() as DailyLog);
-      
-      // Filter logically if needed, but for now just filter current fetched set
-      return logs.filter(log => log.date >= startDate && log.date <= endDate);
+      return querySnapshot.docs.map(doc => doc.data() as DailyLog);
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, path);
       return [];
@@ -176,13 +175,13 @@ export const gymService = {
     try {
       const q = query(
         collection(db, 'users', user.uid, 'measurements'),
+        where('date', '>=', startDate),
+        where('date', '<=', endDate),
         orderBy('date', 'desc')
       );
 
       const querySnapshot = await getDocs(q);
-      const measurements = querySnapshot.docs.map(doc => doc.data() as Measurement);
-      
-      return measurements.filter(m => m.date >= startDate && m.date <= endDate);
+      return querySnapshot.docs.map(doc => doc.data() as Measurement);
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, path);
       return [];

@@ -48,7 +48,8 @@ import {
   ShieldCheck,
   Facebook,
   Users,
-  Apple
+  Apple,
+  Folder
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Button } from './components/ui/Button';
@@ -680,6 +681,7 @@ export default function App() {
   const [showGymAuth, setShowGymAuth] = useState(false);
   const [gymAuthPin, setGymAuthPin] = useState('');
   const [savedReports, setSavedReports] = useState<SavedReport[]>([]);
+  const [selectedReportFolder, setSelectedReportFolder] = useState<Path | 'all'>('all');
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -1398,7 +1400,10 @@ export default function App() {
                     <RefreshCw className={cn("w-4 h-4", isLoadingHistory && "animate-spin")} />
                     Refresh
                   </Button>
-                  <Button variant="outline" onClick={() => setStep('landing')} className="gap-2 border-white/10 hover:bg-white/5 rounded-xl">
+                  <Button variant="outline" onClick={() => {
+                    setStep('landing');
+                    setSelectedReportFolder('all');
+                  }} className="gap-2 border-white/10 hover:bg-white/5 rounded-xl">
                     <ChevronLeft className="w-4 h-4" />
                     Back to Dashboard
                   </Button>
@@ -1425,72 +1430,152 @@ export default function App() {
                   </div>
                 </Card>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {savedReports.map((saved) => (
-                    <Card 
-                      key={saved.id} 
-                      className="group cursor-pointer bg-white/[0.02] border-white/5 hover:border-brand-primary/50 transition-all overflow-hidden relative rounded-3xl"
-                      onClick={() => handleViewSavedReport(saved)}
-                    >
-                      <div className="aspect-video relative overflow-hidden bg-brand-surface">
-                        {saved.photos.front ? (
-                          <img 
-                            src={saved.photos.front} 
-                            alt="Report thumbnail"
-                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 blur-sm brightness-50"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-brand-primary/5">
-                            {saved.path === 'meal' ? (
-                              <Utensils className="w-12 h-12 text-brand-primary/40" />
-                            ) : saved.path === 'workout' ? (
-                              <Dumbbell className="w-12 h-12 text-brand-primary/40" />
-                            ) : (
-                              <Activity className="w-12 h-12 text-brand-primary/40" />
-                            )}
-                            <span className="text-[10px] font-black uppercase tracking-widest text-brand-primary/40">Report Data Only</span>
-                          </div>
-                        )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-brand-dark via-transparent to-transparent" />
-                        <div className="absolute top-4 right-4 z-20 flex gap-2">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-full"
-                            onClick={(e) => handleDeleteReport(saved.id, e)}
+                <div className="space-y-8">
+                  {selectedReportFolder !== 'all' && (
+                    <div className="flex items-center gap-4">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => setSelectedReportFolder('all')}
+                        className="gap-2 text-brand-primary hover:text-brand-primary hover:bg-brand-primary/10 rounded-xl"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                        Back to Library
+                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Folder className="w-5 h-5 text-gray-500" />
+                        <h3 className="text-2xl font-display font-bold uppercase tracking-tight">
+                          {selectedReportFolder === 'assessment' ? 'Assessments' :
+                           selectedReportFolder === 'workout' ? 'Workout Plans' :
+                           selectedReportFolder === 'meal' ? 'Nutrition Plans' :
+                           selectedReportFolder === 'progress' ? 'Progress History' :
+                           'Transformation Reports'}
+                        </h3>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedReportFolder === 'all' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {[
+                        { id: 'assessment', name: 'Assessments', icon: Search, desc: 'Detailed physique analysis' },
+                        { id: 'workout', name: 'Workout Plans', icon: Dumbbell, desc: 'Custom training protocols' },
+                        { id: 'meal', name: 'Nutrition Plans', icon: Utensils, desc: 'Meal and macro strategies' },
+                        { id: 'progress', name: 'Progress History', icon: LineChart, desc: 'Transformation comparisons' },
+                        { id: 'full', name: 'Transformation Reports', icon: FileText, desc: 'Complete unified strategies' },
+                      ].map((folder) => {
+                        const count = savedReports.filter(r => r.path === folder.id).length;
+                        return (
+                          <Card 
+                            key={folder.id}
+                            className={cn(
+                              "group p-6 cursor-pointer bg-white/[0.02] border-white/5 hover:border-brand-primary/50 transition-all rounded-3xl relative overflow-hidden",
+                              count === 0 && "opacity-40 grayscale pointer-events-none"
+                            ) }
+                            onClick={() => count > 0 && setSelectedReportFolder(folder.id as Path)}
                           >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button className="bg-brand-primary text-brand-dark font-bold rounded-full gap-2">
-                            View Report
-                            <ArrowRight className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="p-6 space-y-4">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <Badge className="bg-brand-primary/10 text-brand-primary border-none mb-2">
-                              {saved.path.toUpperCase()}
-                            </Badge>
-                            <h3 className="font-display font-bold text-xl tracking-tight leading-tight uppercase group-hover:text-brand-primary transition-colors">
-                              {saved.userData.name}
-                            </h3>
+                            <div className="absolute -right-4 -top-4 w-24 h-24 bg-brand-primary/5 rounded-full blur-2xl group-hover:bg-brand-primary/10 transition-colors" />
+                            <div className="flex items-start gap-4 relative z-10">
+                              <div className="w-14 h-14 bg-brand-primary/10 rounded-2xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-500">
+                                <folder.icon className="w-7 h-7 text-brand-primary" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between">
+                                  <h3 className="text-xl font-display font-bold uppercase tracking-tight group-hover:text-brand-primary transition-colors">
+                                    {folder.name}
+                                  </h3>
+                                  <div className="w-6 h-6 rounded-lg bg-white/5 flex items-center justify-center text-[10px] font-black font-mono text-gray-500">
+                                    {count}
+                                  </div>
+                                </div>
+                                <p className="text-xs text-gray-400 mt-1 line-clamp-1 font-light italic">"{folder.desc}"</p>
+                                <div className="mt-6 flex items-center justify-between border-t border-white/5 pt-4">
+                                  <span className="text-[10px] font-mono font-black text-brand-primary/60 uppercase tracking-widest flex items-center gap-1.5">
+                                    <Clock className="w-3 h-3" />
+                                    {count > 0 ? 'Managed' : 'Empty'}
+                                  </span>
+                                  {count > 0 && (
+                                    <div className="flex items-center gap-1 text-brand-primary text-[10px] font-black uppercase tracking-widest">
+                                      Open Folder
+                                      <ChevronRight className="w-3 h-3 transition-transform group-hover:translate-x-1" />
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {savedReports.filter(r => r.path === selectedReportFolder).map((saved) => (
+                        <Card 
+                          key={saved.id} 
+                          className="group cursor-pointer bg-white/[0.02] border-white/5 hover:border-brand-primary/50 transition-all overflow-hidden relative rounded-3xl"
+                          onClick={() => handleViewSavedReport(saved)}
+                        >
+                          <div className="aspect-video relative overflow-hidden bg-brand-surface">
+                            {saved.photos.front ? (
+                              <img 
+                                src={saved.photos.front} 
+                                alt="Report thumbnail"
+                                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 blur-sm brightness-50"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-brand-primary/5">
+                                {saved.path === 'meal' ? (
+                                  <Utensils className="w-12 h-12 text-brand-primary/40" />
+                                ) : saved.path === 'workout' ? (
+                                  <Dumbbell className="w-12 h-12 text-brand-primary/40" />
+                                ) : (
+                                  <Activity className="w-12 h-12 text-brand-primary/40" />
+                                )}
+                                <span className="text-[10px] font-black uppercase tracking-widest text-brand-primary/40">Report Data Only</span>
+                              </div>
+                            )}
+                            <div className="absolute inset-0 bg-gradient-to-t from-brand-dark via-transparent to-transparent" />
+                            <div className="absolute top-4 right-4 z-20 flex gap-2">
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-full"
+                                onClick={(e) => handleDeleteReport(saved.id, e)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button className="bg-brand-primary text-brand-dark font-bold rounded-full gap-2">
+                                View Report
+                                <ArrowRight className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </div>
-                          <p className="text-[10px] text-gray-500 font-mono">
-                            {saved.timestamp?.toDate 
-                              ? `${saved.timestamp.toDate().toLocaleDateString()} ${saved.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` 
-                              : 'Recent'}
-                          </p>
-                        </div>
-                        <p className="text-sm text-gray-400 line-clamp-2 font-light italic">
-                          "{saved.report.toplineSummary}"
-                        </p>
-                      </div>
-                    </Card>
-                  ))}
+                          <div className="p-6 space-y-4">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <Badge className="bg-brand-primary/10 text-brand-primary border-none mb-2">
+                                  {saved.path.toUpperCase()}
+                                </Badge>
+                                <h3 className="font-display font-bold text-xl tracking-tight leading-tight uppercase group-hover:text-brand-primary transition-colors">
+                                  {saved.userData.name}
+                                </h3>
+                              </div>
+                              <p className="text-[10px] text-gray-500 font-mono">
+                                {saved.timestamp?.toDate 
+                                  ? `${saved.timestamp.toDate().toLocaleDateString()} ${saved.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` 
+                                  : 'Recent'}
+                              </p>
+                            </div>
+                            <p className="text-sm text-gray-400 line-clamp-2 font-light italic">
+                              "{saved.report.toplineSummary}"
+                            </p>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </motion.div>
