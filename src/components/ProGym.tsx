@@ -224,6 +224,8 @@ export const ProGym = ({
   const [isHubUnlocked, setIsHubUnlocked] = useState(false);
   const [isSavingHydration, setIsSavingHydration] = useState(false);
   const [isSavingSteps, setIsSavingSteps] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<number>(0);
   const [pinEntry, setPinEntry] = useState('');
   const [pinSetup, setPinSetup] = useState({ pin: '', confirm: '' });
   const [error, setError] = useState('');
@@ -607,7 +609,6 @@ export const ProGym = ({
     updatedMeals[index] = { ...updatedMeals[index], [field]: value };
     const updatedLog = { ...log, meals: updatedMeals };
     setLog(updatedLog);
-    gymService.updateDailyLog(selectedDate, { meals: updatedMeals });
   };
 
   const toggleMealCompletion = (index: number) => {
@@ -616,25 +617,22 @@ export const ProGym = ({
     updatedMeals[index] = { ...updatedMeals[index], completed: !updatedMeals[index].completed };
     const updatedLog = { ...log, meals: updatedMeals };
     setLog(updatedLog);
-    gymService.updateDailyLog(selectedDate, { meals: updatedMeals });
   };
 
-  const handleAddManualMeal = async () => {
+  const handleAddManualMeal = () => {
     if (!log) return;
     const currentMeals = log.meals || [];
     const newMeal = { name: 'New Meal', type: 'snack' as any, completed: false };
     const updatedMeals = [...currentMeals, newMeal];
     const updatedLog = { ...log, meals: updatedMeals, useManualWorkout: true };
     setLog(updatedLog);
-    await gymService.updateDailyLog(selectedDate, { meals: updatedMeals, useManualWorkout: true });
   };
 
-  const handleRemoveMeal = async (index: number) => {
+  const handleRemoveMeal = (index: number) => {
     if (!log || !log.meals) return;
     const updatedMeals = log.meals.filter((_, i) => i !== index);
     const updatedLog = { ...log, meals: updatedMeals };
     setLog(updatedLog);
-    await gymService.updateDailyLog(selectedDate, { meals: updatedMeals });
   };
 
   const workoutDay = getWorkoutForSelectedDate();
@@ -839,37 +837,64 @@ export const ProGym = ({
     // Removed immediate service call to let the auto-save useEffect handle it with debounce
   };
 
+  // Data Integrity: Flush changes before switching dates or on unload
+  const flushChanges = async () => {
+    if (!log || !selectedDate) return;
+    
+    const currentData = JSON.stringify(log);
+    const win = window as any;
+    if (win._lastSavedData === currentData) return;
+
+    setIsSaving(true);
+    try {
+      await gymService.updateDailyLog(selectedDate, log);
+      win._lastSavedData = currentData;
+      setLastSaved(Date.now());
+      // Refresh stats to ensure streaks/XP are updated
+      refreshGlobalStats();
+    } catch (error) {
+      console.error("Flush save failed:", error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      // We can't await here reliably in all browsers, but we try a sync-ish update if possible
+      // or just trust the last auto-save. For best integrity, we should have already flushed on navigation.
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [log, selectedDate]);
+
   // Auto-save log data with debounce to prevent quota issues from frequent updates
   useEffect(() => {
-    if (!log || loading) return;
+    if (!log || loading || !isHubUnlocked) return;
     
+    // We want to save EVERYTHING in the log object now to ensure "saved upon entry"
     const timer = setTimeout(async () => {
-      // Check if data actually changed significantly or if this is just an initial load
-      // We use a specific key in window to track the last saved state to avoid redundant writes
       const lastData = (window as any)._lastSavedData;
-      const currentData = JSON.stringify({
-        w: log.workoutData,
-        n: log.generalNotes,
-        cw: log.completedWorkouts,
-        d: log.date
-      });
+      const currentData = JSON.stringify(log);
 
       if (lastData === currentData) return;
-      (window as any)._lastSavedData = currentData;
 
+      setIsSaving(true);
       try {
-        await gymService.updateDailyLog(selectedDate, {
-          workoutData: log.workoutData,
-          generalNotes: log.generalNotes,
-          completedWorkouts: log.completedWorkouts
-        });
+        await gymService.updateDailyLog(selectedDate, log);
+        (window as any)._lastSavedData = currentData;
+        setLastSaved(Date.now());
+        // Trigger streak refresh whenever data is saved to ensure "renewed streaks"
+        refreshGlobalStats();
       } catch (e) {
         console.error("Auto-save failed", e);
+      } finally {
+        setIsSaving(false);
       }
     }, 2000);
     
     return () => clearTimeout(timer);
-  }, [log?.workoutData, log?.generalNotes, log?.completedWorkouts, selectedDate]);
+  }, [log, selectedDate, isHubUnlocked]);
 
   const loadData = async (date: string) => {
     setLoading(true);
@@ -1275,7 +1300,7 @@ export const ProGym = ({
     await loadData(selectedDate);
   };
 
-  const toggleWaterUnit = async () => {
+  const toggleWaterUnit = () => {
     if (!log) return;
     const newUnit: 'ml' | 'oz' = log.waterUnit === 'ml' ? 'oz' : 'ml';
     // Optional: convert current values
@@ -1290,55 +1315,36 @@ export const ProGym = ({
     }
     const updated = { ...log, waterUnit: newUnit, water: newWater, waterGoal: newGoal };
     setLog(updated);
-    await gymService.updateDailyLog(selectedDate, updated);
-    refreshGlobalStats();
   };
 
-  const updateWater = async (amount: number) => {
+  const updateWater = (amount: number) => {
     if (!log) return;
     const newWater = Math.max(0, log.water + amount);
     setLog({ ...log, water: newWater });
-    // Note: We'll add a save button or keep it auto-save if desired, 
-    // but the user specifically asked for a save button for hydration/steps.
-    // I will implement a "Sync" button for these sections.
   };
 
   const saveHydration = async () => {
-    if (!log) return;
+    await flushChanges();
     setIsSavingHydration(true);
-    try {
-      await gymService.updateDailyLog(selectedDate, { water: log.water });
-      await refreshGlobalStats();
-      setTimeout(() => setIsSavingHydration(false), 2000);
-    } catch (e) {
-      setIsSavingHydration(false);
-    }
+    setTimeout(() => setIsSavingHydration(false), 2000);
   };
 
   const saveSteps = async () => {
-    if (!log) return;
+    await flushChanges();
     setIsSavingSteps(true);
-    try {
-      await gymService.updateDailyLog(selectedDate, { steps: log.steps });
-      await refreshGlobalStats();
-      setTimeout(() => setIsSavingSteps(false), 2000);
-    } catch (e) {
-      setIsSavingSteps(false);
-    }
+    setTimeout(() => setIsSavingSteps(false), 2000);
   };
 
-  const updateSteps = async (amount: number) => {
+  const updateSteps = (amount: number) => {
     if (!log) return;
     const newSteps = Math.max(0, log.steps + amount);
     setLog({ ...log, steps: newSteps });
   };
 
-  const toggleHabit = async (habit: string) => {
+  const toggleHabit = (habit: string) => {
     if (!log) return;
     const newHabits = { ...log.habits, [habit]: !log.habits?.[habit] };
     setLog({ ...log, habits: newHabits });
-    await gymService.updateDailyLog(selectedDate, { habits: newHabits });
-    refreshGlobalStats();
   };
 
   const handlePinSubmit = () => {
@@ -1596,7 +1602,32 @@ export const ProGym = ({
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.2),transparent)]" />
         <div className="relative h-full flex flex-col md:flex-row items-center justify-between p-6 md:px-10 gap-6">
           <div className="flex flex-col justify-center text-center md:text-left">
-            <Badge className="w-fit mb-3 bg-brand-primary/20 text-brand-primary border-brand-primary/20 mx-auto md:mx-0 text-[9px] md:text-xs">PREMIUM EXPERIENCE</Badge>
+            <div className="flex items-center gap-3 mb-3 mx-auto md:mx-0">
+              <Badge className="bg-brand-primary/20 text-brand-primary border-brand-primary/20 text-[9px] md:text-xs">PREMIUM EXPERIENCE</Badge>
+              <AnimatePresence>
+                {isSaving && (
+                  <motion.div 
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -10 }}
+                    className="flex items-center gap-1.5"
+                  >
+                    <RefreshCw className="w-3 h-3 text-brand-primary animate-spin" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-brand-primary/60">Saving...</span>
+                  </motion.div>
+                )}
+                {!isSaving && lastSaved > 0 && (
+                  <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="flex items-center gap-1.5"
+                  >
+                    <Check className="w-3 h-3 text-green-500" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-green-500/60">Saved</span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
             <h1 
               className={cn(
                 "text-2xl md:text-5xl font-display font-black text-white tracking-tighter",
@@ -1673,7 +1704,8 @@ export const ProGym = ({
               type="date"
               className="absolute inset-0 opacity-0 cursor-pointer z-10 w-full"
               value={selectedDate}
-              onChange={(e) => {
+              onChange={async (e) => {
+                await flushChanges();
                 setSelectedDate(e.target.value);
                 setUnlockedDates(prev => new Set([...prev, e.target.value]));
               }}
@@ -1700,8 +1732,9 @@ export const ProGym = ({
             {latestReport && (
               <div className="relative group/week">
                 <select 
-                  onChange={(e) => {
+                  onChange={async (e) => {
                     const week = parseInt(e.target.value);
+                    await flushChanges();
                     const startDate = latestReport.userData?.planStartDate 
                       ? parseLocalDate(latestReport.userData.planStartDate)
                       : (latestReport.timestamp?.toDate ? latestReport.timestamp.toDate() : new Date(latestReport.timestamp));
@@ -1732,7 +1765,10 @@ export const ProGym = ({
               <Button 
                 variant="ghost" 
                 size="sm" 
-                onClick={() => setSelectedDate(today)}
+                onClick={async () => {
+                  await flushChanges();
+                  setSelectedDate(today);
+                }}
                 className="h-7 px-3 text-[10px] font-black uppercase bg-white/5 hover:bg-white/10 rounded-lg text-brand-primary"
               >
                 Back to Today
@@ -1760,7 +1796,8 @@ export const ProGym = ({
                   </div>
                 )}
                 <button
-                  onClick={() => {
+                  onClick={async () => {
+                    await flushChanges();
                     setSelectedDate(iso);
                     setUnlockedDates(prev => new Set([...prev, iso]));
                   }}
@@ -1975,7 +2012,7 @@ export const ProGym = ({
                                   <div className="flex gap-2">
                                     {(() => {
                                       const increments = log.waterUnit === 'oz' ? [16, 20, 32] : [500, 750, 1000];
-                                      const baseMinus = log.waterUnit === 'oz' ? -16 : -500;
+                                      const baseMinus = log.waterUnit === 'oz' ? -20 : -500;
                                       return (
                                         <>
                                           <Button 
@@ -2003,6 +2040,12 @@ export const ProGym = ({
                                   </div>
 
                                   <div className="px-1 pt-2">
+                                    <input 
+                                      type="date"
+                                      value={selectedDate}
+                                      onChange={(e) => setSelectedDate(e.target.value)}
+                                      className="hidden"
+                                    />
                                     <input 
                                       type="range"
                                       min="0"
