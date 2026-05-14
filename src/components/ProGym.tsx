@@ -53,7 +53,8 @@ import {
   Trash2,
   Shield,
   Download,
-  ExternalLink
+  ExternalLink,
+  RefreshCw
 } from 'lucide-react';
 import { Card, Badge } from './ui/Card';
 import { Button } from './ui/Button';
