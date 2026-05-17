@@ -304,7 +304,8 @@ async function generateHealthAndSupport(
     FOCUS: 
     1. Health Metrics (BMI, Body Fat, Calorie Targets).
     2. Daily Life (Sleep, Water, Steps).
-    ${includeGrocery ? `3. Comprehensive Nutrition strategy for the full ${userData.planDuration || '12-week'} duration. This strategy MUST reference at least 5 key specific meals or ingredients that appear in the meal plan, including their names and verified links. 4. Grocery store recommendation.` : "3. Motivation and general Nutrition strategies."}
+    3. Supplement Strategy: Recommend specific fitness and nutritional supplements (e.g., Protein Powder, Creatine, Omega-3s, Multivitamins) tailored to their goals and equipment access.
+    ${includeGrocery ? `4. Comprehensive Nutrition strategy for the full ${userData.planDuration || '12-week'} duration. This strategy MUST reference at least 5 key specific meals or ingredients that appear in the meal plan, including their names and verified links. 5. Grocery store recommendation.` : "4. Motivation and general Nutrition strategies."}
     
     UNIT ALIGNMENT: 
     - If user weight is in 'lbs', use US Imperial units for food: oz, lbs, cups, tsp, tbsp.
@@ -330,6 +331,7 @@ async function generateHealthAndSupport(
         NUTRITION PROTOCOL:
         - When recommending meals, ensure quantities align with the unit system: ${userData.weightUnit === 'lbs' ? 'oz/lbs' : 'grams/kg'}.
         - Every single meal or ingredient mentioned in your summaries/strategies MUST be a specific, individually listed item that will appear in the final plan.
+        - SUPPLEMENTS: Provide 3-5 specific supplement recommendations. For each, link to a quality manufacturer website, product page, or informational research search using Markdown: [Supplement Name](https://www.google.com/search?q=[SUPPLEMENT+NAME]+supplement+official+website).
         - NEVER use generic advice. Reference at least 5-7 specific meals by name and provide their verified search links using the pattern [Meal Name](SearchURL).
         - Use the search tool to verify every single meal link leads to a high-quality recipe.
         - NO RAW URLS as text. Only use Markdown: [Meal Name](Link).
@@ -437,6 +439,20 @@ async function generateHealthAndSupport(
           goalAlignmentSummary: { type: Type.STRING },
           trainerSummary: { type: Type.STRING },
           nutritionStrategy: { type: Type.STRING },
+          supplementRecommendations: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                name: { type: Type.STRING },
+                dosage: { type: Type.STRING },
+                timing: { type: Type.STRING },
+                benefit: { type: Type.STRING },
+                link: { type: Type.STRING }
+              },
+              required: ["name", "dosage", "timing", "benefit", "link"]
+            }
+          }
         },
         required: [
           "healthMetrics", 
@@ -451,7 +467,8 @@ async function generateHealthAndSupport(
           "trainerSummary",
           "recommendedGroceryStore",
           "recommendedWorkout",
-          "additionalActivities"
+          "additionalActivities",
+          "supplementRecommendations"
         ],
       },
     },
@@ -798,13 +815,16 @@ export async function generateTransformationReport(
     let result: Partial<AssessmentResult> = {};
 
     // 1. GENERATE ASSESSMENT PIECES
-    if (['full', 'assessment', 'progress'].includes(path)) {
+    if (['full', 'assessment', 'progress', 'workout'].includes(path)) {
       try {
-        console.log("Generating physique analysis...");
-        const physique = await generatePhysiqueAnalysis(cleanUserData, photos, path, isResubmit);
+        if (['full', 'assessment', 'progress'].includes(path)) {
+          console.log("Generating physique analysis...");
+          const physique = await generatePhysiqueAnalysis(cleanUserData, photos, path, isResubmit);
+          result = { ...result, ...physique };
+        }
         console.log("Generating health and support...");
         const lifestyle = await generateHealthAndSupport(cleanUserData, isResubmit, path);
-        result = { ...result, ...physique, ...lifestyle };
+        result = { ...result, ...lifestyle };
       } catch (e) {
         console.error("Analysis step failed:", e);
         throw new Error(`Analysis failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
@@ -887,6 +907,7 @@ export async function generateTransformationReport(
     finalResult.groceryList = finalResult.groceryList || [];
     finalResult.recoverySchedule = finalResult.recoverySchedule || [];
     finalResult.waterSchedule = finalResult.waterSchedule || [];
+    finalResult.supplementRecommendations = finalResult.supplementRecommendations || [];
     
     finalResult.motivationalQuote = finalResult.motivationalQuote || { text: "Believe in the process.", author: "UNLCKD" };
     finalResult.sleepRecommendation = finalResult.sleepRecommendation || { duration: "7-9 hours", rationale: "Standard recovery", tips: [] };

@@ -238,6 +238,67 @@ const ProgressComparison = ({ title, ratings = [], summary, beforePhoto, afterPh
   </div>
 );
 
+const MedicalDisclaimer = () => (
+  <div className="p-4 bg-red-500/5 border border-red-500/10 rounded-2xl mb-8 print:border-gray-200 print:bg-gray-50">
+    <div className="flex gap-4 items-center">
+      <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center shrink-0 no-print">
+        <ShieldAlert className="w-5 h-5 text-red-500" />
+      </div>
+      <p className="text-[10px] md:text-xs text-gray-400 leading-relaxed uppercase tracking-wider font-medium">
+        <span className="text-red-500 font-black">Safety & Medical Disclaimer:</span> Always consult with a qualified healthcare professional or licensed physician prior to starting any new exercise program, consuming any suggested nutritional supplements, or making significant lifestyle/dietary changes to ensure safety. This report provides strategic informational guidance and does not replace professional medical advice, diagnosis, or treatment.
+      </p>
+    </div>
+  </div>
+);
+
+const SupplementSection = ({ supplements = [] }: { supplements?: any[] }) => {
+  if (!supplements || supplements.length === 0) return null;
+  return (
+    <div className="space-y-6 pt-16 border-t border-gray-800 print:border-gray-200">
+      <h2 className="text-3xl font-display font-bold text-brand-primary tracking-tight flex items-center gap-3 print:text-black">
+        <div className="w-8 h-8 rounded-lg bg-brand-primary/10 flex items-center justify-center no-print">
+          <Zap className="w-4 h-4 text-brand-primary" />
+        </div>
+        Performance Supplements & Strategy
+      </h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {supplements.map((sup, i) => (
+          <div key={i} className="p-5 bg-brand-surface border border-gray-800 rounded-2xl space-y-3 print:border-gray-200 print:bg-white shadow-xl">
+            <div className="flex justify-between items-start gap-2">
+              <a 
+                href={sup.link || `https://www.google.com/search?q=${encodeURIComponent(sup.name + ' supplement')}`} 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="font-black text-brand-primary hover:underline flex items-center gap-1 print:text-black uppercase tracking-tighter text-lg leading-none"
+              >
+                {sup.name} <ExternalLink className="w-3 h-3 opacity-50" />
+              </a>
+              <Badge className="text-[9px] bg-brand-primary/10 border-brand-primary/30 text-brand-primary print:text-black font-black uppercase tracking-widest px-2">{sup.timing}</Badge>
+            </div>
+            <p className="text-[11px] text-gray-400 leading-relaxed font-medium print:text-gray-700 italic">"{sup.benefit}"</p>
+            <div className="flex items-center justify-between pt-3 border-t border-white/5 print:border-gray-100">
+              <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Recommended Dosage</span>
+              <span className="text-[10px] font-mono text-brand-primary font-bold bg-brand-primary/5 px-2 py-0.5 rounded-full print:text-black">{sup.dosage}</span>
+            </div>
+            <div className="pt-2 no-print">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="w-full text-[10px] font-black uppercase tracking-widest h-8 gap-2 bg-brand-primary/5 hover:bg-brand-primary/10 text-brand-primary rounded-xl"
+                onClick={() => window.open(sup.link || `https://www.google.com/search?q=${encodeURIComponent(sup.name + ' supplement website')}`, '_blank')}
+              >
+                Visit Website
+                <ExternalLink className="w-3 h-3" />
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="text-[10px] text-gray-500 italic mt-4">* All choices should be cross-referenced with your medical provider to ensure compatibility with your specific health profile.</p>
+    </div>
+  );
+};
+
 import { ProGym } from './components/ProGym';
 import { gymService } from './services/gymService';
 
@@ -2847,6 +2908,8 @@ export default function App() {
                 );
               })()}
 
+              <MedicalDisclaimer />
+
               {/* Page 1: Header & Baseline Info */}
               <section className="space-y-8">
                 <div className="text-center space-y-2">
@@ -3061,6 +3124,8 @@ export default function App() {
                       </div>
                     </div>
                   )}
+
+                  <SupplementSection supplements={report.supplementRecommendations} />
                   <LogoBranding />
                 </section>
               )}
@@ -3224,6 +3289,8 @@ export default function App() {
                       </div>
                     </div>
                   </div>
+
+                  <SupplementSection supplements={report.supplementRecommendations} />
 
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <h2 className="text-3xl font-display font-bold text-brand-primary">Workout Plan</h2>
