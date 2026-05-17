@@ -222,7 +222,7 @@ export const ProGym = ({
   const [isStepsCollapsed, setIsStepsCollapsed] = useState(false);
   const [chartMetric, setChartMetric] = useState<'weight' | 'bodyFat'>('weight');
   const [isWeightCollapsed, setIsWeightCollapsed] = useState(false);
-  const [isHubUnlocked, setIsHubUnlocked] = useState(false);
+  const [isHubUnlocked, setIsHubUnlocked] = useState(true);
   const [isSavingHydration, setIsSavingHydration] = useState(false);
   const [isSavingSteps, setIsSavingSteps] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -871,7 +871,7 @@ export const ProGym = ({
 
   // Auto-save log data with debounce to prevent quota issues from frequent updates
   useEffect(() => {
-    if (!log || loading || !isHubUnlocked) return;
+    if (!log || loading) return;
     
     // We want to save EVERYTHING in the log object now to ensure "saved upon entry"
     const timer = setTimeout(async () => {
@@ -1449,141 +1449,6 @@ export const ProGym = ({
         >
           Return to Dashboard
         </Button>
-      </div>
-    );
-  }
-
-  if (!isHubUnlocked) {
-    const pinStr = userProfile?.gymPin?.toString().trim() || '';
-    const hasPin = pinStr.length === 6;
-    const isFirstTime = !hasPin && !isSettingPin && pinStr.length === 0;
-    const isLegacyPin = pinStr.length > 0 && pinStr.length !== 6;
-
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center p-6">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="w-full max-w-md"
-        >
-          <Card className="p-8 space-y-8 bg-brand-surface border-white/5 shadow-2xl relative overflow-hidden">
-            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand-primary/0 via-brand-primary to-brand-primary/0" />
-            
-            <div className="flex flex-col items-center text-center space-y-4">
-              <div className="p-4 bg-brand-primary/10 rounded-3xl">
-                {isFirstTime ? <Lock className="w-8 h-8 text-red-500" /> : ((isSettingPin || isLegacyPin) ? <Sparkles className="w-8 h-8 text-brand-primary" /> : <Lock className="w-8 h-8 text-brand-primary" />)}
-              </div>
-              <div className="space-y-1">
-                <h2 className="text-2xl font-display font-black text-white">
-                  {isFirstTime ? "Access Restricted" : (isSettingPin || isLegacyPin ? "Security Update Required" : "Gym Hub Locked")}
-                </h2>
-                <p className="text-gray-500 text-sm">
-                  {isFirstTime 
-                    ? "Your Hub access has not been granted. Please contact your UNLCKD instructor for your personal PIN." 
-                    : (isSettingPin || isLegacyPin ? "We've upgraded security. Please set a new 6-digit PIN to secure your data." : "Enter your secure PIN to access your optimization hub.")}
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              {isFirstTime ? (
-                <div className="pt-4 flex flex-col items-center">
-                   <div className="p-4 bg-white/5 rounded-2xl text-center">
-                     <p className="text-xs text-gray-400 font-medium">Once your instructor provides your PIN, you will be able to unlock your personalized training environment.</p>
-                   </div>
-                </div>
-              ) : isSettingPin ? (
-                <div className="space-y-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 ml-1">New 6-Digit PIN</label>
-                    <Input
-                      type="password"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      autoComplete="one-time-code"
-                      placeholder="••••••"
-                      value={pinSetup.pin}
-                      onChange={(e) => setPinSetup(prev => ({ ...prev, pin: e.target.value.replace(/\D/g, '') }))}
-                      className="text-center text-2xl tracking-[1em] font-mono bg-white/5 border-white/10"
-                      maxLength={6}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 ml-1">Confirm PIN</label>
-                    <Input
-                      type="password"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      autoComplete="one-time-code"
-                      placeholder="••••••"
-                      value={pinSetup.confirm}
-                      onChange={(e) => setPinSetup(prev => ({ ...prev, confirm: e.target.value.replace(/\D/g, '') }))}
-                      className="text-center text-2xl tracking-[1em] font-mono bg-white/5 border-white/10"
-                      maxLength={6}
-                    />
-                  </div>
-                  <Button 
-                    className="w-full h-12 rounded-xl text-brand-dark" 
-                    onClick={handlePinSetup}
-                  >
-                    Update PIN
-                  </Button>
-                  {(!isLegacyPin && pinStr.length > 0) && (
-                    <Button 
-                      variant="ghost"
-                      className="w-full text-gray-500 text-xs hover:text-white" 
-                      onClick={() => {
-                        setIsSettingPin(false);
-                        setError('');
-                      }}
-                    >
-                      Back to Login
-                    </Button>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <Input
-                    type="password"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    autoComplete="one-time-code"
-                    placeholder="••••••"
-                    value={pinEntry}
-                    onChange={(e) => setPinEntry(e.target.value.replace(/\D/g, ''))}
-                    onKeyDown={(e) => e.key === 'Enter' && handlePinSubmit()}
-                    className="text-center text-3xl tracking-[1em] font-mono bg-white/5 border-white/10 h-16"
-                    maxLength={6}
-                    autoFocus
-                  />
-                  <Button 
-                    className="w-full h-14 rounded-2xl text-brand-dark font-black text-lg" 
-                    onClick={handlePinSubmit}
-                  >
-                    Unlock Hub
-                  </Button>
-                </div>
-              )}
-
-              {error && (
-                <motion.p 
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="text-red-500 text-xs font-bold text-center"
-                >
-                  {error}
-                </motion.p>
-              )}
-            </div>
-
-            <div className="pt-4 border-t border-white/5 flex flex-col items-center gap-2">
-              <span className="text-[10px] font-black uppercase tracking-widest text-gray-600">Privacy & Security Focus</span>
-              <p className="text-[10px] text-center text-gray-600 px-4">
-                Your data is encrypted and only accessible via your personal device and account.
-              </p>
-            </div>
-          </Card>
-        </motion.div>
       </div>
     );
   }

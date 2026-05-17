@@ -156,6 +156,13 @@ export interface AssessmentResult {
       frequency: string;
     }[];
   };
+  supplementRecommendations?: {
+    name: string;
+    dosage: string;
+    timing: string;
+    benefit: string;
+    link: string;
+  }[];
 }
 
 export interface SavedReport {
