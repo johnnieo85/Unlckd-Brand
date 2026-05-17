@@ -331,7 +331,9 @@ async function generateHealthAndSupport(
         NUTRITION PROTOCOL:
         - When recommending meals, ensure quantities align with the unit system: ${userData.weightUnit === 'lbs' ? 'oz/lbs' : 'grams/kg'}.
         - Every single meal or ingredient mentioned in your summaries/strategies MUST be a specific, individually listed item that will appear in the final plan.
-        - SUPPLEMENTS: Provide 3-5 specific supplement recommendations. For each, link to a quality manufacturer website, product page, or informational research search using Markdown: [Supplement Name](https://www.google.com/search?q=[SUPPLEMENT+NAME]+supplement+official+website).
+        - SUPPLEMENTS & VITAMINS: Provide 3-5 specific recommendations (e.g., Protein, Creatine, Omega-3, Zinc, Multivitamins) tailored to their goals and health profile.
+        - SAFETY: Verify recommendations do not conflict with any stated health issues or injuries.
+        - LINKS: For each, link to a quality manufacturer website or informational search: [Name](https://www.google.com/search?q=[NAME]+supplement+official+website).
         - NEVER use generic advice. Reference at least 5-7 specific meals by name and provide their verified search links using the pattern [Meal Name](SearchURL).
         - Use the search tool to verify every single meal link leads to a high-quality recipe.
         - NO RAW URLS as text. Only use Markdown: [Meal Name](Link).

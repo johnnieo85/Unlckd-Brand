@@ -3482,6 +3482,8 @@ export default function App() {
 </div>
                   </div>
 
+                  <SupplementSection supplements={report.supplementRecommendations} />
+
                   <div className="overflow-x-auto bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl">
                     <table className="w-full text-sm text-left border-collapse">
                       <thead className="bg-brand-secondary/20 text-gray-400 uppercase text-[10px] tracking-wider">
