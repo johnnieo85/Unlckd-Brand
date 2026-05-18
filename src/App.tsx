@@ -255,6 +255,7 @@ const SupplementSection = ({ supplements = [] }: { supplements?: any[] }) => {
   if (!supplements || supplements.length === 0) return null;
   return (
     <div className="space-y-6 pt-16 border-t border-gray-800 print:border-gray-200">
+      <MedicalDisclaimer />
       <h2 className="text-3xl font-display font-bold text-brand-primary tracking-tight flex items-center gap-3 print:text-black">
         <div className="w-8 h-8 rounded-lg bg-brand-primary/10 flex items-center justify-center no-print">
           <Zap className="w-4 h-4 text-brand-primary" />
