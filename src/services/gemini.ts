@@ -333,7 +333,7 @@ async function generateHealthAndSupport(
         - Every single meal or ingredient mentioned in your summaries/strategies MUST be a specific, individually listed item that will appear in the final plan.
         - SUPPLEMENTS & VITAMINS: Provide 3-5 specific recommendations (e.g., Protein, Creatine, Omega-3, Zinc, Multivitamins) tailored to their goals and health profile.
         - SAFETY: Verify recommendations do not conflict with any stated health issues or injuries.
-        - LINKS: For each, link to a quality manufacturer website or informational search: [Name](https://www.google.com/search?q=[NAME]+supplement+official+website).
+        - LINKS: For each supplement, provide a high-quality manufacturer or informational URL in the "link" field. Do NOT use markdown in the JSON "link" property, only the raw URL. Use markdown [Name](Link) format ONLY in the text summaries.
         - NEVER use generic advice. Reference at least 5-7 specific meals by name and provide their verified search links using the pattern [Meal Name](SearchURL).
         - Use the search tool to verify every single meal link leads to a high-quality recipe.
         - NO RAW URLS as text. Only use Markdown: [Meal Name](Link).

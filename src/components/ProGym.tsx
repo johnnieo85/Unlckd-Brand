@@ -63,7 +63,7 @@ import { gymService } from '../services/gymService';
 import { DailyLog, SavedReport, Measurement, UserProfile, Badge as UserBadge } from '../types';
 import { cn, downloadFile, getLocalDateString, parseLocalDate, safeStorage, getPlanDurationWeeks } from '../lib/utils';
 import { getWeeklyQuote } from '../constants/quotes';
-import { updateGymPin, updateUserProfile } from '../services/accessService';
+import { updateUserProfile } from '../services/accessService';
 import { 
   LineChart, 
   Line, 
@@ -222,15 +222,10 @@ export const ProGym = ({
   const [isStepsCollapsed, setIsStepsCollapsed] = useState(false);
   const [chartMetric, setChartMetric] = useState<'weight' | 'bodyFat'>('weight');
   const [isWeightCollapsed, setIsWeightCollapsed] = useState(false);
-  const [isHubUnlocked, setIsHubUnlocked] = useState(true);
   const [isSavingHydration, setIsSavingHydration] = useState(false);
   const [isSavingSteps, setIsSavingSteps] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<number>(0);
-  const [pinEntry, setPinEntry] = useState('');
-  const [pinSetup, setPinSetup] = useState({ pin: '', confirm: '' });
-  const [error, setError] = useState('');
-  const [isSettingPin, setIsSettingPin] = useState(false);
   const [calendarDates, setCalendarDates] = useState<string[]>([]);
   const [activeView, setActiveView] = useState<'hub' | 'report'>('hub');
   const [isSyncing, setIsSyncing] = useState(false);
@@ -259,21 +254,7 @@ export const ProGym = ({
     return Math.round(value);
   };
 
-  useEffect(() => {
-    if (userProfile?.gymPin) {
-      const pinStr = userProfile.gymPin.toString().trim();
-      if (pinStr.length > 0 && pinStr.length !== 6) {
-        setIsSettingPin(true);
-      }
-    }
-  }, [userProfile?.gymPin]);
-
-  useEffect(() => {
-    if (userProfile?.userId) {
-      const unlocked = safeStorage.get(`gym_hub_unlocked_${userProfile.userId}`, 'session') === 'true';
-      if (unlocked) setIsHubUnlocked(true);
-    }
-  }, [userProfile?.userId]);
+  const today = getLocalDateString(new Date());
   
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -313,7 +294,6 @@ export const ProGym = ({
     neck: 0
   });
 
-  const today = getLocalDateString(new Date());
 
   useEffect(() => {
     // Determine how many days to show. Minimum 14 or enough to cover today + buffer.
@@ -895,7 +875,7 @@ export const ProGym = ({
     }, 2000);
     
     return () => clearTimeout(timer);
-  }, [log, selectedDate, isHubUnlocked]);
+  }, [log, selectedDate]);
 
   const loadData = async (date: string) => {
     setLoading(true);
@@ -1214,11 +1194,8 @@ export const ProGym = ({
 
       setIsEditingHabits(false);
       if (onProfileUpdate) onProfileUpdate();
-      // We rely on the parent updating the userProfile prop, or we just use local state if we had it.
-      // But since userProfile is a prop, we should ideally trigger a refresh in App.tsx
-      // For now, let's assume we want to see it immediately
     } catch (e) {
-      setError('Failed to update habits');
+      console.error('Failed to update habits', e);
     }
   };
 
@@ -1346,43 +1323,6 @@ export const ProGym = ({
     if (!log) return;
     const newHabits = { ...log.habits, [habit]: !log.habits?.[habit] };
     setLog({ ...log, habits: newHabits });
-  };
-
-  const handlePinSubmit = () => {
-    if (!userProfile) return;
-    if (pinEntry.trim() === userProfile.gymPin?.toString().trim()) {
-      setIsHubUnlocked(true);
-      safeStorage.set(`gym_hub_unlocked_${userProfile.userId}`, 'true', 'session');
-      setError('');
-    } else {
-      setError('Incorrect PIN. Please try again.');
-      setPinEntry('');
-    }
-  };
-
-  const handlePinSetup = async () => {
-    if (!userProfile) return;
-    if (pinSetup.pin.length !== 6) {
-      setError('PIN must be exactly 6 digits.');
-      return;
-    }
-    if (pinSetup.pin !== pinSetup.confirm) {
-      setError('PINs do not match.');
-      return;
-    }
-    
-    try {
-      await updateGymPin(userProfile.userId, pinSetup.pin.trim());
-      setIsHubUnlocked(true);
-      setIsSettingPin(false);
-      safeStorage.set(`gym_hub_unlocked_${userProfile.userId}`, 'true', 'session');
-      setError('');
-      if (onProfileUpdate) onProfileUpdate();
-      // In a real app, you might want to refresh the profile state here
-      // But for now, we set the unlock state directly
-    } catch (e) {
-      setError('Failed to save PIN. Please try again.');
-    }
   };
 
   const loadReportData = async () => {
@@ -1527,35 +1467,6 @@ export const ProGym = ({
                 Consistency
               </button>
             </div>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            <Button 
-              variant="outline" 
-              size="icon" 
-              className="h-10 w-10 md:h-11 md:w-11 bg-white/5 border-white/10 hover:bg-white/10 rounded-xl md:rounded-2xl shrink-0"
-              onClick={() => {
-                setIsHubUnlocked(false);
-                safeStorage.remove(`gym_hub_unlocked_${userProfile?.userId}`, 'session');
-              }}
-              title="Lock Hub"
-            >
-              <Lock className="w-4 h-4 text-gray-400" />
-            </Button>
-            <Button 
-              variant="outline" 
-              size="icon" 
-              className="h-10 w-10 md:h-11 md:w-11 bg-white/5 border-white/10 hover:bg-white/10 rounded-xl md:rounded-2xl shrink-0"
-              onClick={() => {
-                setIsSettingPin(true);
-                setIsHubUnlocked(false);
-                setPinSetup({ pin: '', confirm: '' });
-                setError('');
-              }}
-              title="Change PIN"
-            >
-              <Settings className="w-4 h-4 text-gray-400" />
-            </Button>
           </div>
         </div>
       </div>
@@ -3710,6 +3621,17 @@ export const ProGym = ({
     </Card>
   </div>
 )}
+      
+      <div className="mt-8 p-4 md:p-6 bg-red-500/5 border border-red-500/10 rounded-[1.5rem] md:rounded-[2rem]">
+        <div className="flex gap-4 items-center">
+          <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center shrink-0">
+            <Shield className="w-5 h-5 text-red-500" />
+          </div>
+          <p className="text-[10px] md:text-xs text-gray-400 leading-relaxed uppercase tracking-wider font-bold">
+            <span className="text-red-500 font-extrabold uppercase">Safety & Medical Disclaimer:</span> Always consult with a qualified healthcare professional or licensed physician prior to starting any new exercise program, consuming any suggested nutritional supplements, or making significant lifestyle/dietary changes to ensure safety. This hub provides strategic informational guidance and does not replace professional medical advice, diagnosis, or treatment.
+          </p>
+        </div>
+      </div>
     </div>
   );
 };
