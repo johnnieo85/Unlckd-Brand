@@ -322,6 +322,18 @@ export const ProGym = ({
     }
   }, [latestReport, calendarDates.length]);
 
+  useEffect(() => {
+    if (selectedDate && calendarDates.length > 0) {
+      const timer = setTimeout(() => {
+        const element = document.getElementById(`date-btn-${selectedDate}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedDate, calendarDates]);
+
   const motivationalMessages: Record<number, string> = {
     0: "The only bad workout is the one that didn't happen. Let's go!",
     1: "Small progress is still progress. Keep moving forward.",
@@ -1506,51 +1518,22 @@ export const ProGym = ({
             )}
           </div>
           <div className="flex items-center gap-2">
-            {latestReport && (
-              <div className="relative group/week">
-                <select 
-                  onChange={async (e) => {
-                    const week = parseInt(e.target.value);
-                    await flushChanges();
-                    const startDate = latestReport.userData?.planStartDate 
-                      ? parseLocalDate(latestReport.userData.planStartDate)
-                      : (latestReport.timestamp?.toDate ? latestReport.timestamp.toDate() : new Date(latestReport.timestamp));
-                    startDate.setHours(12,0,0,0);
-                    const targetDate = new Date(startDate);
-                    targetDate.setDate(targetDate.getDate() + (week - 1) * 7);
-                    const localDateStr = getLocalDateString(targetDate);
-                    setSelectedDate(localDateStr);
-                    setUnlockedDates(prev => new Set([...prev, localDateStr]));
-                  }}
-                  className="absolute inset-0 opacity-0 cursor-pointer z-10 w-full"
-                  value={currentWeekNumber}
-                >
-                  {Array.from({ length: 12 }).map((_, i) => (
-                    <option key={i} value={i + 1}>Week {i + 1}</option>
-                  ))}
-                </select>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-7 px-3 text-[10px] font-black uppercase bg-white/5 hover:bg-white/10 rounded-lg text-gray-400 group-hover/week:text-brand-primary border border-white/5"
-                >
-                  Jump to Week
-                </Button>
-              </div>
-            )}
-            {selectedDate !== today && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={async () => {
-                  await flushChanges();
-                  setSelectedDate(today);
-                }}
-                className="h-7 px-3 text-[10px] font-black uppercase bg-white/5 hover:bg-white/10 rounded-lg text-brand-primary"
-              >
-                Back to Today
-              </Button>
-            )}
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={async () => {
+                await flushChanges();
+                setSelectedDate(today);
+              }}
+              className={cn(
+                "h-7 px-3 text-[10px] font-black uppercase rounded-lg border transition-all",
+                selectedDate === today 
+                  ? "bg-brand-primary/10 border-brand-primary/30 text-brand-primary"
+                  : "bg-white/5 hover:bg-white/10 text-gray-400 hover:text-brand-primary border-white/5"
+              )}
+            >
+              Jump to Today
+            </Button>
           </div>
         </div>
         
@@ -1573,6 +1556,7 @@ export const ProGym = ({
                   </div>
                 )}
                 <button
+                  id={`date-btn-${iso}`}
                   onClick={async () => {
                     await flushChanges();
                     setSelectedDate(iso);
