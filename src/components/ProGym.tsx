@@ -1524,6 +1524,12 @@ export const ProGym = ({
               onClick={async () => {
                 await flushChanges();
                 setSelectedDate(today);
+                setTimeout(() => {
+                  const element = document.getElementById(`date-btn-${today}`);
+                  if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                  }
+                }, 100);
               }}
               className={cn(
                 "h-7 px-3 text-[10px] font-black uppercase rounded-lg border transition-all",
