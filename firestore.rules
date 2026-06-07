@@ -1,0 +1,56 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(userId) { return request.auth.uid == userId; }
+    function hasAccess() {
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return userDoc != null && userDoc.data.hasAccess == true;
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn() && isOwner(userId);
+      allow create: if isSignedIn() && 
+                      isOwner(userId) && 
+                      request.resource.data.keys().hasAll(['userId', 'email', 'hasAccess']) &&
+                      request.resource.data.hasAccess == false; // Initial creation always restricted
+      allow update: if isSignedIn() && 
+                      isOwner(userId) && 
+                      request.resource.data.userId == resource.data.userId &&
+                      request.resource.data.email == resource.data.email &&
+                      request.resource.data.hasAccess == resource.data.hasAccess &&
+                      request.resource.data.isPremium == resource.data.isPremium; // Users cannot grant themselves access or premium
+
+      match /dailyLogs/{date} {
+        allow read, write: if isSignedIn() && isOwner(userId) && hasAccess();
+      }
+
+      match /measurements/{measurementId} {
+        allow read, write: if isSignedIn() && isOwner(userId) && hasAccess();
+      }
+    }
+
+    match /reports/{reportId} {
+      allow create: if isSignedIn() && 
+                      request.resource.data.userId == request.auth.uid &&
+                      isValidReport(request.resource.data);
+      allow get, list, delete: if isSignedIn() && 
+                                 resource.data.userId == request.auth.uid;
+    }
+
+    function isValidReport(data) {
+      return data.keys().hasAll(['id', 'timestamp', 'path', 'userData', 'report', 'photos', 'userId']) &&
+             data.id is string &&
+             data.userId is string &&
+             data.path is string &&
+             data.userData is map &&
+             data.report is map &&
+             data.photos is map;
+    }
+  }
+}
