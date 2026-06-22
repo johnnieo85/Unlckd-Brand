@@ -192,6 +192,127 @@ const getSearchUrl = (title: string, category: 'Workouts' | 'Nutrition') => {
   return `https://www.pinterest.com/search/pins/?q=${encodeURIComponent(cleanTitle + ' healthy recipe')}`;
 };
 
+interface MonthlyGoal {
+  monthName: string;
+  badgeId: string;
+  badgeName: string;
+  missionName: string;
+  description: string;
+  rewardDetail: string;
+  icon: React.ComponentType<any>;
+}
+
+const MONTHLY_GOALS: MonthlyGoal[] = [
+  {
+    monthName: "January",
+    badgeId: "resolute",
+    badgeName: "Jan Resolute",
+    missionName: "The 'Resolute' January Initiative",
+    description: "Establish consistency in the new year. Complete at least 20 workouts during the month of January to lay a rock-solid foundation.",
+    rewardDetail: "Complete 20 total workouts in January",
+    icon: Dumbbell
+  },
+  {
+    monthName: "February",
+    badgeId: "cardio_heart",
+    badgeName: "Feb Pulse",
+    missionName: "The 'Pulse' February Mission",
+    description: "Prioritize cardiovascular conditioning. Log 150 minutes of zone 2 training in February to boost heart health.",
+    rewardDetail: "Log 150+ cardio minutes in February",
+    icon: Activity
+  },
+  {
+    monthName: "March",
+    badgeId: "hydration_march",
+    badgeName: "March Splash",
+    missionName: "The 'H2O' March Splash",
+    description: "Build a hydration routine. Hit your personalized water target 25 days out of the month to keep cellular hydration optimal.",
+    rewardDetail: "Hit hydration target 25 days in March",
+    icon: Droplets
+  },
+  {
+    monthName: "April",
+    badgeId: "spring_gains",
+    badgeName: "April Energizer",
+    missionName: "The 'Energizer' April Sprint",
+    description: "Step up your daily energy expenditure. Hit 8,000 steps minimum every single day for at least 15 days in April.",
+    rewardDetail: "Hit 8k steps for 15 days in April",
+    icon: Footprints
+  },
+  {
+    monthName: "May",
+    badgeId: "stepper",
+    badgeName: "May Stepper",
+    missionName: "The 'Stepper' May Mission",
+    description: "Average 10,000 steps daily throughout the month of May. This is a community-wide focus for all UNLCKD members.",
+    rewardDetail: "Average 10,000 steps daily throughout May",
+    icon: Footprints
+  },
+  {
+    monthName: "June",
+    badgeId: "shredder_june",
+    badgeName: "June Sculptor",
+    missionName: "The 'Sculptor' June Cut",
+    description: "Focus on nutritional precision during prime summer. Log consecutive precise meal plans for 14 days without skipping tracking.",
+    rewardDetail: "Log perfect nutrition for 14 days in June",
+    icon: Utensils
+  },
+  {
+    monthName: "July",
+    badgeId: "midyear_beast",
+    badgeName: "July Fire",
+    missionName: "The 'Fire' July Heat",
+    description: "Maintain your active lifestyle during hot summer peak. Complete a strength/hypertrophy program with 100% adherence.",
+    rewardDetail: "100% training program adherence in July",
+    icon: Dumbbell
+  },
+  {
+    monthName: "August",
+    badgeId: "recovery_august",
+    badgeName: "August Zen",
+    missionName: "The 'Zen' August Reset",
+    description: "Focus heavily on recovery, joint decompression, and sleep hygiene. Log at least 8 hours of quality sleep for 20 nights in August.",
+    rewardDetail: "Log 8hr sleep for 20 nights in August",
+    icon: Moon
+  },
+  {
+    monthName: "September",
+    badgeId: "back_to_grind",
+    badgeName: "Sept Grind",
+    missionName: "The 'Grind' September Re-Entry",
+    description: "Reset after lazy summer. Re-establish routines by hitting both sleep structure and workout frequency perfectly for 3 full weeks.",
+    rewardDetail: "Complete 3-week routine reset in September",
+    icon: Calendar
+  },
+  {
+    monthName: "October",
+    badgeId: "autumn_peak",
+    badgeName: "Oct Peak",
+    missionName: "The 'Peak' October Ascend",
+    description: "Push for personal records or heavy lifts. Log a new weight or measurement record in any primary tracking parameter.",
+    rewardDetail: "Set a premium target metric in October",
+    icon: TrendingUp
+  },
+  {
+    monthName: "November",
+    badgeId: "iron_discipline",
+    badgeName: "Nov Iron",
+    missionName: "The 'Iron' November Crucible",
+    description: "Remain disciplined while holiday temptations begin. Hit daily calorie and macro-nutrient targets within 5% variation for 20 days.",
+    rewardDetail: "Keep macro-precision for 20 days in November",
+    icon: Utensils
+  },
+  {
+    monthName: "December",
+    badgeId: "unbreakable_dec",
+    badgeName: "Dec Finish",
+    missionName: "The 'Finish' December Unbreakable",
+    description: "End the year with momentum. Complete at least 4 active recovery sessions or workouts in the final week of December.",
+    rewardDetail: "Finish the year strong in final week of December",
+    icon: Shield
+  }
+];
+
 export const ProGym = ({ 
   latestReport, 
   userProfile, 
@@ -204,13 +325,28 @@ export const ProGym = ({
   onHomeClick?: () => void 
 }) => {
   const numWeeks = getPlanDurationWeeks(latestReport?.userData?.planDuration);
+  const [selectedDate, setSelectedDate] = useState(getLocalDateString(new Date()));
+
+  const currentGoal = (() => {
+    const activeDate = parseLocalDate(selectedDate) || new Date();
+    const currentMonthIdx = activeDate.getMonth(); // 0-11
+    return MONTHLY_GOALS[currentMonthIdx];
+  })();
+
+  const currentGoalDeadline = (() => {
+    const activeDate = parseLocalDate(selectedDate) || new Date();
+    const currentMonthIdx = activeDate.getMonth();
+    const currentYear = activeDate.getFullYear();
+    const lastDay = new Date(currentYear, currentMonthIdx + 1, 0).getDate();
+    return `${currentMonthIdx + 1}/${lastDay}/${currentYear}`;
+  })();
+
   const [log, setLog] = useState<DailyLog | null>(null);
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddingMeasurement, setIsAddingMeasurement] = useState(false);
   const [hasDayMeasurement, setHasDayMeasurement] = useState(false);
   const [isMeasurementsExpanded, setIsMeasurementsExpanded] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(getLocalDateString(new Date()));
   const [unlockedDates, setUnlockedDates] = useState<Set<string>>(new Set([getLocalDateString(new Date())]));
   const [isNutritionCollapsed, setIsNutritionCollapsed] = useState(false);
   const [isTrainingCollapsed, setIsTrainingCollapsed] = useState(false);
@@ -3024,25 +3160,25 @@ export const ProGym = ({
               <div className="p-2 bg-brand-primary/10 rounded-lg">
                 <Calendar className="w-5 h-5 text-brand-primary" />
               </div>
-              <h3 className="font-bold text-gray-100 uppercase tracking-widest text-sm">May Badge Goal</h3>
+              <h3 className="font-bold text-gray-100 uppercase tracking-widest text-sm">{currentGoal.monthName} Badge Goal</h3>
             </div>
             
             <div className="space-y-4">
               <div>
-                <h4 className="text-2xl font-display font-black text-white">The "Stepper" May Mission</h4>
-                <p className="text-gray-400 mt-2 text-sm leading-relaxed">Average 10,000 steps daily throughout the month of May. This is a community-wide focus for all UNLCKD members.</p>
+                <h4 className="text-2xl font-display font-black text-white">{currentGoal.missionName}</h4>
+                <p className="text-gray-400 mt-2 text-sm leading-relaxed">{currentGoal.description}</p>
               </div>
               
               <div className="flex items-center justify-between pt-4 border-t border-white/5">
                 <div className="space-y-1">
                   <span className="text-[10px] text-gray-500 uppercase font-black tracking-widest">Deadline</span>
-                  <p className="text-gray-200 text-sm font-mono">5/31/2026</p>
+                  <p className="text-gray-200 text-sm font-mono">{currentGoalDeadline}</p>
                 </div>
                 <Badge className={cn(
                   "px-4 py-2 rounded-xl border-none font-black uppercase tracking-tighter",
-                  userProfile?.badges?.find(b => b.id === 'stepper') ? "bg-brand-primary text-brand-dark" : "bg-white/5 text-gray-500"
+                  userProfile?.badges?.find(b => b.id === currentGoal.badgeId) ? "bg-brand-primary text-brand-dark" : "bg-white/5 text-gray-500"
                 )}>
-                  {userProfile?.badges?.find(b => b.id === 'stepper') ? "Mission Complete" : "In Progress"}
+                  {userProfile?.badges?.find(b => b.id === currentGoal.badgeId) ? "Mission Complete" : "In Progress"}
                 </Badge>
               </div>
             </div>
@@ -3050,12 +3186,12 @@ export const ProGym = ({
           
           <div className="mt-8 p-6 bg-brand-primary/5 border border-brand-primary/10 rounded-2xl flex items-center gap-4">
              <div className="w-16 h-16 rounded-full bg-brand-primary/20 flex items-center justify-center border border-brand-primary/30 shadow-[0_0_20px_rgba(16,185,129,0.2)]">
-                <Footprints className="w-8 h-8 text-brand-primary" />
+                <currentGoal.icon className="w-8 h-8 text-brand-primary" />
              </div>
              <div>
-                <p className="text-[10px] text-brand-primary font-black uppercase tracking-widest">May Victory Reward</p>
-                <h5 className="text-lg font-display font-bold text-white tracking-tight">The "Stepper" May Badge</h5>
-                <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mt-1">Average 10,000 steps daily throughout May</p>
+                <p className="text-[10px] text-brand-primary font-black uppercase tracking-widest">{currentGoal.monthName} Victory Reward</p>
+                <h5 className="text-lg font-display font-bold text-white tracking-tight">The "{currentGoal.badgeName}" Badge</h5>
+                <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mt-1">{currentGoal.rewardDetail}</p>
              </div>
           </div>
         </Card>
@@ -3072,17 +3208,17 @@ export const ProGym = ({
            </div>
 
            <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
-              {/* Stepper Badge (Static for now if not unlocked) */}
+              {/* Dynamic Current Month's Badge */}
               <div className={cn(
                 "flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all cursor-help group",
-                userProfile?.badges?.find(b => b.id === 'stepper') 
+                userProfile?.badges?.find(b => b.id === currentGoal.badgeId) 
                   ? "bg-brand-primary/10 border-brand-primary/40" 
                   : "bg-white/5 border-white/5 opacity-40 grayscale"
-              )} title={`Average 10,000 steps daily throughout May`}>
+              )} title={currentGoal.rewardDetail}>
                  <div className="w-12 h-12 rounded-full bg-brand-primary/20 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
-                    <Footprints className="w-6 h-6 text-brand-primary" />
+                    <currentGoal.icon className="w-6 h-6 text-brand-primary" />
                  </div>
-                 <span className="text-[9px] font-black uppercase tracking-tighter text-center leading-none">May Stepper</span>
+                 <span className="text-[9px] font-black uppercase tracking-tighter text-center leading-none">{currentGoal.badgeName}</span>
               </div>
 
               {/* Placeholder Badges */}

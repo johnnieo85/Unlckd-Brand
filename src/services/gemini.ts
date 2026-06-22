@@ -1,31 +1,8 @@
+import { GoogleGenAI, Type } from "@google/genai";
 import { UserData, Photos, ProgressPhotos, AssessmentResult } from "../types";
 import { getPlanDurationWeeks } from "../lib/utils";
 
-const Type = {
-  OBJECT: 'OBJECT',
-  ARRAY: 'ARRAY',
-  STRING: 'STRING',
-  NUMBER: 'NUMBER',
-} as const;
-
-const ai = {
-  models: {
-    async generateContent(payload: any): Promise<{ text?: string }> {
-      const response = await fetch('/api/generate-content', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
-        throw new Error(error.error || `Gemini request failed with status ${response.status}`);
-      }
-
-      return response.json();
-    }
-  }
-};
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
 /**
  * Common photo processing logic
@@ -92,35 +69,78 @@ function safeParseJson(text: string): any {
         .replace(/\}\s*\{/g, '}, {')
         .replace(/\]\s*\[/g, '], [')
         .replace(/,\s*([\]}])/g, '$1') // Trailing commas
-        .replace(/(\w+)\s*:\s*([^,"'{\[][^,}\]]*)/g, '"$1": "$2"') // Wrap unquoted values
         .trim();
-        
-      if (!repaired.endsWith('}') && !repaired.endsWith(']')) {
-         // Try to close hanging JSON
-         if (repaired.lastIndexOf('{') > repaired.lastIndexOf('}')) repaired += '"}';
-         else if (repaired.lastIndexOf('[') > repaired.lastIndexOf(']')) repaired += '"]';
-      }
 
       return JSON.parse(repaired);
     } catch (innerE) {
-      // 4. Last ditch: Find first '{' and last '}'
-      const firstBrace = cleaned.indexOf('{');
-      const lastBrace = cleaned.lastIndexOf('}');
-      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-        const maybeJson = cleaned.substring(firstBrace, lastBrace + 1);
-        try {
-          // One more repair attempt on the substring
-          const repairedSub = maybeJson
-            .replace(/\}\s*\{/g, '}, {')
-            .replace(/\]\s*\[/g, '], [')
-            .replace(/,\s*([\]}])/g, '$1');
-          return JSON.parse(repairedSub);
-        } catch (finalE) {
-          console.error("Failed to repair JSON:", finalE);
-          throw new SyntaxError(`AI returned malformed JSON: ${finalE.message}`);
+      // 4. Robust bracket, brace, and quote balancing repair
+      try {
+        let repaired = cleaned
+          .replace(/\}\s*\{/g, '}, {')
+          .replace(/\]\s*\[/g, '], [')
+          .replace(/,\s*([\]}])/g, '$1')
+          .trim();
+
+        let inString = false;
+        let isEscaped = false;
+        const stack: string[] = [];
+
+        for (let i = 0; i < repaired.length; i++) {
+          const char = repaired[i];
+          if (isEscaped) {
+            isEscaped = false;
+            continue;
+          }
+          if (char === '\\') {
+            isEscaped = true;
+            continue;
+          }
+          if (char === '"') {
+            inString = !inString;
+            continue;
+          }
+          if (!inString) {
+            if (char === '{' || char === '[') {
+              stack.push(char === '{' ? '}' : ']');
+            } else if (char === '}' || char === ']') {
+              if (stack.length > 0 && stack[stack.length - 1] === char) {
+                stack.pop();
+              }
+            }
+          }
         }
+
+        // Repair unclosed string literal if truncated
+        if (inString) {
+          repaired += '"';
+        }
+
+        // Close unclosed braces and brackets in correct reverse order
+        while (stack.length > 0) {
+          repaired += stack.pop();
+        }
+
+        return JSON.parse(repaired);
+      } catch (finalE: any) {
+        // Last ditch: Find first '{' and last '}'
+        const firstBrace = cleaned.indexOf('{');
+        const lastBrace = cleaned.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+          const maybeJson = cleaned.substring(firstBrace, lastBrace + 1);
+          try {
+            // One more repair attempt on the substring
+            const repairedSub = maybeJson
+              .replace(/\}\s*\{/g, '}, {')
+              .replace(/\]\s*\[/g, '], [')
+              .replace(/,\s*([\]}])/g, '$1');
+            return JSON.parse(repairedSub);
+          } catch (superFinalE: any) {
+            console.error("Failed to repair JSON:", superFinalE);
+            throw new SyntaxError(`AI returned malformed JSON: ${superFinalE.message}`);
+          }
+        }
+        throw e;
       }
-      throw e;
     }
   }
 }

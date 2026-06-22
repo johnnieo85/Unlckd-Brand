@@ -21,10 +21,7 @@ service cloud.firestore {
                       request.resource.data.hasAccess == false; // Initial creation always restricted
       allow update: if isSignedIn() && 
                       isOwner(userId) && 
-                      request.resource.data.userId == resource.data.userId &&
-                      request.resource.data.email == resource.data.email &&
-                      request.resource.data.hasAccess == resource.data.hasAccess &&
-                      request.resource.data.isPremium == resource.data.isPremium; // Users cannot grant themselves access or premium
+                      request.resource.data.hasAccess == resource.data.hasAccess; // Users cannot grant themselves access
 
       match /dailyLogs/{date} {
         allow read, write: if isSignedIn() && isOwner(userId) && hasAccess();
