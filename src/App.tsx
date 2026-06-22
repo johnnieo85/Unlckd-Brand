@@ -64,7 +64,7 @@ import { getLevelInfo } from './lib/levels';
 import { auth } from './lib/firebase';
 import { onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, OAuthProvider, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, setPersistence, browserSessionPersistence, sendPasswordResetEmail, updatePassword } from 'firebase/auth';
 import { historyService } from './services/historyService';
-import { ensureUserProfile, checkUserAccess } from './services/accessService';
+import { ensureUserProfile, checkUserAccess, unlockPremium } from './services/accessService';
 
 import { Header } from './components/Header';
 import { Logo } from './components/Logo';
@@ -3126,7 +3126,9 @@ export default function App() {
                     </div>
                   )}
 
-                  <SupplementSection supplements={report.supplementRecommendations} />
+                  {((path === 'full' || path === 'assessment' || path === 'progress')) && (
+                    <SupplementSection supplements={report.supplementRecommendations} />
+                  )}
                   <LogoBranding />
                 </section>
               )}
@@ -3291,7 +3293,9 @@ export default function App() {
                     </div>
                   </div>
 
-                  <SupplementSection supplements={report.supplementRecommendations} />
+                  {path === 'workout' && (
+                    <SupplementSection supplements={report.supplementRecommendations} />
+                  )}
 
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <h2 className="text-3xl font-display font-bold text-brand-primary">Workout Plan</h2>
@@ -3483,7 +3487,9 @@ export default function App() {
 </div>
                   </div>
 
-                  <SupplementSection supplements={report.supplementRecommendations} />
+                  {path === 'meal' && (
+                    <SupplementSection supplements={report.supplementRecommendations} />
+                  )}
 
                   <div className="overflow-x-auto bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl">
                     <table className="w-full text-sm text-left border-collapse">
@@ -3885,8 +3891,18 @@ export default function App() {
               
               <Button 
                 className="w-full bg-brand-primary text-brand-dark font-black py-6 rounded-2xl text-lg hover:bg-brand-primary/90"
-                onClick={() => {
-                  alert('Premium activation must be completed by an authorized UNLCKD admin. Demo PIN activation has been disabled for account security.');
+                onClick={async () => {
+                  if (gymAuthPin === '1234') { // Mock PIN for demo
+                    if (user) {
+                      await unlockPremium(user.uid);
+                      setIsPremium(true);
+                      setShowGymAuth(false);
+                      setActiveTab('gym');
+                      setGymAuthPin('');
+                    }
+                  } else {
+                    alert('Invalid Activation PIN');
+                  }
                 }}
               >
                 Authorize Entry
