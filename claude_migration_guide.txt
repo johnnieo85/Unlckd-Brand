@@ -1,0 +1,316 @@
+UNLCKD PROGYM - APPLICATION ARCHITECTURE & CLAUDE MIGRATION GUIDE
+==================================================================
+
+This guide contains all essential architectural blueprints, database schemas, API structures, 
+frontend interaction patterns, and code-level logic to perfectly replicate or translate 
+the "UNLCKD ProGym" full-stack application into Claude.
+
+------------------------------------------------------------------
+1. ARCHITECTURE & TECH STACK OVERVIEW
+------------------------------------------------------------------
+The application is a full-stack, responsive web application combining:
+* Frontend: React 18+ (TSX) styled with Tailwind CSS and animated using `motion/react` (Framer Motion).
+* Icons: Imported exclusively from `lucide-react`.
+* Charts & Data Visuals: Built using `recharts` for performance metrics, weight trends, and hydration logging.
+* Backend Server: Node.js Express server (`server.ts`) operating as a reverse proxy for API requests, hosting static assets in production, and serving as a Vite middleware wrapper in development on Port 3000.
+* Database & Authentication: Firebase Auth and Cloud Firestore, with configurations matching `firebase-blueprint.json` and strict read/write security policies outlined in `firestore.rules`.
+* AI Services: Google Gemini SDK integration (`@google/genai`) housed server-side, returning structured JSON reports (workout plans, macro-nutrient distributions, and supplement recommendations) with a robust error-resilient repair parser.
+
+------------------------------------------------------------------
+2. FIREBASE STORAGE SCHEMA & DATA TYPES
+------------------------------------------------------------------
+The Firestore backend utilizes three primary collections grouped under user references:
+
+### A. Collection: `users`
+Documents are indexed by Firebase `uid`.
+Schema (TypeScript Interface: `UserProfile` in `/src/types.ts`):
+* `uid` (string): Unique user identifier.
+* `email` (string): User email address.
+* `passcode` (string): Activation passcode or premium security key.
+* `displayName` (string, optional): Display name.
+* `badges` (array of `{ id: string, name: string, unlockedAt: string }`): Track monthly challenges completed.
+* `createdAt` (Timestamp/string): Account creation time.
+
+### B. Collection: `reports`
+Documents are indexed by `{uid}_latest` or generated per plan.
+Schema (TypeScript Interface: `AIGeneratedReport`):
+* `userId` (string)
+* `timestamp` (Timestamp/Date)
+* `userData`: User assessment metrics:
+  - `gender`, `age`, `height`, `weight`, `activityLevel`, `experienceLevel`, `goal` (e.g. build muscle, fat loss)
+  - `planDuration` (number of weeks, e.g., 8, 12)
+  - `planStartDate` (string, local ISO format: YYYY-MM-DD)
+* `macroDist`: Daily macro distribution:
+  - `calories` (number), `protein` (number), `carbs` (number), `fats` (number)
+* `workouts`: Array of structured workouts:
+  - `day` (string, e.g., "Day 1"), `focus` (string, e.g., "Push - Chest/Shoulders/Triceps"), `exercises` (array of objects: `{ name, sets, reps, rpe, rest, notes }`)
+* `meals`: Array of suggested daily meal templates:
+  - `name` (string, e.g., "Breakfast"), `target` (string), `options` (array of strings)
+* `supplementRecommendations`: Array of:
+  - `{ name: string, timing: string, dosage: string, explanation: string }`
+
+### C. Collection: `dailyLogs`
+Documents are stored with a composite ID: `{uid}_{YYYY-MM-DD}`.
+Tracks daily behavioral parameters, exercises completed, and hydration.
+Schema (TypeScript Interface: `DailyLog`):
+* `id` (string): `{uid}_{date}`
+* `userId` (string)
+* `date` (string, format YYYY-MM-DD)
+* `calories` (number, optional): Calorie intake.
+* `protein` (number, optional): Protein intake.
+* `carbs` (number, optional): Carbs intake.
+* `fats` (number, optional): Fats intake.
+* `waterIntake` (number): Ounces of water consumed today.
+* `steps` (number): Step counter.
+* `sleep` (number, optional): Sleep hours.
+* `exercises` (array of `{ name: string, sets: Array<{ weight: number, reps: number, rpe: number, done: boolean }> }`)
+* `notes` (string, optional)
+* `unlocked` (boolean, default: false for dates ahead of plan)
+
+### D. Collection: `measurements`
+Logs progress metrics (weight, body fat) over time.
+Schema (TypeScript Interface: `Measurement`):
+* `id` (string): Unique auto-ID
+* `userId` (string)
+* `date` (string, YYYY-MM-DD)
+* `weight` (number): Daily or weekly bodyweight.
+* `bodyFat` (number, optional)
+* `createdAt` (Timestamp)
+
+------------------------------------------------------------------
+3. EXPRESS BACKEND CONFIGURATION (`server.ts`)
+------------------------------------------------------------------
+Crucial bindings & configurations to translate:
+* **Host & Port Binding**: Must bind to `0.0.0.0` and Port `3000` to satisfy hosting environments.
+* **Dual dev/prod execution modes**:
+  - In Development: Serves assets via Vite Middleware (created via `createViteServer` with `middlewareMode: true` and `appType: 'spa'`).
+  - In Production: Express serves compiled static files inside `./dist` using `express.static` and routes all fallback paths `*` to `dist/index.html`.
+* **Build Config (`package.json`)**:
+  - Bundle command: `vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs`
+  - Runs in prod via: `node dist/server.cjs`
+
+------------------------------------------------------------------
+4. CORE FRONTEND WORKFLOWS & INTERACTION DESIGN
+------------------------------------------------------------------
+To achieve matching behavior and UX fluidities, replicate these specific features:
+
+### A. Passcode Access Validation (`accessService.ts`)
+* Uses a secure verification logic for access. When users attempt to unlock the "ProGym" dashboard workspace, they must type in an authorized passcode. This is validated via `verifyActivationKey(key)` which maps back to configured variables or credentials.
+
+### B. Jump to Today & Smooth Horizontal Calendar Scrolling
+* Component: `src/components/ProGym.tsx`
+* The application renders a horizontal inline scrolling bar showing dates for the entire duration of the plan.
+* Clicking any individual date selects it (`selectedDate`), loading its corresponding Firestore `dailyLogs` entry dynamically.
+* To avoid manual scrolling fatigue, the calendar buttons have unique DOM IDs: `id={"date-btn-" + iso}`.
+* An active `useEffect` watches the selected date. Whenever it changes, it executes a centered, smooth snap transition:
+  ```typescript
+  useEffect(() => {
+    if (selectedDate && calendarDates.length > 0) {
+      const timer = setTimeout(() => {
+        const element = document.getElementById(`date-btn-${selectedDate}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedDate, calendarDates]);
+  ```
+* The **"Jump to Today"** button resets `selectedDate` to the current local ISO string, and executes the exact same delayed smooth-scrolling timeout trigger to center-focus today's calendar pill.
+
+### C. Monthly Dynamic Badge Goals & Challenges
+* The monthly challenge section automatically updates to match the current selected calendar month (0-11) instead of static hardcoding.
+* There is a pre-defined static database array `MONTHLY_GOALS` mapping index `0` to `11` (January through December):
+  - `monthName` (string)
+  - `badgeId` (string, e.g. "shredder_june", "stepper")
+  - `badgeName` (string)
+  - `missionName` (string)
+  - `description` (string)
+  - `rewardDetail` (string)
+  - `icon` (Lucide React Component Reference, e.g. `Footprints`, `Dumbbell`, `Utensils`, `Moon`)
+* Resolved dynamically in-component:
+  ```typescript
+  const currentGoal = (() => {
+    const activeDate = parseLocalDate(selectedDate) || new Date();
+    const currentMonthIdx = activeDate.getMonth(); // 0-11
+    return MONTHLY_GOALS[currentMonthIdx];
+  })();
+  ```
+* Deadlines are computed based on the last calendar day of the active year/month combo:
+  ```typescript
+  const currentGoalDeadline = (() => {
+    const activeDate = parseLocalDate(selectedDate) || new Date();
+    const currentMonthIdx = activeDate.getMonth();
+    const currentYear = activeDate.getFullYear();
+    const lastDay = new Date(currentYear, currentMonthIdx + 1, 0).getDate();
+    return `${currentMonthIdx + 1}/${lastDay}/${currentYear}`;
+  })();
+  ```
+
+### D. Single-Listing Constraint for Performance Supplements & Strategy
+* In the main UI layout (`src/App.tsx`), performance supplements and macronutrient optimization guides must **only list once** per active context tab to avoid UI redundancy.
+* This is managed by wrapping the `<SupplementSection />` component inside conditional expressions:
+  - Inside the Full Plan view: rendered only when path is `"full"`, `"assessment"`, or `"progress"`.
+  - Inside the active Training layout: rendered only when path is `"workout"`.
+  - Inside the active Meal template tracker: rendered only when path is `"meal"`.
+
+------------------------------------------------------------------
+5. AI INTEGRATION & ROBUST JSON REPAIR MECHANISM
+------------------------------------------------------------------
+To prevent parsing crashes caused by truncated AI generations, loose braces, or trailing commas, the Gemini service (`src/services/gemini.ts`) uses a state-of-the-art JSON recovery loop:
+
+```typescript
+export function repairAndParseJSON(rawResponse: string): any {
+  // 1. Clean markdown brackets or prefix/suffix text
+  let cleaned = rawResponse.trim();
+  if (cleaned.startsWith('```json')) cleaned = cleaned.substring(7);
+  else if (cleaned.startsWith('```')) cleaned = cleaned.substring(3);
+  if (cleaned.endsWith('```')) cleaned = cleaned.substring(0, cleaned.length - 3);
+  cleaned = cleaned.trim();
+
+  try {
+    return JSON.parse(cleaned);
+  } catch (e: any) {
+    console.warn("Standard JSON parse failed, initiating robust structural repair...", e.message);
+    try {
+      // 2. Inline list repairs & trailing comma elimination
+      let repaired = cleaned
+        .replace(/\}\s*\{/g, '}, {')
+        .replace(/\]\s*\[/g, '], [')
+        .replace(/,\s*([\]}])/g, '$1')
+        .trim();
+
+      // 3. Robust bracket, brace, and quote balancing loop
+      let inString = false;
+      let isEscaped = false;
+      const stack: string[] = [];
+
+      for (let i = 0; i < repaired.length; i++) {
+        const char = repaired[i];
+        if (isEscaped) {
+          isEscaped = false;
+          continue;
+        }
+        if (char === '\\') {
+          isEscaped = true;
+          continue;
+        }
+        if (char === '"') {
+          inString = !inString;
+          continue;
+        }
+        if (!inString) {
+          if (char === '{' || char === '[') {
+            stack.push(char === '{' ? '}' : ']');
+          } else if (char === '}' || char === ']') {
+            if (stack.length > 0 && stack[stack.length - 1] === char) {
+              stack.pop();
+            }
+          }
+        }
+      }
+
+      // Repair unclosed string literals
+      if (inString) {
+        repaired += '"';
+      }
+
+      // Close unclosed braces/brackets in reverse stack order
+      while (stack.length > 0) {
+        repaired += stack.pop();
+      }
+
+      return JSON.parse(repaired);
+    } catch (finalE: any) {
+      // Last-ditch: Extract first brace to last brace substring
+      const firstBrace = cleaned.indexOf('{');
+      const lastBrace = cleaned.lastIndexOf('}');
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        const maybeJson = cleaned.substring(firstBrace, lastBrace + 1);
+        try {
+          const repairedSub = maybeJson
+            .replace(/\}\s*\{/g, '}, {')
+            .replace(/\]\s*\[/g, '], [')
+            .replace(/,\s*([\]}])/g, '$1');
+          return JSON.parse(repairedSub);
+        } catch (superFinalE: any) {
+          console.error("Critical: Structural JSON repair failed.", superFinalE);
+          throw new SyntaxError(`AI returned malformed JSON: ${superFinalE.message}`);
+        }
+      }
+      throw e;
+    }
+  }
+}
+```
+
+------------------------------------------------------------------
+6. RECOMMENDED MIGRATION STEPS FOR CLAUDE
+------------------------------------------------------------------
+To import this into Claude successfully:
+1. **Initialize Workspace & Package Manifest**: Apply the `package.json` dependencies and ensure standard typescript configs (`tsconfig.json`) are set up.
+2. **Re-create State Enums & Interfaces**: Copy `/src/types.ts` verbatim to guarantee rigid runtime contracts between the frontend and backend.
+3. **Establish Firebase Connectors**: Populate `firebase-blueprint.json` schemas in your Claude cloud instance, and set read/write credentials securely.
+4. **Deploy AI Generation Route**: Implement the server-side Gemini generation handlers utilizing the robust `repairAndParseJSON` wrapper.
+5. **Reassemble Premium UI Layouts**: Copy `App.tsx` and components inside `src/components/`, ensuring local timezone conversions (`getLocalDateString` and `parseLocalDate`) are fully supported.
+
+------------------------------------------------------------------
+7. SECURITY & RESTRICTED IFRAME SANDBOX FALLBACKS
+------------------------------------------------------------------
+In preview or sandbox environments (such as within Claude's preview iframes or other secure, third-party frames), calling standard Firebase APIs like `getAuth()` or accessing `window.localStorage` directly can throw a critical `SecurityError` or `"The operation is insecure."` due to restricted cookie/IndexedDB storage access.
+
+To prevent your application from breaking, implement the following robust fallback patterns:
+
+### A. Safe Storage Availability Check
+Wrap storage access in simple, safe, exception-handling probes:
+```typescript
+const isStorageAvailable = (): boolean => {
+  try {
+    const storage = window.localStorage;
+    if (!storage) return false;
+    
+    // Attempt write/read/remove cycle
+    const testKey = '__auth_test_key__';
+    storage.setItem(testKey, '1');
+    storage.removeItem(testKey);
+    
+    // Safely verify indexedDB exists without executing actions that trigger iframe blocks
+    if (typeof window !== 'undefined' && 'indexedDB' in window) {
+      if (!window.indexedDB) return false;
+    }
+    return true;
+  } catch (e) {
+    return false;
+  }
+};
+```
+
+### B. Graceful Auth Initialization
+Instead of triggering standard `getAuth(app)` followed by late `setPersistence(auth, browserLocalPersistence)`, use modular `initializeAuth()` with automated fallbacks to keep the app functional even inside highly sandboxed wrappers:
+```typescript
+import { initializeAuth, browserLocalPersistence, inMemoryPersistence } from 'firebase/auth';
+
+let safeAuth;
+
+if (isStorageAvailable()) {
+  try {
+    safeAuth = initializeAuth(app, {
+      persistence: [browserLocalPersistence, inMemoryPersistence]
+    });
+    console.info("Auth: Safely initialized with local/memory persistence.");
+  } catch (e) {
+    console.warn("Auth: Failed local initialization, falling back to memory:", e);
+    safeAuth = initializeAuth(app, {
+      persistence: inMemoryPersistence
+    });
+  }
+} else {
+  console.warn("Auth: Storage/IndexedDB blocked. Initializing with in-memory persistence.");
+  safeAuth = initializeAuth(app, {
+    persistence: inMemoryPersistence
+  });
+}
+
+export const auth = safeAuth;
+```
+
