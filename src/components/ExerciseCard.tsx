@@ -1,5 +1,5 @@
-import React from 'react';
-import { Check, ExternalLink, Plus, Minus, Trash2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Check, ExternalLink, Plus, Minus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { DailyLog } from '../types';
 
 interface ExerciseCardProps {
@@ -37,6 +37,7 @@ export function ExerciseCard({
   parseExercise,
   getSearchUrl
 }: ExerciseCardProps) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const { name, sets, reps, url } = parseExercise(exRaw);
   const exerciseData = log?.workoutData?.[exerciseId];
   const isCompleted = exerciseData?.completed || false;
@@ -51,7 +52,9 @@ export function ExerciseCard({
 
   return (
     <div 
-      className={`p-4 sm:p-5 rounded-2xl border transition-all space-y-3 ${
+      className={`p-4 sm:p-5 rounded-2xl border transition-all ${
+        isCollapsed ? 'space-y-0' : 'space-y-3'
+      } ${
         isCompleted 
           ? "bg-brand-primary/5 border-brand-primary/20 opacity-80" 
           : "bg-white/[0.02] border-white/10 hover:border-white/20"
@@ -72,9 +75,12 @@ export function ExerciseCard({
             {isCompleted && <Check className="w-4 h-4 stroke-[3]" />}
           </button>
 
-          <div className="flex-1 min-w-0">
+          <div 
+            className="flex-1 min-w-0 cursor-pointer"
+            onClick={() => setIsCollapsed(!isCollapsed)}
+          >
             {isManual ? (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                 <input 
                   type="text"
                   className="bg-white/5 border border-white/10 rounded px-2.5 py-1 text-sm font-bold text-white outline-none focus:border-brand-primary w-full"
@@ -106,73 +112,85 @@ export function ExerciseCard({
           </div>
         </div>
 
-        {!isManual && (
-          <a 
-            href={url || getSearchUrl(name, 'Workouts')} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="text-gray-500 hover:text-brand-primary p-1.5 rounded-lg hover:bg-white/5 transition-colors shrink-0"
-            title="Search or view exercise demonstration"
-          >
-            <ExternalLink className="w-4 h-4" />
-          </a>
-        )}
-      </div>
-
-      {/* Set rows */}
-      <div className="pl-0 sm:pl-9 space-y-2 pt-1">
-        {/* Set Row Column Header */}
-        <div className="flex items-center gap-2 text-[10px] font-mono font-bold uppercase tracking-wider text-gray-500">
-          <span className="w-5 shrink-0 text-center">#</span>
-          <div className="flex-1 flex items-center gap-2 min-w-0">
-            <span className="flex-[1.4] min-w-0 px-1">Reps / Duration</span>
-            <span className="flex-1 min-w-0 px-1 text-center">Weight ({measurementUnits.weight})</span>
-          </div>
-          <span className="w-6 shrink-0"></span>
-        </div>
-
-        {setRows.map((setRow, sIdx) => (
-          <div key={sIdx} className="flex items-center gap-2 text-xs">
-            <span className="w-5 text-gray-400 font-mono text-xs font-bold shrink-0 text-center">
-              {sIdx + 1}.
-            </span>
-            <div className="flex-1 flex items-center gap-2 min-w-0">
-              <input 
-                type="text" 
-                value={setRow.reps}
-                placeholder={reps || '10'}
-                onChange={(e) => onSetRowUpdate(exerciseId, sIdx, 'reps', e.target.value, reps, sets)}
-                className="flex-[1.4] min-w-0 bg-black/40 border border-white/10 rounded-lg px-2.5 py-1.5 font-mono text-xs text-white focus:border-brand-primary outline-none transition-colors"
-              />
-              <input 
-                type="text" 
-                value={setRow.weight}
-                placeholder={measurementUnits.weight}
-                onChange={(e) => onSetRowUpdate(exerciseId, sIdx, 'weight', e.target.value, reps, sets)}
-                className="flex-1 min-w-0 bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 font-mono text-xs text-white focus:border-brand-primary outline-none transition-colors text-center"
-              />
-            </div>
-            <button
-              type="button"
-              onClick={() => onRemoveSetRow?.(exerciseId, sIdx, reps, sets)}
-              className="text-gray-500 hover:text-red-400 p-1 rounded-lg hover:bg-white/5 transition-colors shrink-0"
-              title="Delete set"
+        <div className="flex items-center gap-1 shrink-0">
+          {!isManual && (
+            <a 
+              href={url || getSearchUrl(name, 'Workouts')} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-gray-500 hover:text-brand-primary p-1.5 rounded-lg hover:bg-white/5 transition-colors shrink-0"
+              title="Search or view exercise demonstration"
             >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        ))}
-
-        <div className="pt-1.5">
+              <ExternalLink className="w-4 h-4" />
+            </a>
+          )}
           <button
             type="button"
-            onClick={() => onAddSetRow(exerciseId, reps, sets)}
-            className="text-[11px] font-mono font-bold text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 border border-dashed border-white/15 hover:border-white/30 rounded-lg px-3 py-1 transition-all flex items-center gap-1 cursor-pointer"
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="text-gray-400 hover:text-white p-1.5 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+            title={isCollapsed ? "Expand workout details" : "Collapse workout details"}
           >
-            <Plus className="w-3.5 h-3.5" /> Add Set
+            {isCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
           </button>
         </div>
       </div>
+
+      {/* Set rows */}
+      {!isCollapsed && (
+        <div className="pl-0 sm:pl-9 space-y-2 pt-1">
+          {/* Set Row Column Header */}
+          <div className="flex items-center gap-2 text-[10px] font-mono font-bold uppercase tracking-wider text-gray-500">
+            <span className="w-5 shrink-0 text-center">#</span>
+            <div className="flex-1 flex items-center gap-2 min-w-0">
+              <span className="flex-[1.4] min-w-0 px-1">Reps / Duration</span>
+              <span className="flex-1 min-w-0 px-1 text-center">Weight ({measurementUnits.weight})</span>
+            </div>
+            <span className="w-6 shrink-0"></span>
+          </div>
+
+          {setRows.map((setRow, sIdx) => (
+            <div key={sIdx} className="flex items-center gap-2 text-xs">
+              <span className="w-5 text-gray-400 font-mono text-xs font-bold shrink-0 text-center">
+                {sIdx + 1}.
+              </span>
+              <div className="flex-1 flex items-center gap-2 min-w-0">
+                <input 
+                  type="text" 
+                  value={setRow.reps}
+                  placeholder={reps || '10'}
+                  onChange={(e) => onSetRowUpdate(exerciseId, sIdx, 'reps', e.target.value, reps, sets)}
+                  className="flex-[1.4] min-w-0 bg-black/40 border border-white/10 rounded-lg px-2.5 py-1.5 font-mono text-xs text-white focus:border-brand-primary outline-none transition-colors"
+                />
+                <input 
+                  type="text" 
+                  value={setRow.weight}
+                  placeholder={measurementUnits.weight}
+                  onChange={(e) => onSetRowUpdate(exerciseId, sIdx, 'weight', e.target.value, reps, sets)}
+                  className="flex-1 min-w-0 bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 font-mono text-xs text-white focus:border-brand-primary outline-none transition-colors text-center"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => onRemoveSetRow?.(exerciseId, sIdx, reps, sets)}
+                className="text-gray-500 hover:text-red-400 p-1 rounded-lg hover:bg-white/5 transition-colors shrink-0"
+                title="Delete set"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+
+          <div className="pt-1.5">
+            <button
+              type="button"
+              onClick={() => onAddSetRow(exerciseId, reps, sets)}
+              className="text-[11px] font-mono font-bold text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 border border-dashed border-white/15 hover:border-white/30 rounded-lg px-3 py-1 transition-all flex items-center gap-1 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" /> Add Set
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

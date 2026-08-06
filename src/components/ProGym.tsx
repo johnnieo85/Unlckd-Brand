@@ -353,8 +353,11 @@ export const ProGym = ({
   const [isConsistencyCollapsed, setIsConsistencyCollapsed] = useState(false);
   const [isNutritionCollapsed, setIsNutritionCollapsed] = useState(false);
   const [isTrainingCollapsed, setIsTrainingCollapsed] = useState(false);
+  const [isWarmUpCollapsed, setIsWarmUpCollapsed] = useState(false);
+  const [isMainWorkCollapsed, setIsMainWorkCollapsed] = useState(false);
   const [isHabitsCollapsed, setIsHabitsCollapsed] = useState(false);
   const [isWaterCollapsed, setIsWaterCollapsed] = useState(false);
+  const [isBadgesCollapsed, setIsBadgesCollapsed] = useState(false);
   const [isLevelModalOpen, setIsLevelModalOpen] = useState(false);
   const [totalXP, setTotalXP] = useState(0);
   const [currentStreak, setCurrentStreak] = useState(0);
@@ -430,6 +433,8 @@ export const ProGym = ({
     rightArm: 0,
     leftThigh: 0,
     rightThigh: 0,
+    leftCalf: 0,
+    rightCalf: 0,
     neck: 0
   });
 
@@ -1489,6 +1494,8 @@ export const ProGym = ({
       rightArm: Number(newMeasurement.rightArm),
       leftThigh: Number(newMeasurement.leftThigh),
       rightThigh: Number(newMeasurement.rightThigh),
+      leftCalf: Number(newMeasurement.leftCalf),
+      rightCalf: Number(newMeasurement.rightCalf),
       neck: Number(newMeasurement.neck),
       units: measurementUnits
     };
@@ -2231,15 +2238,15 @@ export const ProGym = ({
           </div>
 
           {/* Workout Details */}
-          <Card className="p-8 bg-brand-surface border-white/5">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-brand-primary/10 rounded-lg">
+          <Card className="p-6 md:p-8 bg-brand-surface border-white/5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="p-2 bg-brand-primary/10 rounded-lg shrink-0">
                   <Dumbbell className="w-5 h-5 text-brand-primary" />
                 </div>
-                <div className="flex flex-col">
+                <div className="flex flex-col min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-bold text-gray-100 text-lg sm:text-xl">
+                    <h3 className="font-bold text-gray-100 text-lg sm:text-xl shrink-0">
                       {log?.useManualWorkout ? 'Manual Training Log' : 'Prescribed Training'}
                     </h3>
                     {workoutDay?.focus && (
@@ -2268,12 +2275,53 @@ export const ProGym = ({
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+
+              <div className="flex items-center gap-2 flex-wrap shrink-0">
+                <UnitToggle<'lbs' | 'kg'>
+                  unitA="lbs"
+                  unitB="kg"
+                  labelA="[LBS]"
+                  labelB="[KG]"
+                  value={measurementUnits.weight}
+                  onChange={(w) => setMeasurementUnits(prev => ({ ...prev, weight: w }))}
+                  size="sm"
+                />
+
+                {!isTrainingCollapsed && latestReport && (
+                  <>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className={cn(
+                        "text-[10px] font-black uppercase tracking-widest px-2.5 h-8 whitespace-nowrap",
+                        log?.useManualWorkout ? "bg-brand-primary/10 border-brand-primary/20 text-brand-primary" : "border-white/10 text-gray-300 hover:text-white"
+                      )}
+                      onClick={toggleManualMode}
+                    >
+                      {log?.useManualWorkout ? 'Manual Mode' : 'Guided Plan'}
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="border-brand-primary/20 hover:bg-brand-primary/10 text-brand-primary h-8 px-2.5 text-[10px] font-black uppercase tracking-widest whitespace-nowrap"
+                      onClick={importWorkoutFromPlan}
+                    >
+                      Sync Plan
+                    </Button>
+                  </>
+                )}
+
+                {!isTrainingCollapsed && !latestReport && (
+                  <Badge className="bg-brand-primary/10 text-brand-primary border-brand-primary/20 font-black text-[10px] py-1 px-2.5">
+                    MANUAL MODE
+                  </Badge>
+                )}
+
                 {!isTrainingCollapsed && !log?.useManualWorkout && (
                   <Button 
                     variant="ghost" 
                     size="sm"
-                    className="text-brand-primary hover:bg-brand-primary/10 transition-all flex items-center gap-2"
+                    className="text-brand-primary hover:bg-brand-primary/10 transition-all flex items-center gap-1.5 h-8 px-2.5"
                     onClick={() => {
                       if (!workoutDay) return;
                       const dayDate = parseLocalDate(selectedDate);
@@ -2310,40 +2358,15 @@ export const ProGym = ({
                     <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Download</span>
                   </Button>
                 )}
+
                 <Button 
                   variant="ghost" 
                   size="sm" 
                   onClick={() => setIsTrainingCollapsed(!isTrainingCollapsed)}
-                  className="text-gray-500 hover:text-white"
+                  className="text-gray-400 hover:text-white p-1.5 h-8 w-8"
                 >
                   {isTrainingCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
                 </Button>
-                {!isTrainingCollapsed && latestReport && (
-                  <div className="flex items-center gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      className={cn(
-                        "text-[10px] font-black uppercase tracking-widest px-3 h-7",
-                        log?.useManualWorkout ? "bg-brand-primary/10 border-brand-primary/20 text-brand-primary" : "border-white/5 opacity-60"
-                      )}
-                      onClick={toggleManualMode}
-                    >
-                      {log?.useManualWorkout ? 'Manual Mode' : 'Guided Plan'}
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      className="border-brand-primary/20 hover:bg-brand-primary/10 text-brand-primary h-7 px-2 text-[10px] font-black uppercase tracking-widest"
-                      onClick={importWorkoutFromPlan}
-                    >
-                      Sync Plan
-                    </Button>
-                  </div>
-                )}
-                {!isTrainingCollapsed && !latestReport && (
-                  <Badge className="bg-brand-primary/10 text-brand-primary border-brand-primary/20 font-black text-[10px]">MANUAL MODE</Badge>
-                )}
               </div>
             </div>
             
@@ -2377,9 +2400,14 @@ export const ProGym = ({
                 <div className="space-y-4">
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-mono font-black uppercase text-gray-400 tracking-widest">
-                        WARM-UP SEQUENCE
-                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsWarmUpCollapsed(!isWarmUpCollapsed)}
+                        className="flex items-center gap-2 text-xs font-mono font-black uppercase text-gray-400 tracking-widest hover:text-white transition-colors cursor-pointer"
+                      >
+                        {isWarmUpCollapsed ? <ChevronDown className="w-4 h-4 text-brand-primary" /> : <ChevronUp className="w-4 h-4 text-brand-primary" />}
+                        <span>WARM-UP SEQUENCE</span>
+                      </button>
                       {(log?.useManualWorkout || !latestReport) && (
                         <Button 
                           variant="ghost" 
@@ -2392,17 +2420,69 @@ export const ProGym = ({
                       )}
                     </div>
 
+                    {!isWarmUpCollapsed && (
+                      <div className="space-y-3">
+                        {(Array.isArray(workoutDay?.warmUp) 
+                          ? workoutDay.warmUp 
+                          : (typeof workoutDay?.warmUp === 'string' ? workoutDay.warmUp : '').split(/,|\n/).filter(line => typeof line === 'string' && line.trim())
+                        ).map((ex, i) => (
+                          <ExerciseCard
+                            key={`warmup-${i}`}
+                            exerciseId={`warmup-${i}`}
+                            exRaw={ex}
+                            isManual={log?.useManualWorkout || !latestReport}
+                            section="warmUp"
+                            index={i}
+                            log={log}
+                            measurementUnits={measurementUnits}
+                            onToggle={handleExerciseToggle}
+                            onSetRowUpdate={handleSetRowUpdate}
+                            onAddSetRow={handleAddSetRow}
+                            onRemoveSetRow={handleRemoveSetRow}
+                            onUpdateManualName={updateManualExerciseName}
+                            onRemoveManual={removeManualExercise}
+                            parseExercise={parseExercise}
+                            getSearchUrl={getSearchUrl}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-3 pt-3 border-t border-white/5">
+                  <div className="flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={() => setIsMainWorkCollapsed(!isMainWorkCollapsed)}
+                      className="flex items-center gap-2 text-xs font-mono font-black uppercase text-gray-400 tracking-widest hover:text-white transition-colors cursor-pointer"
+                    >
+                      {isMainWorkCollapsed ? <ChevronDown className="w-4 h-4 text-brand-primary" /> : <ChevronUp className="w-4 h-4 text-brand-primary" />}
+                      <span>{workoutDay?.focus ? `${workoutDay.focus.toUpperCase()} (MAIN WORK)` : 'MAIN WORKOUT'}</span>
+                    </button>
+                    {(log?.useManualWorkout || !latestReport) && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => addManualExercise('mainWork')}
+                        className="h-7 px-2.5 text-xs font-bold bg-brand-primary/10 text-brand-primary border border-brand-primary/20 hover:bg-brand-primary/20"
+                      >
+                        <Plus className="w-3.5 h-3.5 mr-1" /> Add Exercise
+                      </Button>
+                    )}
+                  </div>
+                  {!isMainWorkCollapsed && (
                     <div className="space-y-3">
-                      {(Array.isArray(workoutDay?.warmUp) 
-                        ? workoutDay.warmUp 
-                        : (typeof workoutDay?.warmUp === 'string' ? workoutDay.warmUp : '').split(/,|\n/).filter(line => typeof line === 'string' && line.trim())
+                      {(Array.isArray(workoutDay?.mainWork) 
+                        ? workoutDay.mainWork 
+                        : (typeof workoutDay?.mainWork === 'string' ? workoutDay.mainWork : '').split('\n').filter(line => typeof line === 'string' && line.trim())
                       ).map((ex, i) => (
                         <ExerciseCard
-                          key={`warmup-${i}`}
-                          exerciseId={`warmup-${i}`}
+                          key={`main-${i}`}
+                          exerciseId={`main-${i}`}
                           exRaw={ex}
                           isManual={log?.useManualWorkout || !latestReport}
-                          section="warmUp"
+                          section="mainWork"
                           index={i}
                           log={log}
                           measurementUnits={measurementUnits}
@@ -2417,50 +2497,8 @@ export const ProGym = ({
                         />
                       ))}
                     </div>
-                  </div>
+                  )}
                 </div>
-
-                <div className="space-y-3 pt-3 border-t border-white/5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono font-black uppercase text-gray-400 tracking-widest">
-                      {workoutDay?.focus ? `${workoutDay.focus.toUpperCase()} (MAIN WORK)` : 'MAIN WORKOUT'}
-                    </span>
-                    {(log?.useManualWorkout || !latestReport) && (
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => addManualExercise('mainWork')}
-                        className="h-7 px-2.5 text-xs font-bold bg-brand-primary/10 text-brand-primary border border-brand-primary/20 hover:bg-brand-primary/20"
-                      >
-                        <Plus className="w-3.5 h-3.5 mr-1" /> Add Exercise
-                      </Button>
-                    )}
-                  </div>
-                  <div className="space-y-3">
-                    {(Array.isArray(workoutDay?.mainWork) 
-                      ? workoutDay.mainWork 
-                      : (typeof workoutDay?.mainWork === 'string' ? workoutDay.mainWork : '').split('\n').filter(line => typeof line === 'string' && line.trim())
-                    ).map((ex, i) => (
-                      <ExerciseCard
-                        key={`main-${i}`}
-                        exerciseId={`main-${i}`}
-                        exRaw={ex}
-                        isManual={log?.useManualWorkout || !latestReport}
-                        section="mainWork"
-                        index={i}
-                        log={log}
-                        measurementUnits={measurementUnits}
-                        onToggle={handleExerciseToggle}
-                        onSetRowUpdate={handleSetRowUpdate}
-                        onAddSetRow={handleAddSetRow}
-                        onRemoveSetRow={handleRemoveSetRow}
-                        onUpdateManualName={updateManualExerciseName}
-                        onRemoveManual={removeManualExercise}
-                        parseExercise={parseExercise}
-                        getSearchUrl={getSearchUrl}
-                      />
-                    ))}
-                  </div>
 
                   <div className="mt-8 pt-6 border-t border-white/5">
                     <label className="text-[10px] font-black uppercase text-gray-500 tracking-widest block mb-2 px-1">Training Session Notes</label>
@@ -2472,10 +2510,9 @@ export const ProGym = ({
                     />
                   </div>
                 </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              </motion.div>
+            )}
+          </AnimatePresence>
       </Card>
 
           {/* Meal Log */}
@@ -2765,56 +2802,68 @@ export const ProGym = ({
                   <Input 
                     label={`Weight (${measurementUnits.weight})`} 
                     type="number" 
-                    value={newMeasurement.weight || ''} 
-                    onChange={e => setNewMeasurement({...newMeasurement, weight: Number(e.target.value)})}
+                    value={newMeasurement.weight ?? ''} 
+                    onChange={e => setNewMeasurement({...newMeasurement, weight: e.target.value === '' ? ('' as any) : Number(e.target.value)})}
                   />
                   <Input 
                     label="Body Fat (%)" 
                     type="number" 
-                    value={newMeasurement.bodyFat || ''} 
-                    onChange={e => setNewMeasurement({...newMeasurement, bodyFat: Number(e.target.value)})}
+                    value={newMeasurement.bodyFat ?? ''} 
+                    onChange={e => setNewMeasurement({...newMeasurement, bodyFat: e.target.value === '' ? ('' as any) : Number(e.target.value)})}
                   />
                   <Input 
                     label={`Neck (${measurementUnits.length})`} 
                     type="number" 
-                    value={newMeasurement.neck || ''} 
-                    onChange={e => setNewMeasurement({...newMeasurement, neck: Number(e.target.value)})}
+                    value={newMeasurement.neck ?? ''} 
+                    onChange={e => setNewMeasurement({...newMeasurement, neck: e.target.value === '' ? ('' as any) : Number(e.target.value)})}
                   />
                   <Input 
                     label={`Chest (${measurementUnits.length})`} 
                     type="number" 
-                    value={newMeasurement.chest || ''} 
-                    onChange={e => setNewMeasurement({...newMeasurement, chest: Number(e.target.value)})}
+                    value={newMeasurement.chest ?? ''} 
+                    onChange={e => setNewMeasurement({...newMeasurement, chest: e.target.value === '' ? ('' as any) : Number(e.target.value)})}
                   />
                   <Input 
                     label={`Waist (${measurementUnits.length})`} 
                     type="number" 
-                    value={newMeasurement.waist || ''} 
-                    onChange={e => setNewMeasurement({...newMeasurement, waist: Number(e.target.value)})}
+                    value={newMeasurement.waist ?? ''} 
+                    onChange={e => setNewMeasurement({...newMeasurement, waist: e.target.value === '' ? ('' as any) : Number(e.target.value)})}
                   />
                    <Input 
                     label={`L.Arm (${measurementUnits.length})`} 
                     type="number" 
-                    value={newMeasurement.leftArm || ''} 
-                    onChange={e => setNewMeasurement({...newMeasurement, leftArm: Number(e.target.value)})}
+                    value={newMeasurement.leftArm ?? ''} 
+                    onChange={e => setNewMeasurement({...newMeasurement, leftArm: e.target.value === '' ? ('' as any) : Number(e.target.value)})}
                   />
                    <Input 
                     label={`R.Arm (${measurementUnits.length})`} 
                     type="number" 
-                    value={newMeasurement.rightArm || ''} 
-                    onChange={e => setNewMeasurement({...newMeasurement, rightArm: Number(e.target.value)})}
+                    value={newMeasurement.rightArm ?? ''} 
+                    onChange={e => setNewMeasurement({...newMeasurement, rightArm: e.target.value === '' ? ('' as any) : Number(e.target.value)})}
                   />
                    <Input 
                     label={`L.Thigh (${measurementUnits.length})`} 
                     type="number" 
-                    value={newMeasurement.leftThigh || ''} 
-                    onChange={e => setNewMeasurement({...newMeasurement, leftThigh: Number(e.target.value)})}
+                    value={newMeasurement.leftThigh ?? ''} 
+                    onChange={e => setNewMeasurement({...newMeasurement, leftThigh: e.target.value === '' ? ('' as any) : Number(e.target.value)})}
                   />
                    <Input 
                     label={`R.Thigh (${measurementUnits.length})`} 
                     type="number" 
-                    value={newMeasurement.rightThigh || ''} 
-                    onChange={e => setNewMeasurement({...newMeasurement, rightThigh: Number(e.target.value)})}
+                    value={newMeasurement.rightThigh ?? ''} 
+                    onChange={e => setNewMeasurement({...newMeasurement, rightThigh: e.target.value === '' ? ('' as any) : Number(e.target.value)})}
+                  />
+                   <Input 
+                    label={`L.Calf (${measurementUnits.length})`} 
+                    type="number" 
+                    value={newMeasurement.leftCalf ?? ''} 
+                    onChange={e => setNewMeasurement({...newMeasurement, leftCalf: e.target.value === '' ? ('' as any) : Number(e.target.value)})}
+                  />
+                   <Input 
+                    label={`R.Calf (${measurementUnits.length})`} 
+                    type="number" 
+                    value={newMeasurement.rightCalf ?? ''} 
+                    onChange={e => setNewMeasurement({...newMeasurement, rightCalf: e.target.value === '' ? ('' as any) : Number(e.target.value)})}
                   />
                 </div>
                 <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
@@ -2833,6 +2882,7 @@ export const ProGym = ({
                       <th className="pb-4 font-bold">Waist/Neck</th>
                       <th className="pb-4 font-bold">Arms (L/R)</th>
                       <th className="pb-4 font-bold">Thighs (L/R)</th>
+                      <th className="pb-4 font-bold">Calves (L/R)</th>
                       <th className="pb-4 font-bold text-right">Actions</th>
                     </tr>
                   </thead>
@@ -2858,6 +2908,8 @@ export const ProGym = ({
                       const displayRArm = convertLen(Number(m.rightArm), m.units?.length || 'cm');
                       const displayLThigh = convertLen(Number(m.leftThigh), m.units?.length || 'cm');
                       const displayRThigh = convertLen(Number(m.rightThigh), m.units?.length || 'cm');
+                      const displayLCalf = convertLen(Number(m.leftCalf || m.calves || 0), m.units?.length || 'cm');
+                      const displayRCalf = convertLen(Number(m.rightCalf || m.calves || 0), m.units?.length || 'cm');
 
                       // Safe local date parsing
                       const displayDate = parseLocalDate(m.date).toLocaleDateString();
@@ -2883,6 +2935,9 @@ export const ProGym = ({
                           </td>
                           <td className="py-4 font-mono text-gray-200">
                             <span className="block">{displayLThigh.toFixed(1)}/{displayRThigh.toFixed(1)}{measurementUnits.length}</span>
+                          </td>
+                          <td className="py-4 font-mono text-gray-200">
+                            <span className="block">{displayLCalf.toFixed(1)}/{displayRCalf.toFixed(1)}{measurementUnits.length}</span>
                           </td>
                           <td className="py-4 text-right">
                             <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -3135,57 +3190,73 @@ export const ProGym = ({
           </div>
         </Card>
 
-        <Card className="p-8 bg-brand-surface border-white/5 space-y-8">
-           <div className="flex items-center justify-between">
+        <Card className={`p-8 bg-brand-surface border-white/5 ${isBadgesCollapsed ? 'space-y-0' : 'space-y-8'}`}>
+           <div 
+             className="flex items-center justify-between cursor-pointer group select-none"
+             onClick={() => setIsBadgesCollapsed(!isBadgesCollapsed)}
+           >
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-brand-primary/10 rounded-lg">
+                <div className="p-2 bg-brand-primary/10 rounded-lg shrink-0">
                   <Sparkles className="w-5 h-5 text-brand-primary" />
                 </div>
-                <h3 className="font-bold text-gray-100 uppercase tracking-widest text-sm">Accomplishment Badges</h3>
+                <div>
+                  <h3 className="font-bold text-gray-100 uppercase tracking-widest text-sm group-hover:text-brand-primary transition-colors">Accomplishment Badges</h3>
+                  <span className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">{userProfile?.badges?.length || 0} Unlocked</span>
+                </div>
               </div>
-              <span className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">{userProfile?.badges?.length || 0} Unlocked</span>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-gray-400 hover:text-white p-1.5 h-8 w-8"
+              >
+                {isBadgesCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+              </Button>
            </div>
 
-           <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
-              {/* Dynamic Current Month's Badge */}
-              <div className={cn(
-                "flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all cursor-help group",
-                userProfile?.badges?.find(b => b.id === currentGoal.badgeId) 
-                  ? "bg-brand-primary/10 border-brand-primary/40" 
-                  : "bg-white/5 border-white/5 opacity-40 grayscale"
-              )} title={currentGoal.rewardDetail}>
-                 <div className="w-12 h-12 rounded-full bg-brand-primary/20 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
-                    <currentGoal.icon className="w-6 h-6 text-brand-primary" />
-                 </div>
-                 <span className="text-[9px] font-black uppercase tracking-tighter text-center leading-none">{currentGoal.badgeName}</span>
-              </div>
-
-              {/* Placeholder Badges */}
-              {[
-                { id: 'early-bird', name: 'Early Bird', icon: Moon, desc: 'Complete a workout before 6:00 AM' },
-                { id: 'iron-will', name: 'Iron Will', icon: Dumbbell, desc: 'Maintain a 7-day workout streak' },
-                { id: 'aqua-king', name: 'Aqua King', icon: Droplets, desc: 'Achieve hydration targets for 30 consecutive days' }
-              ].map(badge => {
-                const isUnlocked = userProfile?.badges?.find(b => b.id === badge.id);
-                return (
-                  <div key={badge.id} className={cn(
+           {!isBadgesCollapsed && (
+             <div className="space-y-8">
+               <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
+                  {/* Dynamic Current Month's Badge */}
+                  <div className={cn(
                     "flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all cursor-help group",
-                    isUnlocked 
+                    userProfile?.badges?.find(b => b.id === currentGoal.badgeId) 
                       ? "bg-brand-primary/10 border-brand-primary/40" 
                       : "bg-white/5 border-white/5 opacity-40 grayscale"
-                  )} title={badge.desc}>
-                    <div className="w-12 h-12 rounded-full bg-brand-primary/20 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
-                        <badge.icon className="w-6 h-6 text-brand-primary" />
-                    </div>
-                    <span className="text-[9px] font-black uppercase tracking-tighter text-center leading-none">{badge.name}</span>
+                  )} title={currentGoal.rewardDetail}>
+                     <div className="w-12 h-12 rounded-full bg-brand-primary/20 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
+                        <currentGoal.icon className="w-6 h-6 text-brand-primary" />
+                     </div>
+                     <span className="text-[9px] font-black uppercase tracking-tighter text-center leading-none">{currentGoal.badgeName}</span>
                   </div>
-                );
-              })}
-           </div>
 
-           <div className="p-4 bg-white/[0.02] rounded-xl border border-white/5 text-center">
-              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest italic">Every accomplishment starts with the decision to try.</p>
-           </div>
+                  {/* Placeholder Badges */}
+                  {[
+                    { id: 'early-bird', name: 'Early Bird', icon: Moon, desc: 'Complete a workout before 6:00 AM' },
+                    { id: 'iron-will', name: 'Iron Will', icon: Dumbbell, desc: 'Maintain a 7-day workout streak' },
+                    { id: 'aqua-king', name: 'Aqua King', icon: Droplets, desc: 'Achieve hydration targets for 30 consecutive days' }
+                  ].map(badge => {
+                    const isUnlocked = userProfile?.badges?.find(b => b.id === badge.id);
+                    return (
+                      <div key={badge.id} className={cn(
+                        "flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all cursor-help group",
+                        isUnlocked 
+                          ? "bg-brand-primary/10 border-brand-primary/40" 
+                          : "bg-white/5 border-white/5 opacity-40 grayscale"
+                      )} title={badge.desc}>
+                        <div className="w-12 h-12 rounded-full bg-brand-primary/20 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
+                            <badge.icon className="w-6 h-6 text-brand-primary" />
+                        </div>
+                        <span className="text-[9px] font-black uppercase tracking-tighter text-center leading-none">{badge.name}</span>
+                      </div>
+                    );
+                  })}
+               </div>
+
+               <div className="p-4 bg-white/[0.02] rounded-xl border border-white/5 text-center">
+                  <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest italic">Every accomplishment starts with the decision to try.</p>
+               </div>
+             </div>
+           )}
         </Card>
       </div>
       </>

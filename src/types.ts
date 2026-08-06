@@ -212,6 +212,8 @@ export interface UserProfile {
     leftThigh?: number;
     rightThigh?: number;
     calves?: number;
+    leftCalf?: number;
+    rightCalf?: number;
     units?: {
       length: 'cm' | 'in';
       weight: 'kg' | 'lbs';
@@ -274,6 +276,9 @@ export interface Measurement {
   rightArm?: number;
   leftThigh?: number;
   rightThigh?: number;
+  calves?: number;
+  leftCalf?: number;
+  rightCalf?: number;
   neck?: number;
   units: {
     weight: 'kg' | 'lbs';
