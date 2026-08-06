@@ -1,8 +1,3 @@
-app.use((req, res, next) => {
-  res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
-  next();
-});
-
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import axios from 'axios';
@@ -14,6 +9,11 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(express.json());
+
+  app.use((req, res, next) => {
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+  next();
+});
 
   // API Route for Link Auditing
   app.get('/api/audit-link', async (req, res) => {
