@@ -62,7 +62,7 @@ import { Path, UserData, Photos, ProgressPhotos, AssessmentResult, Rating, Saved
 import { generateTransformationReport } from './services/gemini';
 import { getLevelInfo } from './lib/levels';
 import { auth } from './lib/firebase';
-import { onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, OAuthProvider, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, setPersistence, browserSessionPersistence, sendPasswordResetEmail, updatePassword } from 'firebase/auth';
+import { onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, OAuthProvider, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, setPersistence, browserSessionPersistence, sendPasswordResetEmail, updatePassword, browserPopupRedirectResolver } from 'firebase/auth';
 import { historyService } from './services/historyService';
 import { ensureUserProfile, checkUserAccess, unlockPremium } from './services/accessService';
 
@@ -829,7 +829,7 @@ export default function App() {
     const checkRedirect = async () => {
       try {
         console.info("Auth: Checking for redirect result...");
-        const result = await getRedirectResult(auth);
+        const result = await getRedirectResult(auth, browserPopupRedirectResolver);
         if (result?.user) {
           console.info("Auth: Redirect result success:", result.user.email);
           setIsAuthModalOpen(false);
@@ -928,7 +928,7 @@ export default function App() {
       // Step 1: Always try Popup first as it's better for debugging and doesn't lose page state
       console.info("Auth: Attempting Popup login...");
       try {
-        await signInWithPopup(auth, provider);
+        await signInWithPopup(auth, provider, browserPopupRedirectResolver);
         setIsAuthModalOpen(false);
         setAuthError(null);
       } catch (popupError: any) {
@@ -943,7 +943,7 @@ export default function App() {
             console.info("Auth: Popup blocked/closed in standard tab, falling back to Redirect...");
             setAuthError("Popup blocked. Redirecting to secure login...");
             await new Promise(resolve => setTimeout(resolve, 800));
-            await signInWithRedirect(auth, provider);
+            await signInWithRedirect(auth, provider, browserPopupRedirectResolver);
             return;
           }
 
@@ -979,7 +979,7 @@ export default function App() {
     try {
       console.info("Auth: Attempting Apple Popup login...");
       try {
-        await signInWithPopup(auth, provider);
+        await signInWithPopup(auth, provider, browserPopupRedirectResolver);
         setIsAuthModalOpen(false);
         setAuthError(null);
       } catch (popupError: any) {
@@ -993,7 +993,7 @@ export default function App() {
             console.info("Auth: Apple Popup blocked/closed, falling back to Redirect...");
             setAuthError("Popup blocked. Redirecting to secure login...");
             await new Promise(resolve => setTimeout(resolve, 800));
-            await signInWithRedirect(auth, provider);
+            await signInWithRedirect(auth, provider, browserPopupRedirectResolver);
             return;
           }
 
@@ -1106,6 +1106,12 @@ export default function App() {
     
     let message = "Authentication failed. Please try again.";
     
+    if (error?.message?.includes('api-key-expired') || error?.code === 'auth/api-key-expired' || error?.code === 'auth/invalid-api-key') {
+      message = "FIREBASE CONFIGURATION ERROR: The Web API key in firebase-applet-config.json has expired or is invalid. Please renew or re-provision your Firebase API key.";
+      setAuthError(message);
+      return;
+    }
+
     const isSecurityError = error?.message?.includes('insecure') || error?.name === 'SecurityError';
     if (isSecurityError) {
       message = "Browser security settings blocked this action. This often happens in iframes or Private Browsing mode. Try opening the app in a new tab or use Email/Password sign-in.";
