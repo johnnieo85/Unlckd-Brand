@@ -10,11 +10,6 @@ async function startServer() {
 
   app.use(express.json());
 
-  app.use((req, res, next) => {
-  res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
-  next();
-});
-
   // API Route for Link Auditing
   app.get('/api/audit-link', async (req, res) => {
     const { url } = req.query;
