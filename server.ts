@@ -1,3 +1,8 @@
+app.use((req, res, next) => {
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+  next();
+});
+
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import axios from 'axios';
