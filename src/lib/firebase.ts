@@ -1,16 +1,9 @@
 import { initializeApp } from 'firebase/app';
 import { initializeAuth, browserLocalPersistence, inMemoryPersistence, browserPopupRedirectResolver, getAuth } from 'firebase/auth';
 import { initializeFirestore, memoryLocalCache } from 'firebase/firestore';
-import firebaseConfig from '../../firebase-applet-config';
+import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
-
-import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
-
-const appCheck = initializeAppCheck(app, {
-  provider: new ReCaptchaV3Provider("6LduMHgtAAAAAAaLl4pOGNAZtqO-D4D3a0f1ALvs"),
-  isTokenAutoRefreshEnabled: true,
-});
 
 // Try to initialize Firestore with safer settings if storage is blocked
 let firestoreDb;

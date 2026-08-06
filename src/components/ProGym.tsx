@@ -59,6 +59,8 @@ import {
 import { Card, Badge } from './ui/Card';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
+import { UnitToggle } from './UnitToggle';
+import { ExerciseCard } from './ExerciseCard';
 import { gymService } from '../services/gymService';
 import { DailyLog, SavedReport, Measurement, UserProfile, Badge as UserBadge } from '../types';
 import { cn, downloadFile, getLocalDateString, parseLocalDate, safeStorage, getPlanDurationWeeks } from '../lib/utils';
@@ -348,6 +350,7 @@ export const ProGym = ({
   const [hasDayMeasurement, setHasDayMeasurement] = useState(false);
   const [isMeasurementsExpanded, setIsMeasurementsExpanded] = useState(false);
   const [unlockedDates, setUnlockedDates] = useState<Set<string>>(new Set([getLocalDateString(new Date())]));
+  const [isConsistencyCollapsed, setIsConsistencyCollapsed] = useState(false);
   const [isNutritionCollapsed, setIsNutritionCollapsed] = useState(false);
   const [isTrainingCollapsed, setIsTrainingCollapsed] = useState(false);
   const [isHabitsCollapsed, setIsHabitsCollapsed] = useState(false);
@@ -848,6 +851,111 @@ export const ProGym = ({
     const newLog = { ...log, workoutData: updatedWorkoutData, completedWorkouts };
     setLog(newLog);
     // Removed immediate service call to let the auto-save useEffect handle it with debounce
+  };
+
+  const handleSetRowUpdate = (exerciseId: string, setIndex: number, field: 'reps' | 'weight', val: string, defaultReps: string, defaultSets?: string) => {
+    if (!log) return;
+    const currentData = log.workoutData || {};
+    const exerciseData = currentData[exerciseId];
+    const setsCount = parseInt(exerciseData?.sets || defaultSets || '3') || 3;
+
+    const existingRows: Array<{ reps: string; weight: string }> = Array.isArray(exerciseData?.setRows)
+      ? [...exerciseData.setRows]
+      : Array.from({ length: Math.max(1, setsCount) }, () => ({
+          reps: exerciseData?.reps || defaultReps || '',
+          weight: exerciseData?.weight || ''
+        }));
+
+    while (existingRows.length <= setIndex) {
+      existingRows.push({ reps: defaultReps || '', weight: '' });
+    }
+
+    existingRows[setIndex] = {
+      ...existingRows[setIndex],
+      [field]: val
+    };
+
+    const updatedWorkoutData = {
+      ...currentData,
+      [exerciseId]: {
+        ...exerciseData,
+        setRows: existingRows,
+        reps: existingRows[0]?.reps || exerciseData?.reps || '',
+        weight: existingRows[0]?.weight || exerciseData?.weight || '',
+        sets: String(existingRows.length)
+      }
+    };
+
+    const { completed, total } = getTrainingTotals(updatedWorkoutData);
+    const isManual = log.useManualWorkout || !latestReport;
+    const completedWorkouts = isManual ? (completed > 0 ? 1 : 0) : ((total > 0 && completed === total) ? 1 : 0);
+
+    setLog({ ...log, workoutData: updatedWorkoutData, completedWorkouts });
+  };
+
+  const handleAddSetRow = (exerciseId: string, defaultReps: string, defaultSets?: string) => {
+    if (!log) return;
+    const currentData = log.workoutData || {};
+    const exerciseData = currentData[exerciseId];
+    const setsCount = parseInt(exerciseData?.sets || defaultSets || '3') || 3;
+
+    const existingRows: Array<{ reps: string; weight: string }> = Array.isArray(exerciseData?.setRows)
+      ? [...exerciseData.setRows]
+      : Array.from({ length: Math.max(1, setsCount) }, () => ({
+          reps: exerciseData?.reps || defaultReps || '',
+          weight: exerciseData?.weight || ''
+        }));
+
+    const lastRow = existingRows[existingRows.length - 1] || { reps: defaultReps || '', weight: '' };
+    const updatedRows = [...existingRows, { reps: lastRow.reps || defaultReps || '', weight: lastRow.weight || '' }];
+
+    const updatedWorkoutData = {
+      ...currentData,
+      [exerciseId]: {
+        ...exerciseData,
+        setRows: updatedRows,
+        sets: String(updatedRows.length)
+      }
+    };
+
+    setLog({ ...log, workoutData: updatedWorkoutData });
+  };
+
+  const handleRemoveSetRow = (exerciseId: string, setIndex: number, defaultReps: string, defaultSets?: string) => {
+    if (!log) return;
+    const currentData = log.workoutData || {};
+    const exerciseData = currentData[exerciseId];
+    const setsCount = parseInt(exerciseData?.sets || defaultSets || '3') || 3;
+
+    const existingRows: Array<{ reps: string; weight: string }> = Array.isArray(exerciseData?.setRows)
+      ? [...exerciseData.setRows]
+      : Array.from({ length: Math.max(1, setsCount) }, () => ({
+          reps: exerciseData?.reps || defaultReps || '',
+          weight: exerciseData?.weight || ''
+        }));
+
+    if (existingRows.length > 1) {
+      existingRows.splice(setIndex, 1);
+    } else {
+      existingRows[0] = { reps: '', weight: '' };
+    }
+
+    const updatedWorkoutData = {
+      ...currentData,
+      [exerciseId]: {
+        ...exerciseData,
+        setRows: existingRows,
+        reps: existingRows[0]?.reps || exerciseData?.reps || '',
+        weight: existingRows[0]?.weight || exerciseData?.weight || '',
+        sets: String(existingRows.length)
+      }
+    };
+
+    const { completed, total } = getTrainingTotals(updatedWorkoutData);
+    const isManual = log.useManualWorkout || !latestReport;
+    const completedWorkouts = isManual ? (completed > 0 ? 1 : 0) : ((total > 0 && completed === total) ? 1 : 0);
+
+    setLog({ ...log, workoutData: updatedWorkoutData, completedWorkouts });
   };
 
   const refreshGlobalStats = async () => {
@@ -1783,66 +1891,95 @@ export const ProGym = ({
             );
           })()}
 
-          <Card className="p-6 md:p-10 bg-brand-surface border-white/5 relative overflow-hidden">
+          <Card className="p-6 md:p-8 bg-brand-surface border-white/5 relative overflow-hidden">
             <div className="absolute top-0 right-0 p-8 opacity-5 hidden md:block">
               <Activity className="w-32 h-32 text-brand-primary" />
             </div>
             
-            <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12 relative z-10">
-              <div className="grid grid-cols-3 gap-4 md:flex md:gap-8 w-full md:w-auto">
-                <div className="flex justify-center">
-                  <Ring 
-                    progress={log ? (log.steps / (log.stepGoal || 10000)) : 0} 
-                    color="#10b981" 
-                    icon={Footprints} 
-                    label="Steps" 
-                  />
+            <div className="flex items-center justify-between mb-2 cursor-pointer group" onClick={() => setIsConsistencyCollapsed(!isConsistencyCollapsed)}>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-brand-primary/10 rounded-lg group-hover:bg-brand-primary/20 transition-colors">
+                  <Activity className="w-5 h-5 text-brand-primary" />
                 </div>
-                <div className="flex justify-center">
-                  <Ring 
-                    progress={log ? (log.water / (log.waterGoal || 3000)) : 0} 
-                    color="#3b82f6" 
-                    icon={Droplets} 
-                    label="Hydration" 
-                  />
-                </div>
-                <div className="flex justify-center">
-                  <Ring 
-                    progress={log ? (() => {
-                      const { completed, total } = getTrainingTotals();
-                      return total > 0 ? completed / total : ((log.completedWorkouts || 0) > 0 ? 1 : 0);
-                    })() : 0} 
-                    color="#fbbf24" 
-                    icon={Dumbbell} 
-                    label="Workout" 
-                  />
+                <div>
+                  <h3 className="text-lg md:text-xl font-display font-bold text-white">Daily Consistency</h3>
+                  {isConsistencyCollapsed && (
+                    <span className="text-xs font-mono text-brand-primary font-bold">
+                      {currentStreak} Days Streak · {calculateXP().toLocaleString()} XP
+                    </span>
+                  )}
                 </div>
               </div>
-              
-              <div className="flex-1 space-y-4 md:space-y-6 w-full text-center md:text-left">
-                <div className="space-y-1">
-                  <h3 className="text-xl md:text-2xl font-display font-bold text-white">Daily Consistency</h3>
-                  <p className="text-xs md:text-sm text-gray-500 italic px-4 md:px-0">{dailyMessage}</p>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
-                    <div className="flex items-center gap-2 mb-1">
-                      <TrendingUp className="w-4 h-4 text-brand-primary" />
-                      <span className="text-[10px] font-bold text-gray-500 uppercase">Streak</span>
-                    </div>
-                    <div className="text-xl font-mono font-bold text-white">{currentStreak} Days</div>
-                  </div>
-                  <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Target className="w-4 h-4 text-brand-primary" />
-                      <span className="text-[10px] font-bold text-gray-500 uppercase">XP Earned</span>
-                    </div>
-                    <div className="text-xl font-mono font-bold text-white">{calculateXP().toLocaleString()}</div>
-                  </div>
-                </div>
-              </div>
+              <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white p-1">
+                {isConsistencyCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+              </Button>
             </div>
+
+            <AnimatePresence>
+              {!isConsistencyCollapsed && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12 relative z-10 pt-4 border-t border-white/5">
+                    <div className="grid grid-cols-3 gap-4 md:flex md:gap-8 w-full md:w-auto">
+                      <div className="flex justify-center">
+                        <Ring 
+                          progress={log ? (log.steps / (log.stepGoal || 10000)) : 0} 
+                          color="#10b981" 
+                          icon={Footprints} 
+                          label="Steps" 
+                        />
+                      </div>
+                      <div className="flex justify-center">
+                        <Ring 
+                          progress={log ? (log.water / (log.waterGoal || 3000)) : 0} 
+                          color="#3b82f6" 
+                          icon={Droplets} 
+                          label="Hydration" 
+                        />
+                      </div>
+                      <div className="flex justify-center">
+                        <Ring 
+                          progress={log ? (() => {
+                            const { completed, total } = getTrainingTotals();
+                            return total > 0 ? completed / total : ((log.completedWorkouts || 0) > 0 ? 1 : 0);
+                          })() : 0} 
+                          color="#fbbf24" 
+                          icon={Dumbbell} 
+                          label="Workout" 
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="flex-1 space-y-4 md:space-y-6 w-full text-center md:text-left">
+                      <div className="space-y-1">
+                        <p className="text-xs md:text-sm text-gray-400 italic px-4 md:px-0">{dailyMessage}</p>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
+                          <div className="flex items-center gap-2 mb-1">
+                            <TrendingUp className="w-4 h-4 text-brand-primary" />
+                            <span className="text-[10px] font-bold text-gray-500 uppercase">Streak</span>
+                          </div>
+                          <div className="text-xl font-mono font-bold text-white">{currentStreak} Days</div>
+                        </div>
+                        <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Target className="w-4 h-4 text-brand-primary" />
+                            <span className="text-[10px] font-bold text-gray-500 uppercase">XP Earned</span>
+                          </div>
+                          <div className="text-xl font-mono font-bold text-white">{calculateXP().toLocaleString()}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </Card>
 
           {/* Quick Logs */}
@@ -1859,7 +1996,7 @@ export const ProGym = ({
                 {trackerOrder.map((id) => (
                   <SortableTracker key={id} id={id}>
                     {id === 'hydration' ? (
-                      <Card className="p-8 bg-brand-surface border-white/5 h-full">
+                      <Card className="p-6 md:p-8 bg-brand-surface border-white/5 h-full">
                         <div className="flex items-center justify-between">
                           <div 
                             className="flex items-center gap-3 cursor-pointer group"
@@ -1870,36 +2007,34 @@ export const ProGym = ({
                             </div>
                             <div className="flex flex-col">
                               <h3 className="font-bold text-gray-200">Hydration</h3>
-                              <div className="flex items-center gap-2">
-                                <span className={cn("text-[10px] font-black uppercase tracking-widest", isWaterCollapsed ? "text-blue-400" : "text-gray-500")}>
-                                  {isWaterCollapsed ? `${log.water} / ${log.waterGoal} ${log.waterUnit}` : "Track Intake"}
-                                </span>
-                                {isWaterCollapsed ? <ChevronDown className="w-3 h-3 text-gray-600" /> : <ChevronUp className="w-3 h-3 text-gray-600" />}
-                              </div>
+                              <span className={cn("text-[10px] font-black uppercase tracking-widest", isWaterCollapsed ? "text-blue-400" : "text-gray-500")}>
+                                {isWaterCollapsed ? `${log.water} / ${log.waterGoal} ${log.waterUnit}` : "Track Intake"}
+                              </span>
                             </div>
                           </div>
-                          {!isWaterCollapsed && (
-                            <div className="flex items-center gap-4">
-                              <button 
-                                onClick={toggleWaterUnit}
-                                className="text-[10px] font-black uppercase tracking-widest px-2 py-1 bg-white/5 rounded-md hover:bg-white/10 active:scale-95 transition-all text-gray-500 hover:text-blue-400"
-                              >
-                                {log.waterUnit}
-                              </button>
-                              <div className="flex items-center gap-1">
-                                <input 
-                                  type="number"
-                                  value={log.water}
-                                  onChange={(e) => {
-                                    const val = parseInt(e.target.value) || 0;
-                                    setLog({ ...log, water: val });
-                                  }}
-                                  className="w-16 bg-white/5 border border-white/10 rounded px-2 py-0.5 text-right font-mono text-sm text-gray-200 focus:border-blue-500 outline-none transition-colors"
-                                />
-                                <span className="text-sm text-gray-500 font-mono">/ {log.waterGoal} {log.waterUnit}</span>
-                              </div>
-                            </div>
-                          )}
+                          <div className="flex items-center gap-2">
+                            <UnitToggle<'oz' | 'ml'>
+                              unitA="oz"
+                              unitB="ml"
+                              labelA="[OZ]"
+                              labelB="[ML]"
+                              value={log.waterUnit || 'oz'}
+                              onChange={(u) => {
+                                if (log.waterUnit !== u) {
+                                  toggleWaterUnit();
+                                }
+                              }}
+                              size="sm"
+                            />
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              className="p-1 text-gray-400 hover:text-white"
+                              onClick={() => setIsWaterCollapsed(!isWaterCollapsed)}
+                            >
+                              {isWaterCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+                            </Button>
+                          </div>
                         </div>
                         
                         <AnimatePresence>
@@ -1910,91 +2045,71 @@ export const ProGym = ({
                               exit={{ height: 0, opacity: 0 }}
                               className="overflow-hidden"
                             >
-                              <div className="space-y-4 pt-6">
-                                <div className="space-y-3">
-                                  <div className="flex gap-2">
-                                    {(() => {
-                                      const increments = log.waterUnit === 'oz' ? [16, 20, 32] : [500, 750, 1000];
-                                      const baseMinus = log.waterUnit === 'oz' ? -20 : -500;
-                                      return (
-                                        <>
-                                          <Button 
-                                            variant="outline"
-                                            className="flex-none w-10 border-white/5 hover:border-red-500/30 hover:bg-red-500/5 transition-all p-0"
-                                            onClick={() => updateWater(baseMinus)}
-                                          >
-                                            <Minus className="w-3 h-3 text-red-400" />
-                                          </Button>
-                                          <div className="flex-1 flex gap-2">
-                                            {increments.map((amount) => (
-                                              <Button 
-                                                key={amount}
-                                                variant="outline"
-                                                className="flex-1 border-white/5 hover:border-blue-500/30 hover:bg-blue-500/5 transition-all text-xs"
-                                                onClick={() => updateWater(amount)}
-                                              >
-                                                +{amount}
-                                              </Button>
-                                            ))}
-                                          </div>
-                                        </>
-                                      );
-                                    })()}
-                                  </div>
-
-                                  <div className="px-1 pt-2">
+                              <div className="space-y-4 pt-5">
+                                {/* Dedicated Counter Row */}
+                                <div className="flex items-center justify-between bg-black/30 border border-white/10 rounded-xl p-2.5 sm:p-3 gap-1.5 sm:gap-2">
+                                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm"
+                                      className="w-7 h-7 sm:w-8 sm:h-8 p-0 border-white/10 hover:border-blue-500/40 text-blue-400 shrink-0"
+                                      onClick={() => updateWater(log.waterUnit === 'oz' ? -8 : -250)}
+                                    >
+                                      <Minus className="w-3.5 h-3.5" />
+                                    </Button>
                                     <input 
-                                      type="date"
-                                      value={selectedDate}
-                                      onChange={(e) => setSelectedDate(e.target.value)}
-                                      className="hidden"
-                                    />
-                                    <input 
-                                      type="range"
-                                      min="0"
-                                      max={log.waterGoal * 1.5}
-                                      step={log.waterUnit === 'oz' ? 1 : 10}
+                                      type="number"
                                       value={log.water}
                                       onChange={(e) => {
-                                        const val = parseInt(e.target.value);
+                                        const val = parseInt(e.target.value) || 0;
                                         setLog({ ...log, water: val });
                                       }}
-                                      className="w-full h-1.5 bg-white/5 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                      className="w-16 sm:w-20 bg-white/5 border border-white/10 rounded-lg px-1.5 py-1 text-center font-mono text-sm font-bold text-gray-100 focus:border-blue-500 outline-none transition-colors"
                                     />
-                                  </div>
-
-                                  <div className="flex justify-end pt-2">
                                     <Button 
+                                      variant="outline" 
                                       size="sm"
-                                      onClick={saveHydration}
-                                      className={cn(
-                                        "gap-2 font-black text-[10px] uppercase h-8 px-4 transition-all duration-300",
-                                        isSavingHydration 
-                                          ? "bg-green-500 hover:bg-green-600 text-brand-dark" 
-                                          : "bg-blue-500 hover:bg-blue-600 text-white"
-                                      )}
+                                      className="w-7 h-7 sm:w-8 sm:h-8 p-0 border-white/10 hover:border-blue-500/40 text-blue-400 shrink-0"
+                                      onClick={() => updateWater(log.waterUnit === 'oz' ? 8 : 250)}
                                     >
-                                      {isSavingHydration ? (
-                                        <>
-                                          <Check className="w-3 h-3" />
-                                          Synced
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Save className="w-3 h-3" />
-                                          Save Water
-                                        </>
-                                      )}
+                                      <Plus className="w-3.5 h-3.5" />
                                     </Button>
                                   </div>
+                                  <span className="text-xs font-mono font-bold text-gray-400 shrink-0 whitespace-nowrap">
+                                    / {log.waterGoal} {log.waterUnit}
+                                  </span>
+                                </div>
+
+                                {/* Quick Presets */}
+                                <div className="flex gap-2">
+                                  {(() => {
+                                    const increments = log.waterUnit === 'oz' ? [18, 20, 32] : [500, 750, 1000];
+                                    return increments.map((amount) => (
+                                      <Button 
+                                        key={amount}
+                                        variant="outline"
+                                        className="flex-1 border-white/10 bg-white/[0.02] hover:border-blue-500/40 hover:bg-blue-500/10 transition-all text-xs font-bold text-blue-400 py-2"
+                                        onClick={() => updateWater(amount)}
+                                      >
+                                        +{amount} {log.waterUnit}
+                                      </Button>
+                                    ));
+                                  })()}
                                 </div>
                                 
-                                <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-                                  <motion.div 
-                                    className="h-full bg-blue-500"
-                                    initial={{ width: 0 }}
-                                    animate={{ width: `${Math.min((log.water / log.waterGoal) * 100, 100)}%` }}
-                                  />
+                                {/* Progress Bar */}
+                                <div className="space-y-1.5">
+                                  <div className="flex justify-between text-[10px] font-mono text-gray-500">
+                                    <span>Progress</span>
+                                    <span>{Math.round(Math.min((log.water / log.waterGoal) * 100, 100))}%</span>
+                                  </div>
+                                  <div className="h-2 bg-white/5 rounded-full overflow-hidden border border-white/5">
+                                    <motion.div 
+                                      className="h-full bg-blue-500"
+                                      initial={{ width: 0 }}
+                                      animate={{ width: `${Math.min((log.water / log.waterGoal) * 100, 100)}%` }}
+                                    />
+                                  </div>
                                 </div>
                               </div>
                             </motion.div>
@@ -2002,7 +2117,7 @@ export const ProGym = ({
                         </AnimatePresence>
                       </Card>
                     ) : id === 'movement' ? (
-                      <Card className="p-8 bg-brand-surface border-white/5 h-full">
+                      <Card className="p-6 md:p-8 bg-brand-surface border-white/5 h-full">
                         <div className="flex items-center justify-between">
                           <div 
                             className="flex items-center gap-3 cursor-pointer group"
@@ -2013,28 +2128,19 @@ export const ProGym = ({
                             </div>
                             <div className="flex flex-col">
                               <h3 className="font-bold text-gray-200">Movement</h3>
-                              <div className="flex items-center gap-2">
-                                <span className={cn("text-[10px] font-black uppercase tracking-widest", isStepsCollapsed ? "text-emerald-400" : "text-gray-500")}>
-                                  {isStepsCollapsed ? `${log.steps.toLocaleString()} / ${log.stepGoal.toLocaleString()}` : "Daily Progress"}
-                                </span>
-                                {isStepsCollapsed ? <ChevronDown className="w-3 h-3 text-gray-600" /> : <ChevronUp className="w-3 h-3 text-gray-600" />}
-                              </div>
+                              <span className={cn("text-[10px] font-black uppercase tracking-widest", isStepsCollapsed ? "text-emerald-400" : "text-gray-500")}>
+                                {isStepsCollapsed ? `${log.steps.toLocaleString()} / ${log.stepGoal.toLocaleString()}` : "Daily Progress"}
+                              </span>
                             </div>
                           </div>
-                          {!isStepsCollapsed && (
-                            <div className="flex items-center gap-1">
-                              <input 
-                                type="number"
-                                value={log.steps}
-                                onChange={(e) => {
-                                  const val = parseInt(e.target.value) || 0;
-                                  setLog({ ...log, steps: val });
-                                }}
-                                className="w-20 bg-white/5 border border-white/10 rounded px-2 py-0.5 text-right font-mono text-sm text-gray-200 focus:border-emerald-500 outline-none transition-colors"
-                              />
-                              <span className="text-sm text-gray-500 font-mono">/ {log.stepGoal.toLocaleString()}</span>
-                            </div>
-                          )}
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className="p-1 text-gray-400 hover:text-white"
+                            onClick={() => setIsStepsCollapsed(!isStepsCollapsed)}
+                          >
+                            {isStepsCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+                          </Button>
                         </div>
                         
                         <AnimatePresence>
@@ -2045,81 +2151,68 @@ export const ProGym = ({
                               exit={{ height: 0, opacity: 0 }}
                               className="overflow-hidden"
                             >
-                              <div className="space-y-4 pt-6">
-                                <div className="space-y-4">
-                                  <div className="flex gap-2">
+                              <div className="space-y-4 pt-5">
+                                {/* Dedicated Counter Row */}
+                                <div className="flex items-center justify-between bg-black/30 border border-white/10 rounded-xl p-2.5 sm:p-3 gap-1.5 sm:gap-2">
+                                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                                     <Button 
                                       variant="outline" 
-                                      className="flex-none w-10 border-white/5 hover:border-red-500/30 p-0"
-                                      onClick={() => updateSteps(-1000)}
-                                    >
-                                      <Minus className="w-3 h-3 text-red-400" />
-                                    </Button>
-                                    <div className="flex-1 flex gap-2">
-                                      <Button 
-                                        variant="outline" 
-                                        className="flex-1 border-white/5 text-xs"
-                                        onClick={() => updateSteps(1000)}
-                                      >
-                                        +1k Steps
-                                      </Button>
-                                      <Button 
-                                        variant="outline" 
-                                        className="flex-1 border-white/5 text-xs"
-                                        onClick={() => updateSteps(5000)}
-                                      >
-                                        +5k Steps
-                                      </Button>
-                                    </div>
-                                  </div>
-
-                                  <div className="flex justify-end pt-2">
-                                    <Button 
                                       size="sm"
-                                      onClick={saveSteps}
-                                      className={cn(
-                                        "gap-2 font-black text-[10px] uppercase h-8 px-4 transition-all duration-300",
-                                        isSavingSteps 
-                                          ? "bg-green-500 hover:bg-green-600 text-brand-dark" 
-                                          : "bg-emerald-500 hover:bg-emerald-600 text-white"
-                                      )}
+                                      className="w-7 h-7 sm:w-8 sm:h-8 p-0 border-white/10 hover:border-emerald-500/40 text-emerald-400 shrink-0"
+                                      onClick={() => updateSteps(-500)}
                                     >
-                                      {isSavingSteps ? (
-                                        <>
-                                          <Check className="w-3 h-3" />
-                                          Synced
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Save className="w-3 h-3" />
-                                          Save Steps
-                                        </>
-                                      )}
+                                      <Minus className="w-3.5 h-3.5" />
                                     </Button>
-                                  </div>
-
-                                  <div className="px-1 pt-2">
                                     <input 
-                                      type="range"
-                                      min="0"
-                                      max={log.stepGoal * 2}
-                                      step="100"
+                                      type="number"
                                       value={log.steps}
                                       onChange={(e) => {
-                                        const val = parseInt(e.target.value);
+                                        const val = parseInt(e.target.value) || 0;
                                         setLog({ ...log, steps: val });
                                       }}
-                                      className="w-full h-1.5 bg-white/5 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                                      className="w-18 sm:w-20 bg-white/5 border border-white/10 rounded-lg px-1.5 py-1 text-center font-mono text-xs sm:text-sm font-bold text-gray-100 focus:border-emerald-500 outline-none transition-colors"
                                     />
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm"
+                                      className="w-7 h-7 sm:w-8 sm:h-8 p-0 border-white/10 hover:border-emerald-500/40 text-emerald-400 shrink-0"
+                                      onClick={() => updateSteps(500)}
+                                    >
+                                      <Plus className="w-3.5 h-3.5" />
+                                    </Button>
                                   </div>
+                                  <span className="text-[11px] sm:text-xs font-mono font-bold text-gray-400 shrink-0 whitespace-nowrap">
+                                    / {log.stepGoal.toLocaleString()}
+                                  </span>
                                 </div>
 
-                                <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-                                  <motion.div 
-                                    className="h-full bg-emerald-500"
-                                    initial={{ width: 0 }}
-                                    animate={{ width: `${Math.min((log.steps / log.stepGoal) * 100, 100)}%` }}
-                                  />
+                                {/* Quick Presets */}
+                                <div className="flex gap-2">
+                                  {[500, 1000, 2000, 5000].map((amount) => (
+                                    <Button 
+                                      key={amount}
+                                      variant="outline" 
+                                      className="flex-1 border-white/10 bg-white/[0.02] hover:border-emerald-500/40 hover:bg-emerald-500/10 text-xs font-bold text-emerald-400 py-2"
+                                      onClick={() => updateSteps(amount)}
+                                    >
+                                      +{amount >= 1000 ? `${amount / 1000}k` : amount} Steps
+                                    </Button>
+                                  ))}
+                                </div>
+
+                                {/* Progress Bar */}
+                                <div className="space-y-1.5">
+                                  <div className="flex justify-between text-[10px] font-mono text-gray-500">
+                                    <span>Progress</span>
+                                    <span>{Math.round(Math.min((log.steps / log.stepGoal) * 100, 100))}%</span>
+                                  </div>
+                                  <div className="h-2 bg-white/5 rounded-full overflow-hidden border border-white/5">
+                                    <motion.div 
+                                      className="h-full bg-emerald-500"
+                                      initial={{ width: 0 }}
+                                      animate={{ width: `${Math.min((log.steps / log.stepGoal) * 100, 100)}%` }}
+                                    />
+                                  </div>
                                 </div>
                               </div>
                             </motion.div>
@@ -2145,12 +2238,20 @@ export const ProGym = ({
                   <Dumbbell className="w-5 h-5 text-brand-primary" />
                 </div>
                 <div className="flex flex-col">
-                  <h3 className="font-bold text-gray-100">
-                    {log?.useManualWorkout ? 'Manual Training Log' : 'Prescribed Training'}
-                  </h3>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-bold text-gray-100 text-lg sm:text-xl">
+                      {log?.useManualWorkout ? 'Manual Training Log' : 'Prescribed Training'}
+                    </h3>
+                    {workoutDay?.focus && (
+                      <Badge className="bg-brand-primary/10 text-brand-primary border-brand-primary/20 font-bold text-xs py-0.5 px-2">
+                        {workoutDay.focus}
+                      </Badge>
+                    )}
+                  </div>
                   {!isTrainingCollapsed && (
-                    <span className="text-[10px] font-black text-brand-primary/60 uppercase tracking-widest mt-0.5">
+                    <span className="text-[11px] font-mono font-bold text-brand-primary/80 uppercase tracking-wider mt-0.5">
                       {parseLocalDate(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                      {workoutDay?.focus ? ` · ${workoutDay.focus.toUpperCase()}` : ''}
                     </span>
                   )}
                   {isTrainingCollapsed && (
@@ -2158,7 +2259,9 @@ export const ProGym = ({
                       {(() => {
                         const { completed, total } = getTrainingTotals();
                         return (
-                          <span className="text-[10px] font-mono text-brand-primary font-bold">{completed} / {total} EXERCISES DONE</span>
+                          <span className="text-[10px] font-mono text-brand-primary font-bold">
+                            {workoutDay?.focus ? `${workoutDay.focus.toUpperCase()} · ` : ''}{completed} / {total} EXERCISES DONE
+                          </span>
                         );
                       })()}
                     </div>
@@ -2272,263 +2375,91 @@ export const ProGym = ({
               )}
 
                 <div className="space-y-4">
-                  <div className="p-4 bg-white/[0.02] rounded-xl border border-white/5">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <span className="text-[10px] font-black uppercase text-gray-500 tracking-widest block">Warm-Up Sequence</span>
-                        {(log?.useManualWorkout || !latestReport) && (
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={() => addManualExercise('warmUp')}
-                            className="h-6 px-2 text-[9px] font-black uppercase bg-brand-primary/10 text-brand-primary border border-brand-primary/20 hover:bg-brand-primary/20"
-                          >
-                            <Plus className="w-3 h-3 mr-1" /> Add
-                          </Button>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 bg-white/5 p-1 rounded-lg">
-                        <button 
-                          onClick={() => setMeasurementUnits(prev => ({ ...prev, weight: 'kg' }))}
-                          className={cn("text-[9px] font-black px-2 py-1 rounded transition-all", measurementUnits.weight === 'kg' ? "bg-brand-primary text-brand-dark" : "text-gray-500")}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-mono font-black uppercase text-gray-400 tracking-widest">
+                        WARM-UP SEQUENCE
+                      </span>
+                      {(log?.useManualWorkout || !latestReport) && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => addManualExercise('warmUp')}
+                          className="h-7 px-2.5 text-xs font-bold bg-brand-primary/10 text-brand-primary border border-brand-primary/20 hover:bg-brand-primary/20"
                         >
-                          KG
-                        </button>
-                        <button 
-                          onClick={() => setMeasurementUnits(prev => ({ ...prev, weight: 'lbs' }))}
-                          className={cn("text-[9px] font-black px-2 py-1 rounded transition-all", measurementUnits.weight === 'lbs' ? "bg-brand-primary text-brand-dark" : "text-gray-500")}
-                        >
-                          LBS
-                        </button>
-                      </div>
+                          <Plus className="w-3.5 h-3.5 mr-1" /> Add Warm-Up
+                        </Button>
+                      )}
                     </div>
-                    <div className="overflow-x-auto -mx-4 px-4 scrollbar-hide">
-                      <table className="w-full text-left min-w-[650px]">
-                        <thead className="text-[10px] uppercase tracking-widest text-gray-600 border-b border-white/5">
-                          <tr>
-                            <th className="pb-2 font-bold w-[40px] text-center px-0"></th>
-                            <th className="pb-2 font-bold w-1/3">Exercise</th>
-                            <th className="pb-2 font-bold px-2 text-center w-24">Sets</th>
-                            <th className="pb-2 font-bold px-2 text-center w-32">Reps</th>
-                            <th className="pb-2 font-bold px-2 text-center w-24">Time</th>
-                            <th className="pb-2 font-bold min-w-[100px] text-center">Weight ({measurementUnits.weight})</th>
-                          </tr>
-                        </thead>
-                        <tbody className="text-xs">
-                          {(Array.isArray(workoutDay?.warmUp) ? workoutDay.warmUp : (typeof workoutDay?.warmUp === 'string' ? workoutDay.warmUp : '').split(/,|\n/).filter(line => typeof line === 'string' && line.trim())).map((ex, i) => {
-                            const { name, sets, reps, url } = parseExercise(ex);
-                            const exerciseId = `warmup-${i}`;
-                            const isCompleted = log?.workoutData?.[exerciseId]?.completed || false;
-                            
-                            return (
-                              <tr key={i} className={cn(
-                                "border-b border-white/[0.02] last:border-0 hover:bg-white/[0.01] transition-all",
-                                isCompleted && "opacity-40"
-                              )}>
-                                <td className="py-3 px-0 text-center">
-                                  <button 
-                                    onClick={() => handleExerciseToggle(exerciseId)}
-                                    className={cn(
-                                      "w-5 h-5 rounded-full border flex items-center justify-center transition-all",
-                                      isCompleted ? "bg-brand-primary border-brand-primary text-brand-dark" : "border-white/10 hover:border-brand-primary/50"
-                                    )}
-                                  >
-                                    {isCompleted && <Check className="w-3 h-3" />}
-                                  </button>
-                                </td>
-                                <td className="py-3 text-brand-primary font-bold">
-                                  {(log?.useManualWorkout || !latestReport) ? (
-                                    <div className="flex items-center gap-2">
-                                      <input 
-                                        type="text"
-                                        className="bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-brand-primary outline-none focus:border-brand-primary w-full"
-                                        value={name}
-                                        onChange={(e) => updateManualExerciseName('warmUp', i, e.target.value)}
-                                      />
-                                      <button 
-                                        onClick={() => removeManualExercise('warmUp', i)}
-                                        className="text-red-500/50 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                      >
-                                        <Minus className="w-3 h-3" />
-                                      </button>
-                                    </div>
-                                  ) : (
-  <a 
-    href={getSearchUrl(name, 'Workouts')} 
-    target="_blank" 
-    rel="noopener noreferrer" 
-    className="hover:underline flex items-center gap-1"
-  >
-    {name} <ExternalLink className="w-2.5 h-2.5 opacity-50" />
-  </a>
-)}
-                                </td>
-                                <td className="py-3 px-2">
-                                  <input 
-                                    type="text" 
-                                    placeholder={sets || '2-3'}
-                                    className="w-20 bg-white/5 border border-white/10 rounded px-1.5 py-1 text-center font-mono text-white focus:border-brand-primary outline-none transition-colors"
-                                    value={log?.workoutData?.[exerciseId]?.sets || ''}
-                                    onChange={(e) => handleTrainingUpdate(exerciseId, 'sets', e.target.value)}
-                                  />
-                                </td>
-                                <td className="py-3 px-2">
-                                  <input 
-                                    type="text" 
-                                    placeholder={reps || '12-15'}
-                                    className="w-28 bg-white/5 border border-white/10 rounded px-1.5 py-1 text-center font-mono text-white focus:border-brand-primary outline-none transition-colors"
-                                    value={log?.workoutData?.[exerciseId]?.reps || ''}
-                                    onChange={(e) => handleTrainingUpdate(exerciseId, 'reps', e.target.value)}
-                                  />
-                                </td>
-                                <td className="py-3 px-2">
-                                  <input 
-                                    type="text" 
-                                    placeholder="0s"
-                                    className="w-20 bg-white/5 border border-white/10 rounded px-1.5 py-1 text-center font-mono text-white focus:border-brand-primary outline-none transition-colors"
-                                    value={log?.workoutData?.[exerciseId]?.time || ''}
-                                    onChange={(e) => handleTrainingUpdate(exerciseId, 'time', e.target.value)}
-                                  />
-                                </td>
-                                <td className="py-3 pr-2">
-                                  <input 
-                                    type="text" 
-                                    placeholder="0"
-                                    className="w-24 bg-white/5 border border-white/10 rounded px-1.5 py-1 text-center font-mono text-white focus:border-brand-primary outline-none transition-colors"
-                                    value={log?.workoutData?.[exerciseId]?.weight || ''}
-                                    onChange={(e) => handleTrainingUpdate(exerciseId, 'weight', e.target.value)}
-                                  />
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+
+                    <div className="space-y-3">
+                      {(Array.isArray(workoutDay?.warmUp) 
+                        ? workoutDay.warmUp 
+                        : (typeof workoutDay?.warmUp === 'string' ? workoutDay.warmUp : '').split(/,|\n/).filter(line => typeof line === 'string' && line.trim())
+                      ).map((ex, i) => (
+                        <ExerciseCard
+                          key={`warmup-${i}`}
+                          exerciseId={`warmup-${i}`}
+                          exRaw={ex}
+                          isManual={log?.useManualWorkout || !latestReport}
+                          section="warmUp"
+                          index={i}
+                          log={log}
+                          measurementUnits={measurementUnits}
+                          onToggle={handleExerciseToggle}
+                          onSetRowUpdate={handleSetRowUpdate}
+                          onAddSetRow={handleAddSetRow}
+                          onRemoveSetRow={handleRemoveSetRow}
+                          onUpdateManualName={updateManualExerciseName}
+                          onRemoveManual={removeManualExercise}
+                          parseExercise={parseExercise}
+                          getSearchUrl={getSearchUrl}
+                        />
+                      ))}
                     </div>
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between pl-1">
-                    <span className="text-[10px] font-black uppercase text-brand-primary tracking-widest block">{workoutDay?.focus || 'Primary Training Grid'}</span>
+                <div className="space-y-3 pt-3 border-t border-white/5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-mono font-black uppercase text-gray-400 tracking-widest">
+                      {workoutDay?.focus ? `${workoutDay.focus.toUpperCase()} (MAIN WORK)` : 'MAIN WORKOUT'}
+                    </span>
                     {(log?.useManualWorkout || !latestReport) && (
                       <Button 
                         variant="ghost" 
                         size="sm" 
                         onClick={() => addManualExercise('mainWork')}
-                        className="h-6 px-2 text-[9px] font-black uppercase bg-brand-primary/10 text-brand-primary border border-brand-primary/20 hover:bg-brand-primary/20"
+                        className="h-7 px-2.5 text-xs font-bold bg-brand-primary/10 text-brand-primary border border-brand-primary/20 hover:bg-brand-primary/20"
                       >
-                        <Plus className="w-3 h-3 mr-1" /> Add Exercise
+                        <Plus className="w-3.5 h-3.5 mr-1" /> Add Exercise
                       </Button>
                     )}
                   </div>
-                  <div className="overflow-x-auto -mx-4 px-4 scrollbar-hide">
-                    <table className="w-full text-left min-w-[650px]">
-                      <thead className="text-[10px] uppercase tracking-widest text-gray-600 border-b border-brand-primary/10">
-                        <tr>
-                          <th className="pb-2 font-bold w-[40px] text-center px-0"></th>
-                          <th className="pb-2 font-bold w-1/3">Exercise Pattern</th>
-                          <th className="pb-2 font-bold px-2 text-center w-24">Sets</th>
-                          <th className="pb-2 font-bold px-2 text-center w-32">Reps</th>
-                          <th className="pb-2 font-bold px-2 text-center w-24">Time</th>
-                          <th className="pb-2 font-bold min-w-[100px] text-center">Weight ({measurementUnits.weight})</th>
-                        </tr>
-                      </thead>
-                      <tbody className="text-sm">
-                        {(Array.isArray(workoutDay?.mainWork) ? workoutDay.mainWork : (typeof workoutDay?.mainWork === 'string' ? workoutDay.mainWork : '').split('\n').filter(line => typeof line === 'string' && line.trim())).map((ex, i) => {
-                          const exerciseId = `main-${i}`;
-                          const isCompleted = log?.workoutData?.[exerciseId]?.completed || false;
-                          const { name, sets, reps, url } = parseExercise(ex);
-                          
-                          return (
-                            <tr key={i} className={cn(
-                              "border-b border-white/[0.02] last:border-0 hover:bg-brand-primary/[0.02] transition-all group",
-                              isCompleted && "opacity-40"
-                            )}>
-                               <td className="py-4 px-0 text-center">
-                                  <button 
-                                    onClick={() => handleExerciseToggle(exerciseId)}
-                                    className={cn(
-                                      "w-5 h-5 rounded-full border flex items-center justify-center transition-all",
-                                      isCompleted ? "bg-brand-primary border-brand-primary text-brand-dark" : "border-white/10 hover:border-brand-primary/50"
-                                    )}
-                                  >
-                                    {isCompleted && <Check className="w-3 h-3" />}
-                                  </button>
-                                </td>
-                                <td className="py-4 text-brand-primary font-bold">
-                                  {(log?.useManualWorkout || !latestReport) ? (
-                                    <div className="flex items-center gap-2">
-                                      <input 
-                                        type="text"
-                                        className="bg-white/5 border border-white/10 rounded px-2 py-1 text-sm text-brand-primary outline-none focus:border-brand-primary w-full font-bold"
-                                        value={name}
-                                        onChange={(e) => updateManualExerciseName('mainWork', i, e.target.value)}
-                                      />
-                                      <button 
-                                        onClick={() => removeManualExercise('mainWork', i)}
-                                        className="text-red-500/50 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                      >
-                                        <Minus className="w-3 h-3" />
-                                      </button>
-                                    </div>
-                                  ) : (
-                                    <div className="flex items-center gap-3">
-  <div className="w-6 h-6 rounded-md bg-white/5 flex items-center justify-center">
-    <Dumbbell className="w-3 h-3 text-gray-600" />
-  </div>
-  <a 
-    href={getSearchUrl(name, 'Workouts')} 
-    target="_blank" 
-    rel="noopener noreferrer"
-    className="text-brand-primary font-bold hover:underline flex items-center gap-1"
-  >
-    {name} <ExternalLink className="w-2.5 h-2.5 opacity-50" />
-  </a>
-</div>
-                                  )}
-                               </td>
-                              <td className="py-4 px-4">
-                                <input 
-                                  type="text" 
-                                  placeholder={sets || '3-4'}
-                                  className="w-20 bg-white/5 border border-white/10 rounded px-1 py-1 text-center font-mono text-white focus:border-brand-primary outline-none transition-colors"
-                                  value={log?.workoutData?.[exerciseId]?.sets || ''}
-                                  onChange={(e) => handleTrainingUpdate(exerciseId, 'sets', e.target.value)}
-                                />
-                              </td>
-                               <td className="py-4 px-4">
-                                 <input 
-                                  type="text" 
-                                  placeholder={reps || '8-12'}
-                                  className="w-28 bg-white/5 border border-white/10 rounded px-1 py-1 text-center font-mono text-white focus:border-brand-primary outline-none transition-colors"
-                                  value={log?.workoutData?.[exerciseId]?.reps || ''}
-                                  onChange={(e) => handleTrainingUpdate(exerciseId, 'reps', e.target.value)}
-                                />
-                               </td>
-                               <td className="py-4 px-2 text-center">
-                                 <input 
-                                  type="text" 
-                                  placeholder="0s"
-                                  className="w-20 bg-white/5 border border-white/10 rounded px-1 py-1 text-center font-mono text-white focus:border-brand-primary outline-none transition-colors"
-                                  value={log?.workoutData?.[exerciseId]?.time || ''}
-                                  onChange={(e) => handleTrainingUpdate(exerciseId, 'time', e.target.value)}
-                                 />
-                               </td>
-                               <td className="py-4 pr-2">
-                                <input 
-                                  type="text" 
-                                  placeholder="0"
-                                  className="w-24 bg-white/5 border border-white/10 rounded px-1 py-1 text-center font-mono text-white focus:border-brand-primary outline-none transition-colors"
-                                  value={log?.workoutData?.[exerciseId]?.weight || ''}
-                                  onChange={(e) => handleTrainingUpdate(exerciseId, 'weight', e.target.value)}
-                                />
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                  <div className="space-y-3">
+                    {(Array.isArray(workoutDay?.mainWork) 
+                      ? workoutDay.mainWork 
+                      : (typeof workoutDay?.mainWork === 'string' ? workoutDay.mainWork : '').split('\n').filter(line => typeof line === 'string' && line.trim())
+                    ).map((ex, i) => (
+                      <ExerciseCard
+                        key={`main-${i}`}
+                        exerciseId={`main-${i}`}
+                        exRaw={ex}
+                        isManual={log?.useManualWorkout || !latestReport}
+                        section="mainWork"
+                        index={i}
+                        log={log}
+                        measurementUnits={measurementUnits}
+                        onToggle={handleExerciseToggle}
+                        onSetRowUpdate={handleSetRowUpdate}
+                        onAddSetRow={handleAddSetRow}
+                        onRemoveSetRow={handleRemoveSetRow}
+                        onUpdateManualName={updateManualExerciseName}
+                        onRemoveManual={removeManualExercise}
+                        parseExercise={parseExercise}
+                        getSearchUrl={getSearchUrl}
+                      />
+                    ))}
                   </div>
 
                   <div className="mt-8 pt-6 border-t border-white/5">
@@ -2548,65 +2479,55 @@ export const ProGym = ({
       </Card>
 
           {/* Meal Log */}
-          <Card className="p-8 bg-brand-surface border-white/5">
-            <div className="flex items-center justify-between mb-6">
+          <Card className="p-6 md:p-8 bg-brand-surface border-white/5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-brand-primary/10 rounded-lg">
+                <div 
+                  className="p-2 bg-brand-primary/10 rounded-lg cursor-pointer hover:bg-brand-primary/20 transition-colors"
+                  onClick={() => setIsNutritionCollapsed(!isNutritionCollapsed)}
+                >
                   <Utensils className="w-5 h-5 text-brand-primary" />
                 </div>
-                <div className="flex flex-col">
-                  <h3 className="font-bold text-gray-100">Daily Nutrition Log</h3>
-                  {!isNutritionCollapsed && (
-                    <span className="text-[10px] font-black text-brand-primary/60 uppercase tracking-widest mt-0.5">
-                      {parseLocalDate(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
-                    </span>
-                  )}
-                  {isNutritionCollapsed && log?.meals && (
-                    <div className="flex items-center gap-3 mt-1">
-                      {(() => {
-                        const totals = getNutritionTotals();
-                        return (
-                          <>
-                            <span className="text-[10px] font-mono text-brand-primary font-bold">{totals.calories} CAL</span>
-                            <span className="text-[10px] font-mono text-gray-500">{totals.protein}P / {totals.fat}F / {totals.carbs}C</span>
-                            {log.weight ? (
-                              <span className="text-[10px] font-mono text-emerald-400 font-bold ml-2">WEIGHT: {log.weight}{log.weightUnit || measurementUnits.weight}</span>
-                            ) : null}
-                            <span className="text-[10px] font-mono text-blue-400 font-bold ml-2">WATER: {log.water}{log.waterUnit}</span>
-                          </>
-                        );
-                      })()}
-                    </div>
-                  )}
+                <div className="flex flex-col sm:flex-row sm:items-baseline gap-1.5 sm:gap-3">
+                  <h3 
+                    className="text-xl font-bold text-white cursor-pointer hover:text-brand-primary transition-colors"
+                    onClick={() => setIsNutritionCollapsed(!isNutritionCollapsed)}
+                  >
+                    Nutrition
+                  </h3>
+                  {(() => {
+                    const totals = getNutritionTotals();
+                    const targetCal = latestReport?.report?.healthMetrics?.recommendedCalorieLevel || 1790;
+                    const completedMealsCount = log?.meals?.filter(m => m.completed).length || 0;
+                    const totalMealsCount = log?.meals?.length || 0;
+                    return (
+                      <span className="text-xs sm:text-sm font-mono text-gray-400 font-medium">
+                        {totals.calories} / {targetCal} cal · {completedMealsCount}/{totalMealsCount} meals
+                      </span>
+                    );
+                  })()}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => setIsNutritionCollapsed(!isNutritionCollapsed)}
-                  className="text-gray-500 hover:text-white"
-                >
-                  {isNutritionCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-                </Button>
+
+              <div className="flex items-center gap-2 flex-wrap">
                 {!isNutritionCollapsed && (
                   <>
                     <Button 
                       variant="outline" 
                       size="sm" 
                       onClick={handleAddManualMeal}
-                      className="border-brand-primary/20 hover:bg-brand-primary/10 text-brand-primary h-7 px-2 text-[10px] font-black uppercase tracking-widest"
+                      className="border-brand-primary/20 hover:bg-brand-primary/10 text-brand-primary h-8 px-3 text-[11px] font-bold uppercase tracking-wider"
                     >
-                      <Plus className="w-3 h-3 mr-1" /> Add Meal
+                      <Plus className="w-3.5 h-3.5 mr-1" /> Add Meal
                     </Button>
                     {latestReport && (
                       <Button 
                         variant="outline" 
                         size="sm" 
                         onClick={importMealsFromPlan}
-                        className="border-brand-primary/20 hover:bg-brand-primary/10 text-brand-primary h-7 px-2 text-[10px] font-black uppercase tracking-widest"
+                        className="border-brand-primary/20 hover:bg-brand-primary/10 text-brand-primary h-8 px-3 text-[11px] font-bold uppercase tracking-wider"
                       >
-                        Sync from Plan
+                        Sync Plan
                       </Button>
                     )}
                   </>
@@ -2614,11 +2535,19 @@ export const ProGym = ({
                 <Badge className="bg-brand-primary/10 text-brand-primary border-brand-primary/20 font-black text-[10px]">
                   {log?.useManualWorkout ? 'MANUAL EDITS ENABLED' : 'GUIDED PLAN'}
                 </Badge>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setIsNutritionCollapsed(!isNutritionCollapsed)}
+                  className="text-gray-400 hover:text-white p-1.5"
+                >
+                  {isNutritionCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+                </Button>
               </div>
             </div>
 
             <AnimatePresence>
-              {!isNutritionCollapsed && (
+              {!isNutritionCollapsed && log?.meals && (
                 <motion.div
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: 'auto', opacity: 1 }}
@@ -2626,196 +2555,206 @@ export const ProGym = ({
                   transition={{ duration: 0.3 }}
                   className="overflow-hidden"
                 >
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                <thead className="text-[10px] uppercase tracking-widest text-gray-600 border-b border-brand-primary/10">
-                  <tr>
-                    <th className="pb-2 font-bold w-1/3">Meal</th>
-                    <th className="pb-2 font-bold px-4 text-center">Cal</th>
-                    <th className="pb-2 font-bold px-4 text-center">Prot</th>
-                    <th className="pb-2 font-bold px-4 text-center">Fat</th>
-                    <th className="pb-2 font-bold px-4 text-center">Carbs</th>
-                    <th className="pb-2 font-bold text-right">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="text-sm">
-                  {log.meals?.map((meal, i) => (
-                    <tr key={i} className="border-b border-white/[0.02] last:border-0 hover:bg-brand-primary/[0.02] transition-colors group">
-                      <td className="py-4">
-                        <div className="flex flex-col">
-                          {log.useManualWorkout ? (
-                            <div className="flex flex-col gap-1 mb-1">
-                              <select 
-                                className="bg-white/5 border border-white/10 rounded px-1 py-0.5 text-[9px] uppercase font-black text-gray-400 outline-none focus:border-brand-primary w-fit"
-                                value={meal.type}
-                                onChange={(e) => updateMealMacro(i, 'type' as any, e.target.value)}
-                              >
-                                <option value="breakfast">Breakfast</option>
-                                <option value="lunch">Lunch</option>
-                                <option value="dinner">Dinner</option>
-                                <option value="snack">Snack</option>
-                                <option value="other">Other</option>
-                              </select>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3">
+                    {log.meals.map((meal, i) => {
+                      const isCompleted = !!meal.completed;
+                      return (
+                        <div 
+                          key={i}
+                          className={cn(
+                            "p-4 sm:p-5 rounded-2xl border transition-all flex flex-col justify-between gap-3 relative group",
+                            isCompleted 
+                              ? "bg-emerald-500/[0.04] border-emerald-500/30" 
+                              : "bg-white/[0.02] border-white/10 hover:border-white/20"
+                          )}
+                        >
+                          {/* Header row of meal card */}
+                          <div className="flex items-center justify-between">
+                            <button
+                              type="button"
+                              onClick={() => toggleMealCompletion(i)}
+                              className={cn(
+                                "w-6 h-6 rounded-lg flex items-center justify-center transition-all cursor-pointer shrink-0",
+                                isCompleted 
+                                  ? "bg-emerald-500 text-black font-bold shadow-sm shadow-emerald-500/30" 
+                                  : "border border-white/20 hover:border-brand-primary text-transparent"
+                              )}
+                              title={isCompleted ? "Mark as unconsumed" : "Mark as consumed"}
+                            >
+                              <Check className="w-4 h-4 stroke-[3]" />
+                            </button>
+
+                            <div className="flex items-center gap-2">
+                              {log.useManualWorkout ? (
+                                <div className="flex items-center gap-1.5">
+                                  <select 
+                                    className="bg-black/40 border border-white/10 rounded px-1.5 py-0.5 text-[10px] uppercase font-mono font-bold text-gray-300 outline-none focus:border-brand-primary"
+                                    value={meal.type}
+                                    onChange={(e) => updateMealMacro(i, 'type' as any, e.target.value)}
+                                  >
+                                    <option value="breakfast">BREAKFAST</option>
+                                    <option value="lunch">LUNCH</option>
+                                    <option value="dinner">DINNER</option>
+                                    <option value="snack">SNACK</option>
+                                    <option value="other">OTHER</option>
+                                  </select>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveMeal(i)}
+                                    className="p-1 text-red-500/50 hover:text-red-500 transition-colors"
+                                    title="Delete meal"
+                                  >
+                                    <Minus className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <span className="text-[10px] font-mono font-black tracking-widest text-gray-400 uppercase">
+                                  {meal.type}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Meal Title */}
+                          <div>
+                            {log.useManualWorkout ? (
                               <input 
                                 type="text"
-                                className="bg-white/5 border border-white/10 rounded px-2 py-1 text-sm text-brand-primary outline-none focus:border-brand-primary w-full font-bold"
+                                className="bg-black/40 border border-white/10 rounded-lg px-2.5 py-1 text-sm font-bold text-brand-primary outline-none focus:border-brand-primary w-full"
                                 value={meal.name}
                                 onChange={(e) => updateMealMacro(i, 'name', e.target.value)}
+                                placeholder="Meal Name"
                               />
-                            </div>
-                          ) : (
-                            <>
-                              <span className="text-[10px] uppercase font-black text-gray-500 mb-1">{meal.type}</span>
+                            ) : (
                               <a 
                                 href={getSearchUrl(meal.name, 'Nutrition')} 
                                 target="_blank" 
                                 rel="noopener noreferrer" 
-                                className="text-brand-primary font-bold hover:underline flex items-center gap-1"
+                                className="text-base font-bold text-white hover:text-brand-primary transition-colors inline-flex items-center gap-1.5 leading-snug"
                               >
-                                {meal.name} <ExternalLink className="w-2.5 h-2.5 opacity-50" />
+                                {meal.name} <ExternalLink className="w-3.5 h-3.5 opacity-40 shrink-0" />
                               </a>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-4 px-4">
-                        <input 
-                          type="text" 
-                          placeholder="-"
-                          disabled={!log.useManualWorkout}
-                          className={cn(
-                            "w-12 bg-white/5 border border-white/10 rounded px-2 py-1 text-center font-mono text-white outline-none transition-colors",
-                            log.useManualWorkout ? "focus:border-brand-primary" : "opacity-50"
-                          )}
-                          value={meal.calories || ''}
-                          onChange={(e) => updateMealMacro(i, 'calories', e.target.value)}
-                        />
-                      </td>
-                      <td className="py-4 px-4">
-                        <input 
-                          type="text" 
-                          placeholder="-"
-                          disabled={!log.useManualWorkout}
-                          className={cn(
-                            "w-12 bg-white/5 border border-white/10 rounded px-2 py-1 text-center font-mono text-white outline-none transition-colors",
-                            log.useManualWorkout ? "focus:border-brand-primary" : "opacity-50"
-                          )}
-                          value={meal.protein || ''}
-                          onChange={(e) => updateMealMacro(i, 'protein', e.target.value)}
-                        />
-                      </td>
-                      <td className="py-4 px-4">
-                        <input 
-                          type="text" 
-                          placeholder="-"
-                          disabled={!log.useManualWorkout}
-                          className={cn(
-                            "w-12 bg-white/5 border border-white/10 rounded px-2 py-1 text-center font-mono text-white outline-none transition-colors",
-                            log.useManualWorkout ? "focus:border-brand-primary" : "opacity-50"
-                          )}
-                          value={meal.fat || ''}
-                          onChange={(e) => updateMealMacro(i, 'fat', e.target.value)}
-                        />
-                      </td>
-                      <td className="py-4 px-4">
-                        <input 
-                          type="text" 
-                          placeholder="-"
-                          disabled={!log.useManualWorkout}
-                          className={cn(
-                            "w-12 bg-white/5 border border-white/10 rounded px-2 py-1 text-center font-mono text-white outline-none transition-colors",
-                            log.useManualWorkout ? "focus:border-brand-primary" : "opacity-50"
-                          )}
-                          value={meal.carbs || ''}
-                          onChange={(e) => updateMealMacro(i, 'carbs', e.target.value)}
-                        />
-                      </td>
-                      <td className="py-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          {log.useManualWorkout && (
-                            <button 
-                              onClick={() => handleRemoveMeal(i)}
-                              className="p-2 text-red-500/50 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"
-                            >
-                              <Minus className="w-4 h-4" />
-                            </button>
-                          )}
-                          <button 
-                            onClick={() => toggleMealCompletion(i)}
-                            className={cn(
-                              "p-2 rounded-lg transition-all",
-                              meal.completed ? "bg-brand-primary/20 text-brand-primary" : "bg-white/5 text-gray-500 hover:bg-white/10"
                             )}
-                          >
-                            {meal.completed ? <CheckCircle2 className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
-                          </button>
+                          </div>
+
+                          {/* Macros Pills / Editable Inputs */}
+                          {log.useManualWorkout ? (
+                            <div className="grid grid-cols-4 gap-1.5 pt-1">
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-[9px] font-mono text-gray-500 uppercase text-center">Cal</span>
+                                <input 
+                                  type="text" 
+                                  placeholder="0"
+                                  className="w-full bg-black/40 border border-white/10 rounded px-1.5 py-1 text-center font-mono text-xs text-white outline-none focus:border-brand-primary"
+                                  value={meal.calories || ''}
+                                  onChange={(e) => updateMealMacro(i, 'calories', e.target.value)}
+                                />
+                              </div>
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-[9px] font-mono text-gray-500 uppercase text-center">Prot</span>
+                                <input 
+                                  type="text" 
+                                  placeholder="0"
+                                  className="w-full bg-black/40 border border-white/10 rounded px-1.5 py-1 text-center font-mono text-xs text-white outline-none focus:border-brand-primary"
+                                  value={meal.protein || ''}
+                                  onChange={(e) => updateMealMacro(i, 'protein', e.target.value)}
+                                />
+                              </div>
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-[9px] font-mono text-gray-500 uppercase text-center">Fat</span>
+                                <input 
+                                  type="text" 
+                                  placeholder="0"
+                                  className="w-full bg-black/40 border border-white/10 rounded px-1.5 py-1 text-center font-mono text-xs text-white outline-none focus:border-brand-primary"
+                                  value={meal.fat || ''}
+                                  onChange={(e) => updateMealMacro(i, 'fat', e.target.value)}
+                                />
+                              </div>
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-[9px] font-mono text-gray-500 uppercase text-center">Carb</span>
+                                <input 
+                                  type="text" 
+                                  placeholder="0"
+                                  className="w-full bg-black/40 border border-white/10 rounded px-1.5 py-1 text-center font-mono text-xs text-white outline-none focus:border-brand-primary"
+                                  value={meal.carbs || ''}
+                                  onChange={(e) => updateMealMacro(i, 'carbs', e.target.value)}
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                              <span className="bg-white/5 border border-white/5 rounded-lg px-2.5 py-1 text-xs font-mono font-medium text-gray-300">
+                                {meal.calories || 0} cal
+                              </span>
+                              <span className="bg-white/5 border border-white/5 rounded-lg px-2.5 py-1 text-xs font-mono font-medium text-gray-300">
+                                P {meal.protein || 0}g
+                              </span>
+                              <span className="bg-white/5 border border-white/5 rounded-lg px-2.5 py-1 text-xs font-mono font-medium text-gray-300">
+                                F {meal.fat || 0}g
+                              </span>
+                              <span className="bg-white/5 border border-white/5 rounded-lg px-2.5 py-1 text-xs font-mono font-medium text-gray-300">
+                                C {meal.carbs || 0}g
+                              </span>
+                            </div>
+                          )}
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </Card>
+                      );
+                    })}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </Card>
 
           {/* Measurements */}
-          <Card id="measurements-section" className="p-8 bg-brand-surface border-white/5">
-            <div className="flex items-center justify-between mb-8">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <Card id="measurements-section" className="p-6 md:p-8 bg-brand-surface border-white/5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 min-w-0">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-purple-500/10 rounded-lg">
+                  <div className="p-2 bg-purple-500/10 rounded-lg shrink-0">
                     <Ruler className="w-5 h-5 text-purple-500" />
                   </div>
-                  <h3 className="font-bold text-gray-100">Body Measurements</h3>
+                  <h3 className="font-bold text-gray-100 text-lg sm:text-xl shrink-0">Body Measurements</h3>
                 </div>
                 
-                <div className="flex gap-2 p-1 bg-brand-dark rounded-lg ml-0 sm:ml-4 scale-90 origin-left">
-                  {(['kg', 'lbs'] as const).map(u => (
-                    <button 
-                      key={u}
-                      onClick={() => setMeasurementUnits({...measurementUnits, weight: u})}
-                      className={cn(
-                        "px-3 py-1 rounded text-[10px] uppercase font-black tracking-widest transition-all",
-                        measurementUnits.weight === u ? "bg-brand-primary text-brand-dark shadow-[0_0_8px_rgba(16,185,129,0.3)]" : "text-gray-500 hover:text-gray-300"
-                      )}
-                    >
-                      {u}
-                    </button>
-                  ))}
-                  <div className="w-[1px] bg-white/10 mx-1 my-1" />
-                  {(['cm', 'in'] as const).map(u => (
-                    <button 
-                      key={u}
-                      onClick={() => setMeasurementUnits({...measurementUnits, length: u})}
-                      className={cn(
-                        "px-3 py-1 rounded text-[10px] uppercase font-black tracking-widest transition-all",
-                        measurementUnits.length === u ? "bg-purple-500 text-white shadow-[0_0_8px_rgba(168,85,247,0.3)]" : "text-gray-500 hover:text-gray-300"
-                      )}
-                    >
-                      {u}
-                    </button>
-                  ))}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <UnitToggle<'lbs' | 'kg'>
+                    unitA="lbs"
+                    unitB="kg"
+                    labelA="[LBS]"
+                    labelB="[KG]"
+                    value={measurementUnits.weight}
+                    onChange={(w) => setMeasurementUnits(prev => ({ ...prev, weight: w }))}
+                    size="sm"
+                  />
+                  <UnitToggle<'in' | 'cm'>
+                    unitA="in"
+                    unitB="cm"
+                    labelA="[IN]"
+                    labelB="[CM]"
+                    value={measurementUnits.length}
+                    onChange={(l) => setMeasurementUnits(prev => ({ ...prev, length: l }))}
+                    size="sm"
+                  />
                 </div>
               </div>
-              <div className="flex gap-2">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => setIsMeasurementsExpanded(!isMeasurementsExpanded)}
-                  className="text-gray-500 hover:text-white"
-                >
-                  {isMeasurementsExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                </Button>
+
+              <div className="flex items-center gap-2 shrink-0">
                 <Button 
                   variant="outline" 
                   size="sm" 
                   onClick={() => setIsAddingMeasurement(true)}
-                  className="border-white/10 hover:bg-white/5"
+                  className="border-white/10 hover:bg-white/5 whitespace-nowrap h-8 text-xs font-medium"
                 >
                   {hasDayMeasurement ? 'Update Log' : 'Log New'}
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setIsMeasurementsExpanded(!isMeasurementsExpanded)}
+                  className="text-gray-400 hover:text-white p-1.5 h-8 w-8"
+                >
+                  {isMeasurementsExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                 </Button>
               </div>
             </div>

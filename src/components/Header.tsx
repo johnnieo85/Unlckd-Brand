@@ -24,10 +24,10 @@ export interface HeaderProps {
   hasAccess: boolean | null;
   isPremium: boolean;
   userProfile: UserProfile | null;
-  activeTab: 'reports' | 'gym';
+  activeTab: 'reports' | 'gym' | 'client' | 'profile';
   step: string;
   setStep: (step: any) => void;
-  setActiveTab: (tab: 'reports' | 'gym') => void;
+  setActiveTab: (tab: 'reports' | 'gym' | 'client' | 'profile') => void;
   loadHistory: () => Promise<void>;
   handleSignIn: () => void;
   handleSignOut: () => void;
@@ -82,41 +82,60 @@ export const Header: React.FC<HeaderProps> = ({
 
           {user ? (
             <>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={async () => {
-                  setActiveTab('reports');
-                  setStep('history');
-                  await loadHistory();
-                }}
-                className={cn("gap-2 hover:bg-white/5", activeTab === 'reports' && step === 'history' && "text-brand-primary bg-white/5")}
-              >
-                <History className="w-4 h-4" />
-                My Reports
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => {
-                  if (!hasAccess) {
-                    setStep('no-access');
-                    return;
-                  }
-                  if (!isPremium) {
-                    setShowGymAuth(true);
-                  } else {
-                    setActiveTab('gym');
-                  }
-                }}
-                className={cn("gap-2 hover:bg-white/5", activeTab === 'gym' && "text-brand-primary bg-white/5")}
-              >
-                <Dumbbell className="w-4 h-4" />
-                Gym Hub
-                {!isPremium && <Lock className="w-3 h-3 text-gray-500" />}
-              </Button>
+              {/* Desktop Nav Pills (Hidden on Mobile per Section 5) */}
+              <div className="hidden md:flex items-center gap-2">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={async () => {
+                    setActiveTab('reports');
+                    setStep('history');
+                    await loadHistory();
+                  }}
+                  className={cn("gap-2 hover:bg-white/5", activeTab === 'reports' && step === 'history' && "text-brand-primary bg-white/5")}
+                >
+                  <History className="w-4 h-4" />
+                  My Reports
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => {
+                    if (!hasAccess) {
+                      setStep('no-access');
+                      return;
+                    }
+                    if (!isPremium) {
+                      setShowGymAuth(true);
+                    } else {
+                      setActiveTab('gym');
+                    }
+                  }}
+                  className={cn("gap-2 hover:bg-white/5", activeTab === 'gym' && "text-brand-primary bg-white/5")}
+                >
+                  <Dumbbell className="w-4 h-4" />
+                  Gym Hub
+                  {!isPremium && <Lock className="w-3 h-3 text-gray-500" />}
+                </Button>
+
+                {userProfile?.membershipTier === 'trainer' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setActiveTab('client')}
+                    className={cn("gap-2 hover:bg-white/5 text-amber-400 font-bold", activeTab === 'client' && "bg-amber-400/10 text-amber-400 border border-amber-400/30")}
+                  >
+                    Client Hub
+                  </Button>
+                )}
+              </div>
+
               <div className="flex items-center gap-3 pl-4 border-l border-white/10">
-                <div className="text-right hidden sm:block">
+                <div 
+                  className="text-right cursor-pointer group"
+                  onClick={() => setActiveTab('profile')}
+                  title="Open User Profile"
+                >
                   <div className="flex items-center gap-2 justify-end mb-0.5">
                     {userProfile && (
                       <Badge className="text-[8px] h-3.5 px-1 py-0 border-brand-primary/20 bg-brand-primary/10 text-brand-primary uppercase font-black leading-none mr-1">
@@ -128,7 +147,7 @@ export const Header: React.FC<HeaderProps> = ({
                     ) : (
                       <Badge className="text-[8px] h-3.5 px-1 py-0 border-red-500/20 bg-red-500/10 text-red-500 uppercase font-black leading-none">Restricted</Badge>
                     )}
-                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Signed In As</p>
+                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest hidden sm:block">Signed In</p>
                   </div>
                   <motion.div 
                     initial={false}
@@ -146,11 +165,11 @@ export const Header: React.FC<HeaderProps> = ({
                       ease: "easeInOut"
                     }}
                     className={cn(
-                      "text-xs font-medium truncate max-w-[160px] flex items-center justify-end gap-1.5",
+                      "text-xs font-medium truncate max-w-[140px] sm:max-w-[160px] flex items-center justify-end gap-1.5 group-hover:text-brand-primary transition-colors",
                       isPremium ? "text-amber-400" : "text-gray-300"
                     )}
                   >
-                    <span>{user.displayName || user.email}</span>
+                    <span>{userProfile?.fullName || user.displayName || user.email}</span>
                     {isPremium && (
                       <span className="bg-amber-400/20 px-1.5 py-0.5 rounded border border-amber-400/30 text-[9px] font-black tracking-tighter uppercase leading-none">
                         Premium
@@ -159,7 +178,7 @@ export const Header: React.FC<HeaderProps> = ({
                   </motion.div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="icon" onClick={onShowAccount} className="hover:bg-white/5 text-gray-400 hover:text-white" title="Account Settings">
+                  <Button variant="ghost" size="icon" onClick={() => setActiveTab('profile')} className={cn("hover:bg-white/5", activeTab === 'profile' ? "text-brand-primary bg-white/10" : "text-gray-400 hover:text-white")} title="Profile & Settings">
                     <Settings className="w-4 h-4" />
                   </Button>
                   <Button variant="ghost" size="icon" onClick={handleSignOut} className="hover:bg-white/5 text-gray-400 hover:text-white" title="Sign Out">

@@ -194,6 +194,29 @@ export interface UserProfile {
   habitList?: string[];
   xp?: number;
   streak?: number;
+  membershipTier?: 'standard' | 'trainer';
+  avatarUrl?: string;
+  fullName?: string;
+  height?: number;
+  heightUnit?: 'in' | 'cm' | 'ftin';
+  weight?: number;
+  weightUnit?: 'lbs' | 'kg';
+  goalWeight?: number;
+  bodyMeasurements?: {
+    neck?: number;
+    chest?: number;
+    waist?: number;
+    hips?: number;
+    leftArm?: number;
+    rightArm?: number;
+    leftThigh?: number;
+    rightThigh?: number;
+    calves?: number;
+    units?: {
+      length: 'cm' | 'in';
+      weight: 'kg' | 'lbs';
+    };
+  };
   monthlyGoal?: {
     title: string;
     description: string;
@@ -225,7 +248,7 @@ export interface DailyLog {
     [key: string]: boolean;
   };
   completedWorkouts: number;
-  workoutData?: Record<string, { weight: string; sets: string; reps: string; notes: string; time?: string; completed?: boolean }>;
+  workoutData?: Record<string, { weight?: string; sets?: string; reps?: string; notes?: string; time?: string; completed?: boolean; setRows?: Array<{ reps: string; weight: string; completed?: boolean }> }>;
   generalNotes?: string;
   lastUpdated?: any;
   useManualWorkout?: boolean;

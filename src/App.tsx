@@ -301,6 +301,8 @@ const SupplementSection = ({ supplements = [] }: { supplements?: any[] }) => {
 };
 
 import { ProGym } from './components/ProGym';
+import { ClientHub } from './components/ClientHub';
+import { ProfilePage } from './components/ProfilePage';
 import { gymService } from './services/gymService';
 
 const getSearchUrl = (title: string, category: 'Workouts' | 'Nutrition') => {
@@ -594,7 +596,7 @@ const LinkAuditModal = ({
 };
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'reports' | 'gym'>('reports');
+  const [activeTab, setActiveTab] = useState<'reports' | 'gym' | 'client' | 'profile'>('reports');
   const [latestReport, setLatestReport] = useState<SavedReport | null>(null);
   const [step, setStep] = useState<'landing' | 'intake' | 'photos' | 'progress-photos' | 'processing' | 'report' | 'history' | 'no-access' | 'error'>('landing');
   const [lastError, setLastError] = useState<string | null>(null);
@@ -1088,13 +1090,22 @@ export default function App() {
     setIsSigningIn(false);
     console.error("Auth detailed error:", error);
 
-    if (error?.code === 'auth/unauthorized-domain') {
+    const errorMessage = error?.message || String(error || '');
+    const errorCode = error?.code || '';
+
+    if (errorMessage.includes('requests-from-referer') || errorCode.includes('requests-from-referer') || errorMessage.includes('are-blocked')) {
+      const hostname = window.location.hostname;
+      setAuthError(`REFERRER RESTRICTION BLOCKED: Requests from domain '${hostname}' are blocked by Google Cloud API Key referrer restrictions. To fix this: Go to Google Cloud Console > APIs & Services > Credentials > Edit your Web API Key > set Application Restrictions to 'None' or add 'https://${hostname}/*' to the HTTP Referrers allowed list.`);
+      return;
+    }
+
+    if (errorCode === 'auth/unauthorized-domain' || errorMessage.includes('unauthorized-domain')) {
       const hostname = window.location.hostname;
       setAuthError(`DOMAIN NOT AUTHORIZED: The domain '${hostname}' is not in your Firebase Authorized Domains list. Go to Firebase Console > Authentication > Settings > Authorized Domains and add '${hostname}' and 'www.${hostname}'.`);
       return;
     }
 
-    if (error?.code === 'auth/popup-closed-by-user') {
+    if (errorCode === 'auth/popup-closed-by-user') {
       const isIframe = window.self !== window.top;
       if (isIframe) {
         setAuthError("The sign-in window was closed or blocked. In this preview, security rules may prevent the login. Try Email login or 'Open in Standard Tab'.");
@@ -1106,20 +1117,20 @@ export default function App() {
     
     let message = "Authentication failed. Please try again.";
     
-    if (error?.message?.includes('api-key-expired') || error?.code === 'auth/api-key-expired' || error?.code === 'auth/invalid-api-key') {
+    if (errorMessage.includes('api-key-expired') || errorCode === 'auth/api-key-expired' || errorCode === 'auth/invalid-api-key') {
       message = "FIREBASE CONFIGURATION ERROR: The Web API key in firebase-applet-config.json has expired or is invalid. Please renew or re-provision your Firebase API key.";
       setAuthError(message);
       return;
     }
 
-    const isSecurityError = error?.message?.includes('insecure') || error?.name === 'SecurityError';
+    const isSecurityError = errorMessage.includes('insecure') || error?.name === 'SecurityError';
     if (isSecurityError) {
       message = "Browser security settings blocked this action. This often happens in iframes or Private Browsing mode. Try opening the app in a new tab or use Email/Password sign-in.";
       setAuthError(message);
       return;
     }
 
-    switch (error?.code) {
+    switch (errorCode) {
       case 'auth/popup-blocked':
         message = "Popup was blocked by your browser. Please enable popups for this site.";
         break;
@@ -1139,7 +1150,7 @@ export default function App() {
         message = "Apple Sign-In is not enabled on this Firebase project. Go to Firebase Console > Authentication > Sign-in method and enable Apple.";
         break;
       case 'auth/internal-error':
-        if (error.message?.includes('partition')) {
+        if (errorMessage.includes('partition')) {
           message = "Browser cross-site restrictions (Partitioned Cookies) detected. Try using a non-private window or another browser.";
         }
         break;
@@ -1441,6 +1452,40 @@ export default function App() {
                   setStep('landing');
                   setActiveTab('reports');
                 }}
+              />
+            </motion.div>
+          ) : activeTab === 'client' ? (
+            <motion.div
+              key="client"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+            >
+              <ClientHub
+                userProfile={userProfile}
+                onProfileUpdate={refreshProfile}
+              />
+            </motion.div>
+          ) : activeTab === 'profile' ? (
+            <motion.div
+              key="profile"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+            >
+              <ProfilePage
+                userProfile={userProfile}
+                userEmail={user?.email || undefined}
+                userName={user?.displayName || undefined}
+                onProfileUpdate={refreshProfile}
+                setActiveTab={(tab) => {
+                  if (tab === 'client-hub') setActiveTab('client');
+                  else setActiveTab(tab);
+                }}
+                setStep={setStep}
+                loadHistory={loadHistory}
+                hasAccess={hasAccess || false}
+                isPremium={isPremium}
               />
             </motion.div>
           ) : (
