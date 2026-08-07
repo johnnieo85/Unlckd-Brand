@@ -156,16 +156,133 @@ export function ProgressReportModal({
   const filteredLogs = logs.filter(l => l.date <= todayStr && new Date(l.date) >= cutoffDate);
   const filteredMeasurements = measurements.filter(m => m.date <= todayStr && new Date(m.date) >= cutoffDate);
 
-  // Compute measurement changes
-  const sortedMeasurements = [...filteredMeasurements].sort((a, b) => a.date.localeCompare(b.date));
-  const firstM = sortedMeasurements[0] || (measurements.length > 0 ? measurements[measurements.length - 1] : null);
-  const latestM = sortedMeasurements[sortedMeasurements.length - 1] || (measurements.length > 0 ? measurements[0] : null);
+  // Collect and sort ALL body measurements chronologically (ASCENDING: oldest to newest)
+  const allMeasurementsSorted = [...measurements].sort((a, b) => a.date.localeCompare(b.date));
 
-  // User current stats
-  const currentWeight = latestM?.weight ?? (userProfile?.weight ? Number(userProfile.weight) : 185);
-  const startWeight = firstM?.weight ?? currentWeight;
+  // Collect weight entries across both measurements and daily logs
+  const weightDateMap = new Map<string, number>();
+
+  measurements.forEach(m => {
+    if (m.date && m.weight !== undefined && m.weight !== null && Number(m.weight) > 0) {
+      weightDateMap.set(m.date, Number(m.weight));
+    }
+  });
+
+  allGymLogs.forEach(l => {
+    if (l.date && l.weight !== undefined && l.weight !== null && Number(l.weight) > 0 && !weightDateMap.has(l.date)) {
+      weightDateMap.set(l.date, Number(l.weight));
+    }
+  });
+
+  const allWeightEntriesSorted = Array.from(weightDateMap.entries())
+    .map(([date, weight]) => ({ date, weight }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  // Compute weight start and latest values
+  const weightEntriesInTimeframe = allWeightEntriesSorted.filter(
+    w => w.date <= todayStr && new Date(w.date) >= cutoffDate
+  );
+
+  let startWeight = userProfile?.weight ? Number(userProfile.weight) : 185;
+  let currentWeight = userProfile?.weight ? Number(userProfile.weight) : 185;
+  let startWeightDate: string | null = null;
+  let latestWeightDate: string | null = null;
+
+  if (weightEntriesInTimeframe.length >= 2) {
+    const sEntry = weightEntriesInTimeframe[0];
+    const lEntry = weightEntriesInTimeframe[weightEntriesInTimeframe.length - 1];
+    startWeight = sEntry.weight;
+    currentWeight = lEntry.weight;
+    startWeightDate = sEntry.date;
+    latestWeightDate = lEntry.date;
+  } else if (weightEntriesInTimeframe.length === 1) {
+    const lEntry = weightEntriesInTimeframe[0];
+    currentWeight = lEntry.weight;
+    latestWeightDate = lEntry.date;
+    const earlierEntries = allWeightEntriesSorted.filter(w => w.date < lEntry.date);
+    if (earlierEntries.length > 0) {
+      startWeight = earlierEntries[0].weight; // Earliest recorded body measurement
+      startWeightDate = earlierEntries[0].date;
+    } else if (userProfile?.weight && Number(userProfile.weight) !== currentWeight) {
+      startWeight = Number(userProfile.weight);
+    } else {
+      startWeight = currentWeight;
+      startWeightDate = lEntry.date;
+    }
+  } else if (allWeightEntriesSorted.length >= 2) {
+    const sEntry = allWeightEntriesSorted[0];
+    const lEntry = allWeightEntriesSorted[allWeightEntriesSorted.length - 1];
+    startWeight = sEntry.weight;
+    currentWeight = lEntry.weight;
+    startWeightDate = sEntry.date;
+    latestWeightDate = lEntry.date;
+  } else if (allWeightEntriesSorted.length === 1) {
+    currentWeight = allWeightEntriesSorted[0].weight;
+    latestWeightDate = allWeightEntriesSorted[0].date;
+    if (userProfile?.weight && Number(userProfile.weight) !== currentWeight) {
+      startWeight = Number(userProfile.weight);
+    } else {
+      startWeight = currentWeight;
+      startWeightDate = currentWeight ? allWeightEntriesSorted[0].date : null;
+    }
+  }
+
   const weightChange = currentWeight - startWeight;
   const goalWeight = userProfile?.goalWeight ?? 175;
+
+  // Helper for computing site comparison (bodyFat, chest, waist, etc.)
+  const getSiteComparison = (field: keyof Measurement) => {
+    const validRecords = allMeasurementsSorted
+      .filter(m => m[field] !== undefined && m[field] !== null && Number(m[field]) > 0)
+      .map(m => ({ date: m.date, value: Number(m[field]) }));
+
+    if (validRecords.length === 0) return { start: null, latest: null };
+
+    const recordsInTimeframe = validRecords.filter(r => r.date <= todayStr && new Date(r.date) >= cutoffDate);
+
+    if (recordsInTimeframe.length >= 2) {
+      return {
+        start: recordsInTimeframe[0].value,
+        latest: recordsInTimeframe[recordsInTimeframe.length - 1].value
+      };
+    } else if (recordsInTimeframe.length === 1) {
+      const lRec = recordsInTimeframe[0];
+      const earlierRecs = validRecords.filter(r => r.date < lRec.date);
+      return {
+        start: earlierRecs.length > 0 ? earlierRecs[0].value : lRec.value,
+        latest: lRec.value
+      };
+    } else {
+      return {
+        start: validRecords[0].value,
+        latest: validRecords[validRecords.length - 1].value
+      };
+    }
+  };
+
+  const firstM = {
+    weight: startWeight,
+    bodyFat: getSiteComparison('bodyFat').start,
+    chest: getSiteComparison('chest').start ?? userProfile?.bodyMeasurements?.chest,
+    waist: getSiteComparison('waist').start ?? userProfile?.bodyMeasurements?.waist,
+    leftArm: getSiteComparison('leftArm').start ?? userProfile?.bodyMeasurements?.leftArm,
+    rightArm: getSiteComparison('rightArm').start ?? userProfile?.bodyMeasurements?.rightArm,
+    leftThigh: getSiteComparison('leftThigh').start ?? userProfile?.bodyMeasurements?.leftThigh,
+    rightThigh: getSiteComparison('rightThigh').start ?? userProfile?.bodyMeasurements?.rightThigh,
+    neck: getSiteComparison('neck').start ?? userProfile?.bodyMeasurements?.neck,
+  };
+
+  const latestM = {
+    weight: currentWeight,
+    bodyFat: getSiteComparison('bodyFat').latest,
+    chest: getSiteComparison('chest').latest ?? userProfile?.bodyMeasurements?.chest,
+    waist: getSiteComparison('waist').latest ?? userProfile?.bodyMeasurements?.waist,
+    leftArm: getSiteComparison('leftArm').latest ?? userProfile?.bodyMeasurements?.leftArm,
+    rightArm: getSiteComparison('rightArm').latest ?? userProfile?.bodyMeasurements?.rightArm,
+    leftThigh: getSiteComparison('leftThigh').latest ?? userProfile?.bodyMeasurements?.leftThigh,
+    rightThigh: getSiteComparison('rightThigh').latest ?? userProfile?.bodyMeasurements?.rightThigh,
+    neck: getSiteComparison('neck').latest ?? userProfile?.bodyMeasurements?.neck,
+  };
 
   const heightInches = userProfile?.height || 70;
   const heightFormatted = userProfile?.heightUnit === 'cm' 
@@ -939,8 +1056,14 @@ export function ProgressReportModal({
                     <thead>
                       <tr className="border-b border-white/10 text-gray-400 text-[10px] uppercase">
                         <th className="pb-3 font-bold">Measurement Site</th>
-                        <th className="pb-3 font-bold text-center">Start Value</th>
-                        <th className="pb-3 font-bold text-center">Latest Value</th>
+                        <th className="pb-3 font-bold text-center">
+                          Start Value
+                          {startWeightDate && <span className="block text-[8px] text-gray-500 font-mono tracking-normal capitalize">{startWeightDate}</span>}
+                        </th>
+                        <th className="pb-3 font-bold text-center">
+                          Latest Value
+                          {latestWeightDate && <span className="block text-[8px] text-gray-500 font-mono tracking-normal capitalize">{latestWeightDate}</span>}
+                        </th>
                         <th className="pb-3 font-bold text-right">Net Change</th>
                       </tr>
                     </thead>
