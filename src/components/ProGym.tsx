@@ -2308,17 +2308,6 @@ export const ProGym = ({
                   size="sm"
                 />
 
-                {!isTrainingCollapsed && latestReport && (
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="border-white/10 hover:bg-white/10 text-gray-300 h-8 px-2.5 text-[10px] font-black uppercase tracking-widest whitespace-nowrap"
-                    onClick={importWorkoutFromPlan}
-                  >
-                    Sync Plan
-                  </Button>
-                )}
-
                 {!isTrainingCollapsed && !latestReport && (
                   <Badge className="bg-brand-primary/10 text-brand-primary border-brand-primary/20 font-black text-[10px] py-1 px-2.5">
                     MANUAL MODE
@@ -2390,9 +2379,19 @@ export const ProGym = ({
                   <div className="space-y-6">
               {(log?.useManualWorkout || !latestReport) && (
                 <div className="space-y-4 mb-4">
-                  <div className="p-4 bg-brand-primary/5 border border-brand-primary/20 rounded-xl">
-                    <p className="text-xs font-bold text-brand-primary mb-2">Manual Entry Mode</p>
-                    <p className="text-[10px] text-brand-primary/60">Add exercises directly in the tables below.</p>
+                  <div className="p-4 bg-brand-primary/5 border border-brand-primary/20 rounded-xl flex items-center justify-between gap-4 flex-wrap">
+                    <div>
+                      <p className="text-xs font-bold text-brand-primary mb-1">Manual Entry Mode</p>
+                      <p className="text-[10px] text-brand-primary/60">Add exercises directly in the tables below.</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={toggleManualMode}
+                      className="border-brand-primary/30 text-brand-primary hover:bg-brand-primary/10 hover:border-brand-primary/60 h-8 px-3 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all"
+                    >
+                      Auto Mode
+                    </Button>
                   </div>
                 </div>
               )}
