@@ -944,32 +944,11 @@ export function ProgressReportModal({
                   </h4>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
                   <Card className="p-4 bg-brand-surface border-white/5 rounded-2xl space-y-1">
                     <span className="text-[10px] font-mono uppercase text-gray-400">Workout Sessions</span>
                     <div className="text-2xl font-black text-white">{workoutsCompleted}</div>
                     <p className="text-[10px] text-gray-500 font-mono">Completed sessions in timeframe</p>
-                  </Card>
-
-                  {/* Dedicated Low Intensity Zone 2 Walk Tracking Box */}
-                  <Card className="p-4 bg-brand-surface border-emerald-500/20 bg-gradient-to-br from-emerald-500/5 via-brand-surface to-transparent rounded-2xl space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-mono uppercase text-emerald-400 font-bold flex items-center gap-1">
-                        <Footprints className="w-3.5 h-3.5 text-emerald-400" /> Walk Tracking
-                      </span>
-                    </div>
-                    <div className="text-xl font-black text-emerald-400">
-                      {walkSessionsCompleted}/{walkTargetCount} Completed
-                    </div>
-                    <p className="text-[10px] text-gray-300 font-mono leading-tight pt-1">
-                      Low intensity Zone 2 walk - {walkSessionsCompleted}/{walkTargetCount} completed
-                    </p>
-                    <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden mt-2">
-                      <div 
-                        className="bg-emerald-400 h-full rounded-full transition-all duration-500" 
-                        style={{ width: `${Math.min(100, Math.round((walkSessionsCompleted / walkTargetCount) * 100))}%` }} 
-                      />
-                    </div>
                   </Card>
 
                   {/* Dedicated Meal Plan Compliance Box */}
