@@ -363,6 +363,7 @@ export const ProGym = ({
   const [currentStreak, setCurrentStreak] = useState(0);
   const [isStepsCollapsed, setIsStepsCollapsed] = useState(false);
   const [chartMetric, setChartMetric] = useState<'weight' | 'bodyFat'>('weight');
+  const [graphWeightUnit, setGraphWeightUnit] = useState<'lbs' | 'kg'>('lbs');
   const [isWeightCollapsed, setIsWeightCollapsed] = useState(false);
   const [isSavingHydration, setIsSavingHydration] = useState(false);
   const [isSavingSteps, setIsSavingSteps] = useState(false);
@@ -3643,54 +3644,87 @@ export const ProGym = ({
           </Card>
 
           {/* Weight Progression Chart */}
-          <Card className="p-8 bg-brand-surface border-white/5">
-            <div className="flex items-center justify-between mb-8">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-emerald-500/10 rounded-lg">
+          <Card className="p-4 sm:p-6 lg:p-8 bg-brand-surface border-white/5 overflow-hidden">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-white/5">
+              <div className="flex items-center gap-3 shrink-0">
+                <div className="p-2 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
                   <TrendingUp className="w-5 h-5 text-emerald-500" />
                 </div>
-                <h3 className="font-bold text-gray-100 uppercase tracking-widest text-sm">Weight Progression</h3>
+                <div>
+                  <h3 className="font-extrabold text-gray-100 uppercase tracking-wider text-sm sm:text-base">Weight Progression</h3>
+                  <p className="text-[10px] text-gray-400 font-medium">Historical trend analysis</p>
+                </div>
               </div>
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2 p-1 bg-brand-dark rounded-lg scale-90">
+
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                {/* Metric Selector: Weight vs Body Fat */}
+                <div className="flex items-center p-1 bg-black/50 border border-white/10 rounded-xl shadow-inner shrink-0">
                   <button 
+                    type="button"
                     onClick={() => setChartMetric('weight')}
                     className={cn(
-                      "px-3 py-1 rounded text-[9px] uppercase font-black transition-all",
-                      chartMetric === 'weight' ? "bg-emerald-500 text-white shadow-[0_0_8px_rgba(16,185,129,0.3)]" : "text-gray-500 hover:text-gray-300"
+                      "px-3 py-1 rounded-lg text-[10px] uppercase font-black transition-all cursor-pointer",
+                      chartMetric === 'weight' 
+                        ? "bg-emerald-500 text-brand-dark shadow-md shadow-emerald-500/20 font-black" 
+                        : "text-gray-400 hover:text-gray-200"
                     )}
                   >
                     Weight
                   </button>
                   <button 
+                    type="button"
                     onClick={() => setChartMetric('bodyFat')}
                     className={cn(
-                      "px-3 py-1 rounded text-[9px] uppercase font-black transition-all",
-                      chartMetric === 'bodyFat' ? "bg-purple-500 text-white shadow-[0_0_8px_rgba(168,85,247,0.3)]" : "text-gray-500 hover:text-gray-300"
+                      "px-3 py-1 rounded-lg text-[10px] uppercase font-black transition-all cursor-pointer",
+                      chartMetric === 'bodyFat' 
+                        ? "bg-purple-500 text-white shadow-md shadow-purple-500/20 font-black" 
+                        : "text-gray-400 hover:text-gray-200"
                     )}
                   >
                     Body Fat
                   </button>
                 </div>
-                <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-gray-500">
-                   Current: <span className="text-white ml-1">
-                     {measurements.length > 0 ? (() => {
-                       const sorted = [...measurements].sort((a, b) => b.date.localeCompare(a.date));
-                       const latest = sorted[0];
-                       let w = Number(latest.weight);
-                       if (latest.units?.weight && latest.units.weight !== measurementUnits.weight) {
-                         if (measurementUnits.weight === 'kg' && latest.units.weight === 'lbs') w = w * 0.453592;
-                         else if (measurementUnits.weight === 'lbs' && latest.units.weight === 'kg') w = w / 0.453592;
-                       }
-                       return `${w.toFixed(1)}${measurementUnits.weight}`;
-                     })() : '--'}
-                   </span>
+
+                {/* Exclusive LBS / KG toggle for this graph */}
+                {chartMetric === 'weight' && (
+                  <UnitToggle<'lbs' | 'kg'>
+                    unitA="lbs"
+                    unitB="kg"
+                    value={graphWeightUnit}
+                    onChange={(unit) => setGraphWeightUnit(unit)}
+                    size="sm"
+                    className="shrink-0"
+                  />
+                )}
+
+                {/* Current Value Display */}
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 border border-white/10 rounded-xl text-[10px] font-mono font-bold text-gray-300 shrink-0">
+                  <span className="text-gray-400 uppercase font-sans text-[9px] tracking-wider font-extrabold">Current:</span>
+                  <span className="text-brand-primary font-black">
+                    {measurements.length > 0 ? (() => {
+                      const sorted = [...measurements].sort((a, b) => b.date.localeCompare(a.date));
+                      const latest = sorted[0];
+                      if (chartMetric === 'bodyFat') {
+                        return latest.bodyFat ? `${latest.bodyFat}%` : '--';
+                      }
+                      let w = Number(latest.weight);
+                      if (!w) return '--';
+                      const loggedUnit = latest.units?.weight || 'lbs';
+                      if (loggedUnit !== graphWeightUnit) {
+                        if (graphWeightUnit === 'kg' && loggedUnit === 'lbs') w = w * 0.453592;
+                        else if (graphWeightUnit === 'lbs' && loggedUnit === 'kg') w = w / 0.453592;
+                      }
+                      return `${w.toFixed(1)} ${graphWeightUnit}`;
+                    })() : '--'}
+                  </span>
                 </div>
+
+                {/* Collapse Button */}
                 <Button 
                   variant="ghost" 
                   size="sm" 
                   onClick={() => setIsWeightCollapsed(!isWeightCollapsed)}
-                  className="text-gray-500 hover:text-white"
+                  className="text-gray-400 hover:text-white p-1.5 h-8 w-8 rounded-lg hover:bg-white/5 shrink-0"
                 >
                   {isWeightCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
                 </Button>
@@ -3715,11 +3749,12 @@ export const ProGym = ({
                       .map(m => {
                         const val = chartMetric === 'weight' ? Number(m.weight) : Number(m.bodyFat);
                         let displayVal = val;
+                        const loggedUnit = m.units?.weight || 'lbs';
                         
-                        if (chartMetric === 'weight' && m.units?.weight && m.units.weight !== measurementUnits.weight) {
-                          if (measurementUnits.weight === 'kg' && m.units.weight === 'lbs') {
+                        if (chartMetric === 'weight' && loggedUnit !== graphWeightUnit) {
+                          if (graphWeightUnit === 'kg' && loggedUnit === 'lbs') {
                             displayVal = val * 0.453592;
-                          } else if (measurementUnits.weight === 'lbs' && m.units.weight === 'kg') {
+                          } else if (graphWeightUnit === 'lbs' && loggedUnit === 'kg') {
                             displayVal = val / 0.453592;
                           }
                         }
@@ -3731,7 +3766,7 @@ export const ProGym = ({
                           date: dateObj.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
                           value: parseFloat(displayVal.toFixed(1)),
                           originalValue: val,
-                          originalUnit: chartMetric === 'weight' ? (m.units?.weight || 'kg') : '%',
+                          originalUnit: chartMetric === 'weight' ? loggedUnit : '%',
                           rawDate: m.date
                         };
                       })
@@ -3761,11 +3796,11 @@ export const ProGym = ({
                             <div className="bg-[#0A0A0A] border border-white/5 p-3 rounded-xl shadow-2xl">
                               <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">{label}</p>
                               <p className="text-sm font-black text-brand-primary">
-                                {data.value}{chartMetric === 'weight' ? measurementUnits.weight : '%'}
+                                {data.value} {chartMetric === 'weight' ? graphWeightUnit : '%'}
                               </p>
-                              {chartMetric === 'weight' && data.originalUnit !== measurementUnits.weight && (
-                                <p className="text-[10px] text-gray-600 font-bold mt-1">
-                                  Logged as: {data.originalValue}{data.originalUnit}
+                              {chartMetric === 'weight' && data.originalUnit !== graphWeightUnit && (
+                                <p className="text-[10px] text-gray-400 font-bold mt-1">
+                                  Logged as: {data.originalValue} {data.originalUnit}
                                 </p>
                               )}
                             </div>
