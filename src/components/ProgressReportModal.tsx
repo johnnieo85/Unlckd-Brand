@@ -49,6 +49,7 @@ export function ProgressReportModal({
   const [allGymLogs, setAllGymLogs] = useState<DailyLog[]>([]);
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [selectedGymRangeIds, setSelectedGymRangeIds] = useState<string[]>([]);
+  const [isRangeDropdownOpen, setIsRangeDropdownOpen] = useState(false);
   const [displayWeightUnit, setDisplayWeightUnit] = useState<'lbs' | 'kg'>('lbs');
   const [savingReport, setSavingReport] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -734,13 +735,13 @@ export function ProgressReportModal({
                 </div>
               </Card>
 
-              {/* Previous Gym Hub Range Selector */}
-              <div className="space-y-3 no-print">
+              {/* Previous Gym Hub Range Selector Dropdown Menu */}
+              <div className="space-y-3 no-print relative">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Dumbbell className="w-5 h-5 text-purple-400" />
                     <h4 className="text-sm font-bold uppercase tracking-wider text-white">
-                      Include Data from Gym Hub Transformation Ranges (Multi-Select)
+                      Include Data from Gym Hub Transformation Ranges
                     </h4>
                   </div>
                   <span className="text-xs font-mono text-purple-400 font-bold bg-purple-500/10 px-2.5 py-1 rounded-lg border border-purple-500/20">
@@ -748,58 +749,180 @@ export function ProgressReportModal({
                   </span>
                 </div>
 
-                <Card className="p-4 bg-brand-surface border-white/5 rounded-2xl">
-                  {allGymLogs.length === 0 ? (
-                    <p className="text-xs text-gray-500 font-mono">No previous Gym Hub data found in your account history. Log workouts in Gym Hub to enable multi-range comparison.</p>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                      {gymHubRangeOptions.map((option) => {
-                        const isSelected = selectedGymRangeIds.includes(option.id);
-                        const rangeLogs = getLogsForRangeOption(option.id);
-                        const logsCount = rangeLogs.length;
-                        const workoutsCount = rangeLogs.reduce((acc, l) => acc + (l.completedWorkouts || (l.workoutData || l.manualWorkout ? 1 : 0)), 0);
-
-                        return (
-                          <button
-                            key={option.id}
-                            type="button"
-                            onClick={() => {
-                              if (isSelected) {
-                                setSelectedGymRangeIds(selectedGymRangeIds.filter(id => id !== option.id));
-                              } else {
-                                setSelectedGymRangeIds([...selectedGymRangeIds, option.id]);
-                              }
-                            }}
-                            className={cn(
-                              "p-3.5 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between gap-2.5",
-                              isSelected 
-                                ? "bg-purple-500/15 border-purple-500/40 text-white shadow-md shadow-purple-500/10" 
-                                : "bg-black/30 border-white/5 text-gray-400 hover:text-white hover:border-white/20"
-                            )}
-                          >
-                            <div className="truncate flex-1">
-                              <div className="text-xs font-bold text-white truncate flex items-center gap-1.5">
-                                <Calendar className="w-3.5 h-3.5 text-brand-primary shrink-0" />
-                                {option.label}
-                              </div>
-                              <div className="text-[10px] text-gray-400 font-mono mt-1 flex items-center gap-1.5 flex-wrap">
-                                <span className="text-purple-300 font-bold">{option.description}</span>
-                                <span>•</span>
-                                <span>{logsCount} Day Log(s) ({workoutsCount} Session(s))</span>
-                              </div>
-                            </div>
-                            <div className={cn(
-                              "w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors",
-                              isSelected ? "bg-purple-500 border-purple-400 text-white" : "border-white/20 bg-black/40"
-                            )}>
-                              {isSelected ? <Check className="w-3.5 h-3.5 text-white stroke-[3]" /> : <Plus className="w-3.5 h-3.5 text-gray-500" />}
-                            </div>
-                          </button>
-                        );
-                      })}
+                {/* Dropdown Field Button */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsRangeDropdownOpen(!isRangeDropdownOpen)}
+                    className={cn(
+                      "w-full p-3.5 bg-brand-surface border rounded-2xl flex items-center justify-between gap-3 text-left transition-all cursor-pointer shadow-md",
+                      isRangeDropdownOpen 
+                        ? "border-purple-500/60 ring-2 ring-purple-500/20 bg-purple-500/5" 
+                        : "border-white/10 hover:border-purple-500/30 hover:bg-white/[0.02]"
+                    )}
+                  >
+                    <div className="flex items-center gap-3 truncate flex-1">
+                      <div className="w-8 h-8 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center shrink-0 text-purple-400">
+                        <Dumbbell className="w-4 h-4" />
+                      </div>
+                      <div className="truncate">
+                        <div className="text-xs font-bold text-white flex items-center gap-2">
+                          {selectedGymRangeIds.length === 0 ? (
+                            <span className="text-gray-400">Select Transformation Range(s)...</span>
+                          ) : (
+                            <span className="text-purple-300">
+                              {selectedGymRangeIds.length} Range{selectedGymRangeIds.length > 1 ? 's' : ''} Active in Comparison
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-gray-400 font-mono truncate mt-0.5">
+                          {selectedGymRangeIds.length === 0
+                            ? "Click to open menu and choose workout ranges to merge into this report"
+                            : gymHubRangeOptions
+                                .filter(o => selectedGymRangeIds.includes(o.id))
+                                .map(o => o.label)
+                                .join(', ')}
+                        </p>
+                      </div>
                     </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="text-[10px] font-mono font-bold uppercase px-2 py-1 rounded-lg bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                        {selectedGymRangeIds.length} Selected
+                      </div>
+                      <ChevronDown className={cn("w-4 h-4 text-gray-400 transition-transform duration-200", isRangeDropdownOpen && "rotate-180 text-purple-400")} />
+                    </div>
+                  </button>
+
+                  {/* Dropdown Menu Panel */}
+                  {isRangeDropdownOpen && (
+                    <>
+                      {/* Click outside backdrop */}
+                      <div 
+                        className="fixed inset-0 z-20" 
+                        onClick={() => setIsRangeDropdownOpen(false)} 
+                      />
+
+                      <div className="absolute top-full left-0 right-0 mt-2 z-30 bg-[#121624] border border-purple-500/30 rounded-2xl shadow-2xl overflow-hidden p-3 space-y-2 backdrop-blur-xl animate-in fade-in duration-150">
+                        {/* Dropdown Header Actions */}
+                        <div className="flex items-center justify-between pb-2 border-b border-white/10 px-2">
+                          <span className="text-[10px] font-mono uppercase font-bold text-purple-300 flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5 text-purple-400" /> Multi-Select Ranges
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedGymRangeIds(gymHubRangeOptions.map(o => o.id))}
+                              className="text-[10px] font-mono font-bold text-purple-400 hover:text-purple-300 hover:underline cursor-pointer px-1.5 py-0.5 rounded"
+                            >
+                              Select All
+                            </button>
+                            <span className="text-gray-600 text-[10px]">•</span>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedGymRangeIds([])}
+                              className="text-[10px] font-mono font-bold text-gray-400 hover:text-white hover:underline cursor-pointer px-1.5 py-0.5 rounded"
+                            >
+                              Clear All
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Options List */}
+                        {allGymLogs.length === 0 ? (
+                          <div className="p-4 text-center">
+                            <p className="text-xs text-gray-400 font-mono">No previous Gym Hub data found in your account history. Log workouts in Gym Hub to enable multi-range comparison.</p>
+                          </div>
+                        ) : (
+                          <div className="max-h-64 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+                            {gymHubRangeOptions.map((option) => {
+                              const isSelected = selectedGymRangeIds.includes(option.id);
+                              const rangeLogs = getLogsForRangeOption(option.id);
+                              const logsCount = rangeLogs.length;
+                              const workoutsCount = rangeLogs.reduce((acc, l) => acc + (l.completedWorkouts || (l.workoutData || l.manualWorkout ? 1 : 0)), 0);
+
+                              return (
+                                <button
+                                  key={option.id}
+                                  type="button"
+                                  onClick={() => {
+                                    if (isSelected) {
+                                      setSelectedGymRangeIds(selectedGymRangeIds.filter(id => id !== option.id));
+                                    } else {
+                                      setSelectedGymRangeIds([...selectedGymRangeIds, option.id]);
+                                    }
+                                  }}
+                                  className={cn(
+                                    "w-full p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between gap-3",
+                                    isSelected 
+                                      ? "bg-purple-500/20 border-purple-500/50 text-white shadow-sm" 
+                                      : "bg-black/30 border-white/5 text-gray-400 hover:text-white hover:border-white/20 hover:bg-white/5"
+                                  )}
+                                >
+                                  <div className="flex items-center gap-3 truncate flex-1">
+                                    <div className={cn(
+                                      "w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-all",
+                                      isSelected ? "bg-purple-500 border-purple-400 text-white" : "border-white/20 bg-black/40"
+                                    )}>
+                                      {isSelected ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : <Plus className="w-3 h-3 text-gray-500" />}
+                                    </div>
+                                    <div className="truncate">
+                                      <div className="text-xs font-bold text-white flex items-center gap-1.5 truncate">
+                                        <Calendar className="w-3.5 h-3.5 text-brand-primary shrink-0" />
+                                        {option.label}
+                                      </div>
+                                      <div className="text-[10px] text-gray-400 font-mono mt-0.5 flex items-center gap-1.5 flex-wrap">
+                                        <span className="text-purple-300 font-bold">{option.description}</span>
+                                        <span>•</span>
+                                        <span>{logsCount} Day Log(s) ({workoutsCount} Session(s))</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Footer Done Button */}
+                        <div className="pt-2 border-t border-white/10 flex justify-end">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => setIsRangeDropdownOpen(false)}
+                            className="bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold py-1 px-4 rounded-xl cursor-pointer"
+                          >
+                            Done
+                          </Button>
+                        </div>
+                      </div>
+                    </>
                   )}
-                </Card>
+                </div>
+
+                {/* Selected Range Tags / Pills Preview */}
+                {selectedGymRangeIds.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                    <span className="text-[10px] font-mono text-gray-400 uppercase mr-1">Active Ranges:</span>
+                    {gymHubRangeOptions
+                      .filter(o => selectedGymRangeIds.includes(o.id))
+                      .map(o => (
+                        <span
+                          key={o.id}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-500/15 border border-purple-500/30 text-purple-200 text-xs font-mono font-bold"
+                        >
+                          {o.label}
+                          <button
+                            type="button"
+                            onClick={() => setSelectedGymRangeIds(selectedGymRangeIds.filter(id => id !== o.id))}
+                            className="hover:text-white text-purple-400 cursor-pointer transition-colors"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                  </div>
+                )}
               </div>
 
               {/* Body Measurements & Net Changes Table */}
