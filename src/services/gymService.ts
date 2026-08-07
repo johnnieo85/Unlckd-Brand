@@ -167,6 +167,34 @@ export const gymService = {
     }
   },
 
+  async getDailyLogsRange(days: number): Promise<DailyLog[]> {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - days);
+    const startStr = start.toISOString().split('T')[0];
+    const endStr = end.toISOString().split('T')[0];
+    return this.getLogsInRange(startStr, endStr);
+  },
+
+  async getAllDailyLogs(): Promise<DailyLog[]> {
+    const user = auth.currentUser;
+    if (!user) return [];
+
+    const path = `users/${user.uid}/dailyLogs`;
+    try {
+      const q = query(
+        collection(db, 'users', user.uid, 'dailyLogs'),
+        orderBy('date', 'desc')
+      );
+
+      const querySnapshot = await getDocs(q);
+      return querySnapshot.docs.map(doc => doc.data() as DailyLog);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, path);
+      return [];
+    }
+  },
+
   async getMeasurementsInRange(startDate: string, endDate: string): Promise<Measurement[]> {
     const user = auth.currentUser;
     if (!user) return [];

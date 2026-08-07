@@ -21,6 +21,7 @@ import {
 import { Card, Badge as UiBadge } from './ui/Card';
 import { Button } from './ui/Button';
 import { UnitToggle } from './UnitToggle';
+import { WeightProgressionChart } from './WeightProgressionChart';
 import { UserProfile, Badge as UserBadge } from '../types';
 import { cn } from '../lib/utils';
 import { updateUserProfile } from '../services/accessService';
@@ -101,6 +102,22 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   const [goalWeight, setGoalWeight] = useState<string | number>(userProfile?.goalWeight ?? 175);
   const [level, setLevel] = useState<number>(Math.floor((userProfile?.xp || 1250) / 500) + 1);
 
+  // Membership / Account Status (Automatically associated with user database)
+  const membershipTier: 'standard' | 'premium' | 'coach' = (
+    ((userProfile?.membershipTier as string) === 'trainer' || (userProfile?.membershipTier as string) === 'coach' || isTrainer)
+      ? 'coach'
+      : (userProfile?.membershipTier as string) === 'premium' || userProfile?.isPremium || isPremium
+      ? 'premium'
+      : 'standard'
+  );
+
+  const getAccountStatusLabel = (tier: string) => {
+    if (tier === 'coach' || tier === 'trainer') return 'Coach';
+    if (tier === 'premium') return 'Premium';
+    return 'Standard';
+  };
+  const accountStatusLabel = getAccountStatusLabel(membershipTier);
+
   // Body measurements
   const initialMeasurements = userProfile?.bodyMeasurements || {};
   const [measurements, setMeasurements] = useState<{ [key: string]: string | number }>({
@@ -119,10 +136,10 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
     initialMeasurements.units?.length || 'in'
   );
 
-  const [isProfileHeaderOpen, setIsProfileHeaderOpen] = useState(true);
-  const [isPersonalMetricsOpen, setIsPersonalMetricsOpen] = useState(true);
-  const [isBodyMeasurementsOpen, setIsBodyMeasurementsOpen] = useState(true);
-  const [isBadgesOpen, setIsBadgesOpen] = useState(true);
+  const [isProfileHeaderOpen, setIsProfileHeaderOpen] = useState(false);
+  const [isPersonalMetricsOpen, setIsPersonalMetricsOpen] = useState(false);
+  const [isBodyMeasurementsOpen, setIsBodyMeasurementsOpen] = useState(false);
+  const [isBadgesOpen, setIsBadgesOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -314,36 +331,40 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
       </div>
 
       {/* Profile Header Banner */}
-      <Card className="p-6 bg-brand-surface border-white/10 relative overflow-hidden space-y-4">
+      <Card className="p-4 sm:p-6 bg-brand-surface border-white/10 relative overflow-hidden space-y-4">
         <div 
           onClick={() => setIsProfileHeaderOpen(!isProfileHeaderOpen)}
-          className="flex items-center justify-between cursor-pointer group"
+          className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer group"
         >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-brand-primary/50 bg-black/40 flex items-center justify-center text-xs font-black text-brand-primary shrink-0 shadow-md">
+          <div className="flex items-center gap-3.5 sm:gap-4 min-w-0">
+            <div className="w-11 h-11 rounded-full overflow-hidden border-2 border-brand-primary/50 bg-black/40 flex items-center justify-center text-xs font-black text-brand-primary shrink-0 shadow-md">
               {avatarUrl ? (
                 <img src={avatarUrl} alt={fullName} className="w-full h-full object-cover" />
               ) : (
                 computeInitials(fullName)
               )}
             </div>
-            <div>
-              <h2 className="text-sm sm:text-base font-black text-white group-hover:text-brand-primary transition-colors flex items-center gap-2">
-                Athlete Profile
+            <div className="space-y-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+                <h2 className="text-base sm:text-lg font-black text-white group-hover:text-brand-primary transition-colors tracking-tight">
+                  Profile
+                </h2>
                 <UiBadge className={cn(
-                  "text-[8px] font-black uppercase tracking-wider px-2 py-0.5",
-                  isTrainer 
+                  "text-[9px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md border shrink-0",
+                  membershipTier === 'coach'
                     ? "bg-amber-400/20 text-amber-400 border-amber-400/40" 
+                    : membershipTier === 'premium'
+                    ? "bg-purple-500/20 text-purple-300 border-purple-500/40"
                     : "bg-brand-primary/20 text-brand-primary border-brand-primary/40"
                 )}>
-                  {isTrainer ? 'Pro Trainer' : 'Athlete Member'}
+                  {accountStatusLabel}
                 </UiBadge>
-              </h2>
-              <p className="text-[11px] text-gray-400 font-medium mt-0.5">Level {level} • Streak {userProfile?.streak ?? 0} Days • XP {userProfile?.xp ?? 0}</p>
+              </div>
+              <p className="text-[11px] text-gray-400 font-medium">Level {level} • Streak {userProfile?.streak ?? 0} Days • XP {userProfile?.xp ?? 0}</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-3 shrink-0 ml-auto sm:ml-0">
             <AnimatePresence>
               {saveSuccess && (
                 <motion.div
@@ -357,7 +378,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 </motion.div>
               )}
             </AnimatePresence>
-            <div className="p-1.5 bg-white/5 rounded-lg border border-white/10 text-gray-400 group-hover:text-white transition-colors">
+            <div className="p-2 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 text-gray-400 group-hover:text-white transition-colors shadow-sm ml-2">
               {isProfileHeaderOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </div>
           </div>
@@ -424,12 +445,14 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                   <div className="flex flex-col sm:flex-row sm:items-center gap-2 justify-center sm:justify-start">
                     <h1 className="text-2xl font-display font-black text-white">{fullName}</h1>
                     <UiBadge className={cn(
-                      "text-[9px] font-black uppercase tracking-wider self-center sm:self-auto px-2.5 py-0.5",
-                      isTrainer 
+                      "text-[9px] font-black uppercase tracking-wider self-center sm:self-auto px-2.5 py-0.5 rounded-md border",
+                      membershipTier === 'coach'
                         ? "bg-amber-400/20 text-amber-400 border-amber-400/40" 
+                        : membershipTier === 'premium'
+                        ? "bg-purple-500/20 text-purple-300 border-purple-500/40"
                         : "bg-brand-primary/20 text-brand-primary border-brand-primary/40"
                     )}>
-                      {isTrainer ? 'Pro Trainer' : 'Athlete Member'}
+                      {accountStatusLabel}
                     </UiBadge>
                   </div>
                   <p className="text-xs text-gray-400 font-medium">{userEmail || 'registered@unlckd.com'}</p>
@@ -454,15 +477,15 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
       </Card>
 
       {/* Editable Fields Grid (Collapsible) */}
-      <Card className="p-6 bg-brand-surface border-white/10 space-y-4">
+      <Card className="p-4 sm:p-6 bg-brand-surface border-white/10 space-y-4">
         <div 
           onClick={() => setIsPersonalMetricsOpen(!isPersonalMetricsOpen)}
           className="flex items-center justify-between cursor-pointer group"
         >
           <h3 className="text-xs font-black uppercase tracking-widest text-brand-primary flex items-center gap-2 group-hover:text-white transition-colors">
-            <User className="w-4 h-4 text-brand-primary" /> Personal Metrics & Targets
+            <User className="w-4 h-4 text-brand-primary shrink-0" /> Personal Metrics & Targets
           </h3>
-          <div className="p-1.5 bg-white/5 rounded-lg border border-white/10 text-gray-400 group-hover:text-white">
+          <div className="p-1.5 bg-white/5 rounded-lg border border-white/10 text-gray-400 group-hover:text-white shrink-0">
             {isPersonalMetricsOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </div>
         </div>
@@ -605,19 +628,20 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
       </Card>
 
       {/* Body Measurements Section (Collapsible) */}
-      <Card className="p-6 bg-brand-surface border-white/10 space-y-4">
+      <Card className="p-4 sm:p-6 bg-brand-surface border-white/10 space-y-4 overflow-hidden">
         <div 
           onClick={() => setIsBodyMeasurementsOpen(!isBodyMeasurementsOpen)}
-          className="flex items-center justify-between cursor-pointer group"
+          className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 cursor-pointer group min-w-0"
         >
-          <div className="flex items-center gap-2">
-            <h3 className="text-xs font-black uppercase tracking-widest text-emerald-400 flex items-center gap-2 group-hover:text-white transition-colors">
-              <Ruler className="w-4 h-4 text-emerald-400" /> Body Measurements (10 Points)
+          <div className="flex items-center gap-2 min-w-0 shrink">
+            <h3 className="text-xs font-black uppercase tracking-widest text-emerald-400 flex items-center gap-2 group-hover:text-white transition-colors truncate">
+              <Ruler className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span className="truncate">Body Measurements (10 Points)</span>
             </h3>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-2.5 sm:gap-3 shrink-0 ml-auto">
+            <div onClick={(e) => e.stopPropagation()} className="shrink-0">
               <UnitToggle<'in' | 'cm'>
                 unitA="in"
                 unitB="cm"
@@ -649,7 +673,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 size="sm"
               />
             </div>
-            <div className="p-1.5 bg-white/5 rounded-lg border border-white/10 text-gray-400 group-hover:text-white">
+            <div className="p-1.5 bg-white/5 rounded-lg border border-white/10 text-gray-400 group-hover:text-white shrink-0">
               {isBodyMeasurementsOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </div>
           </div>
@@ -697,6 +721,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
           )}
         </AnimatePresence>
       </Card>
+
+      {/* Weight Progression Chart (Moved to Profile) */}
+      <WeightProgressionChart defaultCollapsed={true} />
 
       {/* Badges Section (Collapsible, Full Year Grid) */}
       <Card className="p-6 bg-brand-surface border-white/10 space-y-4">

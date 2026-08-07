@@ -197,6 +197,10 @@ export interface UserProfile {
   membershipTier?: 'standard' | 'trainer';
   avatarUrl?: string;
   fullName?: string;
+  age?: string;
+  sex?: string;
+  location?: string;
+  goals?: string;
   height?: number;
   heightUnit?: 'in' | 'cm' | 'ftin';
   weight?: number;

@@ -61,6 +61,7 @@ import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { UnitToggle } from './UnitToggle';
 import { ExerciseCard } from './ExerciseCard';
+import { ProgressReportModal } from './ProgressReportModal';
 import { gymService } from '../services/gymService';
 import { DailyLog, SavedReport, Measurement, UserProfile, Badge as UserBadge } from '../types';
 import { cn, downloadFile, getLocalDateString, parseLocalDate, safeStorage, getPlanDurationWeeks } from '../lib/utils';
@@ -319,11 +320,13 @@ export const ProGym = ({
   latestReport, 
   userProfile, 
   onProfileUpdate,
+  onReportSaved,
   onHomeClick 
 }: { 
   latestReport: SavedReport | null; 
   userProfile: UserProfile | null; 
   onProfileUpdate?: () => void;
+  onReportSaved?: () => void;
   onHomeClick?: () => void 
 }) => {
   const numWeeks = getPlanDurationWeeks(latestReport?.userData?.planDuration);
@@ -350,29 +353,88 @@ export const ProGym = ({
   const [hasDayMeasurement, setHasDayMeasurement] = useState(false);
   const [isMeasurementsExpanded, setIsMeasurementsExpanded] = useState(false);
   const [unlockedDates, setUnlockedDates] = useState<Set<string>>(new Set([getLocalDateString(new Date())]));
-  const [isConsistencyCollapsed, setIsConsistencyCollapsed] = useState(false);
-  const [isNutritionCollapsed, setIsNutritionCollapsed] = useState(false);
-  const [isTrainingCollapsed, setIsTrainingCollapsed] = useState(false);
-  const [isWarmUpCollapsed, setIsWarmUpCollapsed] = useState(false);
-  const [isMainWorkCollapsed, setIsMainWorkCollapsed] = useState(false);
-  const [isHabitsCollapsed, setIsHabitsCollapsed] = useState(false);
-  const [isWaterCollapsed, setIsWaterCollapsed] = useState(false);
-  const [isBadgesCollapsed, setIsBadgesCollapsed] = useState(false);
+  const [isConsistencyCollapsed, setIsConsistencyCollapsed] = useState(true);
+  const [isNutritionCollapsed, setIsNutritionCollapsed] = useState(true);
+  const [isTrainingCollapsed, setIsTrainingCollapsed] = useState(true);
+  const [isWarmUpCollapsed, setIsWarmUpCollapsed] = useState(true);
+  const [isMainWorkCollapsed, setIsMainWorkCollapsed] = useState(true);
+  const [isHabitsCollapsed, setIsHabitsCollapsed] = useState(true);
+  const [isWaterCollapsed, setIsWaterCollapsed] = useState(true);
+  const [isBadgesCollapsed, setIsBadgesCollapsed] = useState(true);
   const [isLevelModalOpen, setIsLevelModalOpen] = useState(false);
   const [totalXP, setTotalXP] = useState(0);
   const [currentStreak, setCurrentStreak] = useState(0);
-  const [isStepsCollapsed, setIsStepsCollapsed] = useState(false);
+  const [isStepsCollapsed, setIsStepsCollapsed] = useState(true);
   const [chartMetric, setChartMetric] = useState<'weight' | 'bodyFat'>('weight');
   const [graphWeightUnit, setGraphWeightUnit] = useState<'lbs' | 'kg'>('lbs');
-  const [isWeightCollapsed, setIsWeightCollapsed] = useState(false);
+  const [isWeightCollapsed, setIsWeightCollapsed] = useState(true);
   const [isSavingHydration, setIsSavingHydration] = useState(false);
   const [isSavingSteps, setIsSavingSteps] = useState(false);
+
+  const handleSaveHydration = async () => {
+    if (!log) return;
+    setIsSavingHydration(true);
+    try {
+      await gymService.updateDailyLog(selectedDate, { 
+        water: log.water, 
+        waterUnit: log.waterUnit, 
+        waterGoal: log.waterGoal 
+      });
+    } catch (e) {
+      console.error("Save hydration error:", e);
+    } finally {
+      setTimeout(() => setIsSavingHydration(false), 1500);
+    }
+  };
+
+  const handleSaveMovement = async () => {
+    if (!log) return;
+    setIsSavingSteps(true);
+    try {
+      await gymService.updateDailyLog(selectedDate, { 
+        steps: log.steps, 
+        stepGoal: log.stepGoal 
+      });
+    } catch (e) {
+      console.error("Save movement error:", e);
+    } finally {
+      setTimeout(() => setIsSavingSteps(false), 1500);
+    }
+  };
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<number>(0);
   const [calendarDates, setCalendarDates] = useState<string[]>([]);
   const [activeView, setActiveView] = useState<'hub' | 'report'>('hub');
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isProgressReportOpen, setIsProgressReportOpen] = useState(false);
   const [trackerOrder, setTrackerOrder] = useState<string[]>(['hydration', 'movement']);
+
+  const getLastPerformance = (exRaw: any) => {
+    const parsed = parseExercise(exRaw);
+    if (!parsed?.name || !reportLogs || reportLogs.length === 0) return null;
+    const targetName = parsed.name.trim().toLowerCase();
+
+    const sorted = [...reportLogs]
+      .filter(l => l.date !== selectedDate && l.workoutData)
+      .sort((a, b) => b.date.localeCompare(a.date));
+
+    for (const prevLog of sorted) {
+      if (!prevLog.workoutData) continue;
+      for (const [key, wData] of Object.entries(prevLog.workoutData)) {
+        const keyName = key.replace(/^(warmUp|mainWork)-/, '').replace(/-\d+$/, '').replace(/_/g, ' ').toLowerCase();
+        if (keyName.includes(targetName) || targetName.includes(keyName) || key.toLowerCase().includes(targetName)) {
+          if (wData.setRows && wData.setRows.length > 0) {
+            const validSet = wData.setRows.slice().reverse().find(s => s.weight || s.reps);
+            if (validSet) return { weight: validSet.weight, reps: validSet.reps, date: prevLog.date };
+          }
+          if (wData.weight || wData.reps) {
+            return { weight: wData.weight, reps: wData.reps, date: prevLog.date };
+          }
+        }
+      }
+    }
+    return null;
+  };
 
   const parseStepGoal = (goalStr: string) => {
     if (!goalStr) return 10000;
@@ -870,21 +932,22 @@ export const ProGym = ({
     // Removed immediate service call to let the auto-save useEffect handle it with debounce
   };
 
-  const handleSetRowUpdate = (exerciseId: string, setIndex: number, field: 'reps' | 'weight', val: string, defaultReps: string, defaultSets?: string) => {
+  const handleSetRowUpdate = (exerciseId: string, setIndex: number, field: 'reps' | 'weight' | 'completed', val: string | boolean, defaultReps: string, defaultSets?: string) => {
     if (!log) return;
     const currentData = log.workoutData || {};
-    const exerciseData = currentData[exerciseId];
+    const exerciseData = currentData[exerciseId] || {};
     const setsCount = parseInt(exerciseData?.sets || defaultSets || '3') || 3;
 
-    const existingRows: Array<{ reps: string; weight: string }> = Array.isArray(exerciseData?.setRows)
+    const existingRows: Array<{ reps: string; weight: string; completed?: boolean }> = Array.isArray(exerciseData?.setRows)
       ? [...exerciseData.setRows]
       : Array.from({ length: Math.max(1, setsCount) }, () => ({
           reps: exerciseData?.reps || defaultReps || '',
-          weight: exerciseData?.weight || ''
+          weight: exerciseData?.weight || '',
+          completed: exerciseData?.completed || false
         }));
 
     while (existingRows.length <= setIndex) {
-      existingRows.push({ reps: defaultReps || '', weight: '' });
+      existingRows.push({ reps: defaultReps || '', weight: '', completed: false });
     }
 
     existingRows[setIndex] = {
@@ -892,10 +955,13 @@ export const ProGym = ({
       [field]: val
     };
 
+    const allSetsCompleted = existingRows.length > 0 && existingRows.every(sr => !!sr.completed);
+
     const updatedWorkoutData = {
       ...currentData,
       [exerciseId]: {
         ...exerciseData,
+        completed: allSetsCompleted,
         setRows: existingRows,
         reps: existingRows[0]?.reps || exerciseData?.reps || '',
         weight: existingRows[0]?.weight || exerciseData?.weight || '',
@@ -913,54 +979,66 @@ export const ProGym = ({
   const handleAddSetRow = (exerciseId: string, defaultReps: string, defaultSets?: string) => {
     if (!log) return;
     const currentData = log.workoutData || {};
-    const exerciseData = currentData[exerciseId];
+    const exerciseData = currentData[exerciseId] || {};
     const setsCount = parseInt(exerciseData?.sets || defaultSets || '3') || 3;
 
-    const existingRows: Array<{ reps: string; weight: string }> = Array.isArray(exerciseData?.setRows)
+    const existingRows: Array<{ reps: string; weight: string; completed?: boolean }> = Array.isArray(exerciseData?.setRows)
       ? [...exerciseData.setRows]
       : Array.from({ length: Math.max(1, setsCount) }, () => ({
           reps: exerciseData?.reps || defaultReps || '',
-          weight: exerciseData?.weight || ''
+          weight: exerciseData?.weight || '',
+          completed: exerciseData?.completed || false
         }));
 
-    const lastRow = existingRows[existingRows.length - 1] || { reps: defaultReps || '', weight: '' };
-    const updatedRows = [...existingRows, { reps: lastRow.reps || defaultReps || '', weight: lastRow.weight || '' }];
+    const lastRow = existingRows[existingRows.length - 1] || { reps: defaultReps || '', weight: '', completed: false };
+    const updatedRows = [...existingRows, { reps: lastRow.reps || defaultReps || '', weight: lastRow.weight || '', completed: false }];
+
+    const allSetsCompleted = updatedRows.length > 0 && updatedRows.every(sr => !!sr.completed);
 
     const updatedWorkoutData = {
       ...currentData,
       [exerciseId]: {
         ...exerciseData,
+        completed: allSetsCompleted,
         setRows: updatedRows,
         sets: String(updatedRows.length)
       }
     };
 
-    setLog({ ...log, workoutData: updatedWorkoutData });
+    const { completed, total } = getTrainingTotals(updatedWorkoutData);
+    const isManual = log.useManualWorkout || !latestReport;
+    const completedWorkouts = isManual ? (completed > 0 ? 1 : 0) : ((total > 0 && completed === total) ? 1 : 0);
+
+    setLog({ ...log, workoutData: updatedWorkoutData, completedWorkouts });
   };
 
   const handleRemoveSetRow = (exerciseId: string, setIndex: number, defaultReps: string, defaultSets?: string) => {
     if (!log) return;
     const currentData = log.workoutData || {};
-    const exerciseData = currentData[exerciseId];
+    const exerciseData = currentData[exerciseId] || {};
     const setsCount = parseInt(exerciseData?.sets || defaultSets || '3') || 3;
 
-    const existingRows: Array<{ reps: string; weight: string }> = Array.isArray(exerciseData?.setRows)
+    const existingRows: Array<{ reps: string; weight: string; completed?: boolean }> = Array.isArray(exerciseData?.setRows)
       ? [...exerciseData.setRows]
       : Array.from({ length: Math.max(1, setsCount) }, () => ({
           reps: exerciseData?.reps || defaultReps || '',
-          weight: exerciseData?.weight || ''
+          weight: exerciseData?.weight || '',
+          completed: exerciseData?.completed || false
         }));
 
     if (existingRows.length > 1) {
       existingRows.splice(setIndex, 1);
     } else {
-      existingRows[0] = { reps: '', weight: '' };
+      existingRows[0] = { reps: '', weight: '', completed: false };
     }
+
+    const allSetsCompleted = existingRows.length > 0 && existingRows.every(sr => !!sr.completed);
 
     const updatedWorkoutData = {
       ...currentData,
       [exerciseId]: {
         ...exerciseData,
+        completed: allSetsCompleted,
         setRows: existingRows,
         reps: existingRows[0]?.reps || exerciseData?.reps || '',
         weight: existingRows[0]?.weight || exerciseData?.weight || '',
@@ -1088,12 +1166,45 @@ export const ProGym = ({
     }
   };
 
-  const handleExerciseToggle = (exerciseId: string) => {
+  const handleExerciseToggle = (exerciseId: string, defaultReps?: string, defaultSets?: string) => {
     if (!log) return;
     const currentData = log.workoutData || {};
     const exerciseData = currentData[exerciseId] || { weight: '', sets: '', reps: '', notes: '', time: '', completed: false };
-    const isCompleted = !exerciseData.completed;
-    handleTrainingUpdate(exerciseId, 'completed', isCompleted);
+    
+    const setsCount = parseInt(exerciseData?.sets || defaultSets || '3') || 3;
+    const existingRows: Array<{ reps: string; weight: string; completed?: boolean }> = Array.isArray(exerciseData?.setRows)
+      ? [...exerciseData.setRows]
+      : Array.from({ length: Math.max(1, setsCount) }, () => ({
+          reps: exerciseData?.reps || defaultReps || '',
+          weight: exerciseData?.weight || '',
+          completed: exerciseData?.completed || false
+        }));
+
+    const currentlyCompleted = exerciseData.completed || (existingRows.length > 0 && existingRows.every(sr => !!sr.completed));
+    const nextCompleted = !currentlyCompleted;
+
+    const updatedRows = existingRows.map(sr => ({
+      ...sr,
+      completed: nextCompleted
+    }));
+
+    const updatedWorkoutData = {
+      ...currentData,
+      [exerciseId]: {
+        ...exerciseData,
+        completed: nextCompleted,
+        setRows: updatedRows,
+        sets: String(updatedRows.length),
+        reps: updatedRows[0]?.reps || exerciseData?.reps || defaultReps || '',
+        weight: updatedRows[0]?.weight || exerciseData?.weight || ''
+      }
+    };
+
+    const { completed, total } = getTrainingTotals(updatedWorkoutData);
+    const isManual = log.useManualWorkout || !latestReport;
+    const completedWorkouts = isManual ? (completed > 0 ? 1 : 0) : ((total > 0 && completed === total) ? 1 : 0);
+
+    setLog({ ...log, workoutData: updatedWorkoutData, completedWorkouts });
   };
 
   const handleGeneralNotesUpdate = (notes: string) => {
@@ -1792,6 +1903,16 @@ export const ProGym = ({
             )}
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsProgressReportOpen(true)}
+              className="bg-brand-primary/10 border-brand-primary/30 text-brand-primary hover:bg-brand-primary/20 text-xs font-bold rounded-xl gap-1.5 cursor-pointer shadow-sm"
+            >
+              <ClipboardList className="w-3.5 h-3.5" />
+              Progress Report
+            </Button>
+
             <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-3 py-1.5 rounded-xl text-xs font-mono font-bold text-gray-200 shadow-inner">
               <span className="w-2 h-2 rounded-full bg-brand-primary animate-pulse shrink-0" />
               <span className="text-gray-400 font-sans text-[10px] uppercase tracking-wider font-extrabold">Today:</span>
@@ -2140,6 +2261,19 @@ export const ProGym = ({
                                     />
                                   </div>
                                 </div>
+
+                                {/* Save Button for Hydration */}
+                                <div className="pt-2">
+                                  <Button 
+                                    size="sm"
+                                    onClick={handleSaveHydration}
+                                    disabled={isSavingHydration}
+                                    className="w-full bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/40 text-blue-400 font-bold text-xs py-2 rounded-xl gap-2 cursor-pointer transition-all"
+                                  >
+                                    <Save className="w-3.5 h-3.5" />
+                                    {isSavingHydration ? "Hydration Saved!" : "Save Hydration"}
+                                  </Button>
+                                </div>
                               </div>
                             </motion.div>
                           )}
@@ -2242,6 +2376,19 @@ export const ProGym = ({
                                       animate={{ width: `${Math.min((log.steps / log.stepGoal) * 100, 100)}%` }}
                                     />
                                   </div>
+                                </div>
+
+                                {/* Save Button for Movement */}
+                                <div className="pt-2">
+                                  <Button 
+                                    size="sm"
+                                    onClick={handleSaveMovement}
+                                    disabled={isSavingSteps}
+                                    className="w-full bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-400 font-bold text-xs py-2 rounded-xl gap-2 cursor-pointer transition-all"
+                                  >
+                                    <Save className="w-3.5 h-3.5" />
+                                    {isSavingSteps ? "Movement Saved!" : "Save Movement"}
+                                  </Button>
                                 </div>
                               </div>
                             </motion.div>
@@ -2478,6 +2625,7 @@ export const ProGym = ({
                             index={i}
                             log={log}
                             measurementUnits={measurementUnits}
+                            lastPerformance={getLastPerformance(ex)}
                             onToggle={handleExerciseToggle}
                             onSetRowUpdate={handleSetRowUpdate}
                             onAddSetRow={handleAddSetRow}
@@ -2529,6 +2677,7 @@ export const ProGym = ({
                           index={i}
                           log={log}
                           measurementUnits={measurementUnits}
+                          lastPerformance={getLastPerformance(ex)}
                           onToggle={handleExerciseToggle}
                           onSetRowUpdate={handleSetRowUpdate}
                           onAddSetRow={handleAddSetRow}
@@ -2787,7 +2936,7 @@ export const ProGym = ({
           </Card>
 
           {/* Measurements */}
-          <Card id="measurements-section" className="p-6 md:p-8 bg-brand-surface border-white/5">
+          <Card id="measurements-section" className="p-4 sm:p-6 md:p-8 bg-brand-surface border-white/5 overflow-hidden">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
               <div className="flex flex-col sm:flex-row sm:items-center gap-3 min-w-0">
                 <div className="flex items-center gap-3">
@@ -2819,12 +2968,12 @@ export const ProGym = ({
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-2 shrink-0 ml-auto sm:ml-0">
                 <Button 
                   variant="outline" 
                   size="sm" 
                   onClick={() => setIsAddingMeasurement(true)}
-                  className="border-white/10 hover:bg-white/5 whitespace-nowrap h-8 text-xs font-medium"
+                  className="border-white/10 hover:bg-white/5 whitespace-nowrap h-8 text-xs font-medium shrink-0"
                 >
                   {hasDayMeasurement ? 'Update Log' : 'Log New'}
                 </Button>
@@ -2832,7 +2981,7 @@ export const ProGym = ({
                   variant="ghost" 
                   size="sm" 
                   onClick={() => setIsMeasurementsExpanded(!isMeasurementsExpanded)}
-                  className="text-gray-400 hover:text-white p-1.5 h-8 w-8"
+                  className="text-gray-400 hover:text-white p-1.5 h-8 w-8 shrink-0"
                 >
                   {isMeasurementsExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                 </Button>
@@ -3642,198 +3791,8 @@ export const ProGym = ({
               )}
             </AnimatePresence>
           </Card>
-
-          {/* Weight Progression Chart */}
-          <Card className="p-4 sm:p-6 lg:p-8 bg-brand-surface border-white/5 overflow-hidden">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-white/5">
-              <div className="flex items-center gap-3 shrink-0">
-                <div className="p-2 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
-                  <TrendingUp className="w-5 h-5 text-emerald-500" />
-                </div>
-                <div>
-                  <h3 className="font-extrabold text-gray-100 uppercase tracking-wider text-sm sm:text-base">Weight Progression</h3>
-                  <p className="text-[10px] text-gray-400 font-medium">Historical trend analysis</p>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                {/* Metric Selector: Weight vs Body Fat */}
-                <div className="flex items-center p-1 bg-black/50 border border-white/10 rounded-xl shadow-inner shrink-0">
-                  <button 
-                    type="button"
-                    onClick={() => setChartMetric('weight')}
-                    className={cn(
-                      "px-3 py-1 rounded-lg text-[10px] uppercase font-black transition-all cursor-pointer",
-                      chartMetric === 'weight' 
-                        ? "bg-emerald-500 text-brand-dark shadow-md shadow-emerald-500/20 font-black" 
-                        : "text-gray-400 hover:text-gray-200"
-                    )}
-                  >
-                    Weight
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={() => setChartMetric('bodyFat')}
-                    className={cn(
-                      "px-3 py-1 rounded-lg text-[10px] uppercase font-black transition-all cursor-pointer",
-                      chartMetric === 'bodyFat' 
-                        ? "bg-purple-500 text-white shadow-md shadow-purple-500/20 font-black" 
-                        : "text-gray-400 hover:text-gray-200"
-                    )}
-                  >
-                    Body Fat
-                  </button>
-                </div>
-
-                {/* Exclusive LBS / KG toggle for this graph */}
-                {chartMetric === 'weight' && (
-                  <UnitToggle<'lbs' | 'kg'>
-                    unitA="lbs"
-                    unitB="kg"
-                    value={graphWeightUnit}
-                    onChange={(unit) => setGraphWeightUnit(unit)}
-                    size="sm"
-                    className="shrink-0"
-                  />
-                )}
-
-                {/* Current Value Display */}
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 border border-white/10 rounded-xl text-[10px] font-mono font-bold text-gray-300 shrink-0">
-                  <span className="text-gray-400 uppercase font-sans text-[9px] tracking-wider font-extrabold">Current:</span>
-                  <span className="text-brand-primary font-black">
-                    {measurements.length > 0 ? (() => {
-                      const sorted = [...measurements].sort((a, b) => b.date.localeCompare(a.date));
-                      const latest = sorted[0];
-                      if (chartMetric === 'bodyFat') {
-                        return latest.bodyFat ? `${latest.bodyFat}%` : '--';
-                      }
-                      let w = Number(latest.weight);
-                      if (!w) return '--';
-                      const loggedUnit = latest.units?.weight || 'lbs';
-                      if (loggedUnit !== graphWeightUnit) {
-                        if (graphWeightUnit === 'kg' && loggedUnit === 'lbs') w = w * 0.453592;
-                        else if (graphWeightUnit === 'lbs' && loggedUnit === 'kg') w = w / 0.453592;
-                      }
-                      return `${w.toFixed(1)} ${graphWeightUnit}`;
-                    })() : '--'}
-                  </span>
-                </div>
-
-                {/* Collapse Button */}
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => setIsWeightCollapsed(!isWeightCollapsed)}
-                  className="text-gray-400 hover:text-white p-1.5 h-8 w-8 rounded-lg hover:bg-white/5 shrink-0"
-                >
-                  {isWeightCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-                </Button>
-              </div>
-            </div>
-
-            <AnimatePresence>
-              {!isWeightCollapsed && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.3 }}
-                  className="overflow-hidden"
-                >
-                  <div className="h-[300px] w-full">
-              {measurements.length >= 1 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart
-                    data={measurements
-                      .filter(m => chartMetric === 'weight' ? (m.weight && m.weight > 0) : (m.bodyFat && m.bodyFat > 0))
-                      .map(m => {
-                        const val = chartMetric === 'weight' ? Number(m.weight) : Number(m.bodyFat);
-                        let displayVal = val;
-                        const loggedUnit = m.units?.weight || 'lbs';
-                        
-                        if (chartMetric === 'weight' && loggedUnit !== graphWeightUnit) {
-                          if (graphWeightUnit === 'kg' && loggedUnit === 'lbs') {
-                            displayVal = val * 0.453592;
-                          } else if (graphWeightUnit === 'lbs' && loggedUnit === 'kg') {
-                            displayVal = val / 0.453592;
-                          }
-                        }
-                        
-                        // Handle UTC/Local date parsing issue
-                        const dateObj = parseLocalDate(m.date);
-                        
-                        return {
-                          date: dateObj.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
-                          value: parseFloat(displayVal.toFixed(1)),
-                          originalValue: val,
-                          originalUnit: chartMetric === 'weight' ? loggedUnit : '%',
-                          rawDate: m.date
-                        };
-                      })
-                      .sort((a, b) => a.rawDate.localeCompare(b.rawDate))
-                    }
-                    margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#262626" vertical={false} />
-                    <XAxis 
-                      dataKey="date" 
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fill: '#737373', fontSize: 10, fontWeight: 900 }}
-                      dy={10}
-                    />
-                    <YAxis 
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fill: '#737373', fontSize: 10, fontWeight: 900 }}
-                      domain={['auto', 'auto']}
-                    />
-                    <Tooltip 
-                      content={({ active, payload, label }) => {
-                        if (active && payload && payload.length) {
-                          const data = payload[0].payload;
-                          return (
-                            <div className="bg-[#0A0A0A] border border-white/5 p-3 rounded-xl shadow-2xl">
-                              <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">{label}</p>
-                              <p className="text-sm font-black text-brand-primary">
-                                {data.value} {chartMetric === 'weight' ? graphWeightUnit : '%'}
-                              </p>
-                              {chartMetric === 'weight' && data.originalUnit !== graphWeightUnit && (
-                                <p className="text-[10px] text-gray-400 font-bold mt-1">
-                                  Logged as: {data.originalValue} {data.originalUnit}
-                                </p>
-                              )}
-                            </div>
-                          );
-                        }
-                        return null;
-                      }}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="value" 
-                      stroke={chartMetric === 'weight' ? '#10b981' : '#a855f7'} 
-                      strokeWidth={4}
-                      connectNulls
-                      dot={{ r: 4, fill: chartMetric === 'weight' ? '#10b981' : '#a855f7', strokeWidth: 2, stroke: '#000' }}
-                      activeDot={{ r: 6, fill: chartMetric === 'weight' ? '#10b981' : '#a855f7', stroke: '#fff', strokeWidth: 2 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex flex-col items-center justify-center text-gray-500 gap-3 border border-dashed border-white/5 rounded-2xl bg-white/[0.01]">
-                  <TrendingUp className="w-8 h-8 opacity-20 mb-2" />
-                  <p className="text-[10px] font-black uppercase tracking-widest">No Measurements Found</p>
-                  <p className="text-[10px] font-bold text-gray-600">Start logging your weight to see progress</p>
-                </div>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </Card>
-  </div>
-)}
+        </div>
+      )}
       
       <div className="mt-8 p-4 md:p-6 bg-red-500/5 border border-red-500/10 rounded-[1.5rem] md:rounded-[2rem]">
         <div className="flex gap-4 items-center">
@@ -3845,6 +3804,13 @@ export const ProGym = ({
           </p>
         </div>
       </div>
+
+      <ProgressReportModal 
+        isOpen={isProgressReportOpen}
+        onClose={() => setIsProgressReportOpen(false)}
+        userProfile={userProfile}
+        onReportSaved={onReportSaved}
+      />
     </div>
   );
 };

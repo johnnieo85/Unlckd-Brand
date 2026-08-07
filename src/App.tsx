@@ -1448,6 +1448,7 @@ export default function App() {
                 latestReport={latestReport} 
                 userProfile={userProfile} 
                 onProfileUpdate={refreshProfile}
+                onReportSaved={loadHistory}
                 onHomeClick={() => {
                   setStep('landing');
                   setActiveTab('reports');
@@ -1498,26 +1499,32 @@ export default function App() {
               exit={{ opacity: 0, scale: 0.95 }}
               className="space-y-8"
             >
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <h2 className="text-4xl font-display font-bold tracking-tight">Your Transformation History</h2>
-                  <p className="text-gray-400 mt-2 text-lg font-light">Your professional assessments, preserved and tracked.</p>
+                  <h2 className="text-2xl sm:text-4xl font-display font-bold tracking-tight">Your Transformation History</h2>
+                  <p className="text-gray-400 mt-1 sm:mt-2 text-sm sm:text-lg font-light">Your professional assessments, preserved and tracked.</p>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0">
                   <Button 
                     variant="outline" 
+                    size="sm"
                     onClick={() => loadHistory()} 
                     disabled={isLoadingHistory}
-                    className="gap-2 border-white/10 hover:bg-white/5 rounded-xl"
+                    className="gap-2 border-white/10 hover:bg-white/5 rounded-xl text-xs sm:text-sm h-9 sm:h-10 px-3 sm:px-4 cursor-pointer"
                   >
-                    <RefreshCw className={cn("w-4 h-4", isLoadingHistory && "animate-spin")} />
+                    <RefreshCw className={cn("w-3.5 h-3.5 sm:w-4 sm:h-4", isLoadingHistory && "animate-spin")} />
                     Refresh
                   </Button>
-                  <Button variant="outline" onClick={() => {
-                    setStep('landing');
-                    setSelectedReportFolder('all');
-                  }} className="gap-2 border-white/10 hover:bg-white/5 rounded-xl">
-                    <ChevronLeft className="w-4 h-4" />
+                  <Button 
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setStep('landing');
+                      setSelectedReportFolder('all');
+                    }} 
+                    className="gap-2 border-white/10 hover:bg-white/5 rounded-xl text-xs sm:text-sm h-9 sm:h-10 px-3 sm:px-4 cursor-pointer"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     Back to Dashboard
                   </Button>
                 </div>

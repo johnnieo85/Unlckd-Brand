@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check, ExternalLink, Plus, Minus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Check, ExternalLink, Plus, Minus, Trash2, ChevronDown, ChevronUp, History } from 'lucide-react';
 import { DailyLog } from '../types';
 
 interface ExerciseCardProps {
@@ -10,8 +10,9 @@ interface ExerciseCardProps {
   index: number;
   log: DailyLog | null;
   measurementUnits: { weight: 'lbs' | 'kg'; length: 'in' | 'cm' };
-  onToggle: (id: string) => void;
-  onSetRowUpdate: (id: string, sIdx: number, field: 'reps' | 'weight', val: string, defaultReps: string, defaultSets?: string) => void;
+  lastPerformance?: { weight?: string; reps?: string; date?: string; setRows?: Array<{ reps: string; weight: string }> } | null;
+  onToggle: (id: string, defaultReps?: string, defaultSets?: string) => void;
+  onSetRowUpdate: (id: string, sIdx: number, field: 'reps' | 'weight' | 'completed', val: string | boolean, defaultReps: string, defaultSets?: string) => void;
   onAddSetRow: (id: string, defaultReps: string, defaultSets?: string) => void;
   onRemoveSetRow?: (id: string, sIdx: number, defaultReps: string, defaultSets?: string) => void;
   onUpdateManualName?: (section: 'warmUp' | 'mainWork', index: number, name: string) => void;
@@ -28,6 +29,7 @@ export function ExerciseCard({
   index,
   log,
   measurementUnits,
+  lastPerformance,
   onToggle,
   onSetRowUpdate,
   onAddSetRow,
@@ -37,18 +39,38 @@ export function ExerciseCard({
   parseExercise,
   getSearchUrl
 }: ExerciseCardProps) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  // Default to collapsed as requested: "All boxes default to being collapsed"
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const { name, sets, reps, url } = parseExercise(exRaw);
   const exerciseData = log?.workoutData?.[exerciseId];
-  const isCompleted = exerciseData?.completed || false;
   const setsCount = parseInt(exerciseData?.sets || sets || '3') || 3;
 
-  const setRows: Array<{ reps: string; weight: string }> = Array.isArray(exerciseData?.setRows)
+  const setRows: Array<{ reps: string; weight: string; completed?: boolean }> = Array.isArray(exerciseData?.setRows)
     ? exerciseData.setRows
     : Array.from({ length: Math.max(1, setsCount) }, () => ({
         reps: exerciseData?.reps || reps || '',
-        weight: exerciseData?.weight || ''
+        weight: exerciseData?.weight || '',
+        completed: exerciseData?.completed || false
       }));
+
+  const allSetRowsCompleted = setRows.length > 0 && setRows.every(sr => !!sr.completed);
+  const isCompleted = exerciseData?.completed || allSetRowsCompleted;
+
+  // Format last performance string if available
+  const lastPerfText = (() => {
+    if (!lastPerformance) return null;
+    if (typeof lastPerformance === 'string') return lastPerformance;
+    if (lastPerformance.setRows && lastPerformance.setRows.length > 0) {
+      const lastSet = lastPerformance.setRows[lastPerformance.setRows.length - 1];
+      if (lastSet.weight || lastSet.reps) {
+        return `${lastSet.weight ? lastSet.weight + ' ' + measurementUnits.weight : ''} ${lastSet.reps ? '× ' + lastSet.reps + ' reps' : ''}`.trim();
+      }
+    }
+    if (lastPerformance.weight) {
+      return `${lastPerformance.weight} ${measurementUnits.weight}${lastPerformance.reps ? ' × ' + lastPerformance.reps : ''}`;
+    }
+    return null;
+  })();
 
   return (
     <div 
@@ -65,12 +87,13 @@ export function ExerciseCard({
         <div className="flex items-start gap-3 flex-1 min-w-0">
           <button 
             type="button"
-            onClick={() => onToggle(exerciseId)}
+            onClick={() => onToggle(exerciseId, reps, sets)}
             className={`w-6 h-6 rounded-lg border flex items-center justify-center transition-all shrink-0 mt-0.5 cursor-pointer ${
               isCompleted 
                 ? "bg-emerald-500 border-emerald-500 text-brand-dark shadow-md shadow-emerald-500/20" 
                 : "border-white/20 hover:border-emerald-400/50 bg-black/30"
             }`}
+            title={isCompleted ? "Mark workout in-progress" : "Mark entire exercise completed"}
           >
             {isCompleted && <Check className="w-4 h-4 stroke-[3]" />}
           </button>
@@ -115,9 +138,19 @@ export function ExerciseCard({
               </div>
             )}
 
-            <p className="text-xs text-gray-400 font-mono mt-0.5">
-              {sets ? `${sets} ${sets === '1' ? 'set' : 'sets'}` : '3 sets'} × {reps || '10-12 reps'}
-            </p>
+            <div className="flex items-center gap-3 flex-wrap mt-0.5">
+              <p className="text-xs text-gray-400 font-mono">
+                {sets ? `${sets} ${sets === '1' ? 'set' : 'sets'}` : '3 sets'} × {reps || '10-12 reps'}
+              </p>
+
+              {/* Display previously performed weight tracking badge */}
+              {lastPerfText && (
+                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-md text-[10px] font-mono text-emerald-400 font-bold">
+                  <History className="w-3 h-3 shrink-0" />
+                  <span>Last used weight: <strong className="text-white">{lastPerfText}</strong></span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -144,11 +177,12 @@ export function ExerciseCard({
         </div>
       </div>
 
-      {/* Set rows */}
+      {/* Set rows with completion checkboxes */}
       {!isCollapsed && (
         <div className="pl-0 sm:pl-9 space-y-2 pt-1">
           {/* Set Row Column Header */}
           <div className="flex items-center gap-2 text-[10px] font-mono font-bold uppercase tracking-wider text-gray-500">
+            <span className="w-7 shrink-0 text-center">Done</span>
             <span className="w-5 shrink-0 text-center">#</span>
             <div className="flex-1 flex items-center gap-2 min-w-0">
               <span className="flex-[1.4] min-w-0 px-1">Reps / Duration</span>
@@ -157,39 +191,56 @@ export function ExerciseCard({
             <span className="w-6 shrink-0"></span>
           </div>
 
-          {setRows.map((setRow, sIdx) => (
-            <div key={sIdx} className="flex items-center gap-2 text-xs">
-              <span className="w-5 text-gray-400 font-mono text-xs font-bold shrink-0 text-center">
-                {sIdx + 1}.
-              </span>
-              <div className="flex-1 flex items-center gap-2 min-w-0">
-                <input 
-                  type="text" 
-                  value={setRow.reps}
-                  placeholder={reps || '10'}
-                  onChange={(e) => onSetRowUpdate(exerciseId, sIdx, 'reps', e.target.value, reps, sets)}
-                  className="flex-[1.4] min-w-0 bg-black/40 border border-white/10 rounded-lg px-2.5 py-1.5 font-mono text-xs text-white focus:border-brand-primary outline-none transition-colors"
-                />
-                <input 
-                  type="text" 
-                  value={setRow.weight}
-                  placeholder={measurementUnits.weight}
-                  onChange={(e) => onSetRowUpdate(exerciseId, sIdx, 'weight', e.target.value, reps, sets)}
-                  className="flex-1 min-w-0 bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 font-mono text-xs text-white focus:border-brand-primary outline-none transition-colors text-center"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => onRemoveSetRow?.(exerciseId, sIdx, reps, sets)}
-                className="text-gray-500 hover:text-red-400 p-1 rounded-lg hover:bg-white/5 transition-colors shrink-0"
-                title="Delete set"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          ))}
+          {setRows.map((setRow, sIdx) => {
+            const isSetDone = setRow.completed || false;
+            return (
+              <div key={sIdx} className={`flex items-center gap-2 text-xs p-1 rounded-xl transition-all ${isSetDone ? 'bg-emerald-500/10 border border-emerald-500/20' : ''}`}>
+                {/* Individual Set Completion Box */}
+                <button
+                  type="button"
+                  onClick={() => onSetRowUpdate(exerciseId, sIdx, 'completed', !isSetDone, reps, sets)}
+                  className={`w-6 h-6 rounded-md border flex items-center justify-center transition-all shrink-0 cursor-pointer ${
+                    isSetDone 
+                      ? "bg-emerald-500 border-emerald-500 text-brand-dark shadow-sm" 
+                      : "border-white/20 hover:border-emerald-500/50 bg-black/40 text-transparent"
+                  }`}
+                  title={isSetDone ? "Mark set incomplete" : "Mark set completed"}
+                >
+                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                </button>
 
-          <div className="pt-1.5">
+                <span className="w-5 text-gray-400 font-mono text-xs font-bold shrink-0 text-center">
+                  {sIdx + 1}.
+                </span>
+                <div className="flex-1 flex items-center gap-2 min-w-0">
+                  <input 
+                    type="text" 
+                    value={setRow.reps}
+                    placeholder={reps || '10'}
+                    onChange={(e) => onSetRowUpdate(exerciseId, sIdx, 'reps', e.target.value, reps, sets)}
+                    className="flex-[1.4] min-w-0 bg-black/40 border border-white/10 rounded-lg px-2.5 py-1.5 font-mono text-xs text-white focus:border-brand-primary outline-none transition-colors"
+                  />
+                  <input 
+                    type="text" 
+                    value={setRow.weight}
+                    placeholder={lastPerfText ? `Last: ${lastPerfText}` : measurementUnits.weight}
+                    onChange={(e) => onSetRowUpdate(exerciseId, sIdx, 'weight', e.target.value, reps, sets)}
+                    className="flex-1 min-w-0 bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 font-mono text-xs text-white focus:border-brand-primary outline-none transition-colors text-center"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onRemoveSetRow?.(exerciseId, sIdx, reps, sets)}
+                  className="text-gray-500 hover:text-red-400 p-1 rounded-lg hover:bg-white/5 transition-colors shrink-0"
+                  title="Delete set"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            );
+          })}
+
+          <div className="pt-1.5 flex items-center justify-between">
             <button
               type="button"
               onClick={() => onAddSetRow(exerciseId, reps, sets)}
@@ -197,10 +248,15 @@ export function ExerciseCard({
             >
               <Plus className="w-3.5 h-3.5" /> Add Set
             </button>
+
+            {lastPerfText && (
+              <span className="text-[10px] font-mono text-gray-500 italic">
+                Reference: {lastPerfText}
+              </span>
+            )}
           </div>
         </div>
       )}
     </div>
   );
 }
-
