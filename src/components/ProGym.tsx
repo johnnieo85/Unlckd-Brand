@@ -118,8 +118,8 @@ const SortableTracker = ({ id, children }: { id: string; children: React.ReactNo
 const Ring = ({ 
   progress, 
   color, 
-  size = 120, 
-  strokeWidth = 12, 
+  size = 80, 
+  strokeWidth = 8, 
   icon: Icon,
   label 
 }: { 
@@ -135,8 +135,8 @@ const Ring = ({
   const offset = circumference - (Math.min(progress, 1) * circumference);
 
   return (
-    <div className="flex flex-col items-center gap-2 group">
-      <div className="relative" style={{ width: size, height: size }}>
+    <div className="flex flex-col items-center gap-1.5 group max-w-[90px] mx-auto">
+      <div className="relative shrink-0" style={{ width: size, height: size }}>
         <svg className="w-full h-full -rotate-90">
           <circle
             cx={size / 2}
@@ -161,12 +161,12 @@ const Ring = ({
           />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
-          <Icon className="w-6 h-6" style={{ color }} />
+          <Icon className="w-5 h-5" style={{ color }} />
         </div>
       </div>
       <div className="text-center">
-        <span className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">{label}</span>
-        <div className="text-sm font-mono font-bold text-gray-200">{Math.round(progress * 100)}%</div>
+        <span className="text-[10px] uppercase tracking-wider text-gray-400 font-bold block truncate">{label}</span>
+        <div className="text-xs font-mono font-bold text-gray-200">{Math.round(progress * 100)}%</div>
       </div>
     </div>
   );
@@ -663,11 +663,11 @@ export const ProGym = ({
     if (!workout || workout.day === 'Manual Entry') return;
 
     const warmUpStr = Array.isArray(workout.warmUp) 
-      ? workout.warmUp.map((ex: any) => `${ex.name} (${ex.videoUrl})`).join('\n')
+      ? workout.warmUp.map((ex: any) => typeof ex === 'string' ? ex : ex.name).join('\n')
       : (workout.warmUp || '');
       
     const mainWorkStr = Array.isArray(workout.mainWork)
-      ? workout.mainWork.map((ex: any) => `${ex.name} [${ex.sets}x${ex.reps}] (${ex.videoUrl})`).join('\n')
+      ? workout.mainWork.map((ex: any) => typeof ex === 'string' ? ex : `${ex.name} ${ex.sets ? `[${ex.sets}x${ex.reps}]` : ''}`).join('\n')
       : (workout.mainWork || '');
 
     const updatedManual = {
@@ -778,43 +778,54 @@ export const ProGym = ({
   // Helper to parse exercise name, sets, and reps
   const parseExercise = (rawEx: any) => {
     if (rawEx && typeof rawEx === 'object') {
+      const cleanName = String(rawEx.name || '')
+        .replace(/https?:\/\/[^\s\)]+/gi, '')
+        .replace(/[\[\]\(\)]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      const finalName = cleanName || rawEx.name || 'Exercise';
       return {
-        name: rawEx.name,
+        name: finalName,
         sets: rawEx.sets || '',
         reps: rawEx.reps || '',
-        url: rawEx.videoUrl || ''
+        url: getSearchUrl(finalName, 'Workouts')
       };
     }
     
-    const rawText = String(rawEx || '').trim().replace(/^[-*]\s*/, '');
+    const rawText = String(rawEx || '').trim().replace(/^[-*•]\s*/, '');
     
-    // Extract URL
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    const urlMatch = rawText.match(urlRegex);
-    const textWithoutUrl = rawText.replace(urlRegex, '').replace(/[\[\]]/g, '').trim();
+    // Extract & remove URL strings completely so raw links are never shown
+    const urlRegex = /(https?:\/\/[^\s\)]+)/gi;
+    const textWithoutUrl = rawText
+      .replace(urlRegex, '')
+      .replace(/\(\s*\)/g, '')
+      .replace(/[\[\]]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
 
     // Extract sets/reps: looking for patterns like (3x10), 3 sets of 10, 3x10-12
     const setsRepsRegex = /(\d+)\s*(?:sets?\s*(?:of|x|—|\*|-)\s*)(\d+(?:-\d+)?)|(?:(\d+)\s*x\s*(\d+(?:-\d+)?))/i;
     const setsRepsMatch = textWithoutUrl.match(setsRepsRegex);
     
-    let sets = '3-4';
-    let reps = '8-12';
+    let sets = '3';
+    let reps = '10-12';
     let cleanName = textWithoutUrl;
 
     if (setsRepsMatch) {
       sets = setsRepsMatch[1] || setsRepsMatch[3];
       reps = setsRepsMatch[2] || setsRepsMatch[4];
-      cleanName = textWithoutUrl.replace(setsRepsMatch[0], '').replace(/[()]/g, '').trim();
+      cleanName = textWithoutUrl.replace(setsRepsMatch[0], '').replace(/[()]/g, '').replace(/\s+/g, ' ').trim();
     } else {
-      // Fallback for just name if no sets/reps detected
-      cleanName = textWithoutUrl.replace(/[()]/g, '').trim();
+      cleanName = textWithoutUrl.replace(/[()]/g, '').replace(/\s+/g, ' ').trim();
     }
 
+    const finalName = cleanName || 'Exercise';
+
     return {
-      name: cleanName,
+      name: finalName,
       sets,
       reps,
-      url: urlMatch ? urlMatch[0] : null
+      url: getSearchUrl(finalName, 'Workouts')
     };
   };
 
@@ -1017,7 +1028,16 @@ export const ProGym = ({
     setTotalXP(calculatedTotalXP);
     
     // Streak Calculation (Consecutive Workout Days)
-    const sortedLogs = [...logs].sort((a, b) => b.date.localeCompare(a.date));
+    const combinedLogs = [...logs];
+    if (log && selectedDate) {
+      const existingIdx = combinedLogs.findIndex(l => l.date === selectedDate);
+      if (existingIdx >= 0) {
+        combinedLogs[existingIdx] = log;
+      } else {
+        combinedLogs.push(log);
+      }
+    }
+
     let streak = 0;
     
     const todayStr = getLocalDateString(new Date());
@@ -1026,8 +1046,10 @@ export const ProGym = ({
     const yesterdayStr = getLocalDateString(yesterday);
 
     const activeDays = Array.from(new Set(
-      logs.filter(l => {
-        const hasWorkout = (Number(l.completedWorkouts) || 0) > 0;
+      combinedLogs.filter(l => {
+        const hasWorkout = (Number(l.completedWorkouts) || 0) > 0 ||
+          (l.workoutData && Object.values(l.workoutData).some((ex: any) => ex?.completed || (ex?.setRows && ex.setRows.some((sr: any) => sr?.completed)))) ||
+          (l as any).completed === true;
         return hasWorkout;
       }).map(l => l.date)
     )).sort((a, b) => b.localeCompare(a));
@@ -1768,29 +1790,14 @@ export const ProGym = ({
               </Button>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={async () => {
-                await flushChanges();
-                setSelectedDate(today);
-                setTimeout(() => {
-                  const element = document.getElementById(`date-btn-${today}`);
-                  if (element) {
-                    element.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-                  }
-                }, 100);
-              }}
-              className={cn(
-                "h-7 px-3 text-[10px] font-black uppercase rounded-lg border transition-all",
-                selectedDate === today 
-                  ? "bg-brand-primary/10 border-brand-primary/30 text-brand-primary"
-                  : "bg-white/5 hover:bg-white/10 text-gray-400 hover:text-brand-primary border-white/5"
-              )}
-            >
-              Jump to Today
-            </Button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-3 py-1.5 rounded-xl text-xs font-mono font-bold text-gray-200 shadow-inner">
+              <span className="w-2 h-2 rounded-full bg-brand-primary animate-pulse shrink-0" />
+              <span className="text-gray-400 font-sans text-[10px] uppercase tracking-wider font-extrabold">Today:</span>
+              <span className="text-brand-primary font-bold">
+                {parseLocalDate(today).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+              </span>
+            </div>
           </div>
         </div>
         
@@ -1826,8 +1833,16 @@ export const ProGym = ({
                       : "bg-brand-surface border-white/5 text-gray-500 hover:border-white/10"
                   )}
                 >
-                  <span className="text-[9px] font-black uppercase tracking-widest mb-1 opacity-70">
+                  <span className="text-[9px] font-black uppercase tracking-widest mb-1 opacity-70 flex items-center gap-1">
                     {d.toLocaleDateString('en-US', { weekday: 'short' })}
+                    {isToday && (
+                      <span className={cn(
+                        "text-[7px] font-black px-1 py-0.2 rounded uppercase leading-tight",
+                        isSelected ? "bg-brand-dark/20 text-brand-dark" : "bg-brand-primary/20 text-brand-primary"
+                      )}>
+                        Today
+                      </span>
+                    )}
                   </span>
                   <div className="relative">
                     <span className="text-lg font-bold font-mono">{d.getDate()}</span>
@@ -1930,10 +1945,12 @@ export const ProGym = ({
                   exit={{ height: 0, opacity: 0 }}
                   className="overflow-hidden"
                 >
-                  <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12 relative z-10 pt-4 border-t border-white/5">
-                    <div className="grid grid-cols-3 gap-4 md:flex md:gap-8 w-full md:w-auto">
+                  <div className="flex flex-col md:flex-row items-center gap-6 md:gap-10 relative z-10 pt-4 border-t border-white/5 w-full overflow-hidden">
+                    <div className="grid grid-cols-3 gap-2 sm:gap-4 md:flex md:gap-6 w-full md:w-auto items-center justify-center max-w-full overflow-hidden py-1 px-2">
                       <div className="flex justify-center">
                         <Ring 
+                          size={80}
+                          strokeWidth={8}
                           progress={log ? (log.steps / (log.stepGoal || 10000)) : 0} 
                           color="#10b981" 
                           icon={Footprints} 
@@ -1942,6 +1959,8 @@ export const ProGym = ({
                       </div>
                       <div className="flex justify-center">
                         <Ring 
+                          size={80}
+                          strokeWidth={8}
                           progress={log ? (log.water / (log.waterGoal || 3000)) : 0} 
                           color="#3b82f6" 
                           icon={Droplets} 
@@ -1950,6 +1969,8 @@ export const ProGym = ({
                       </div>
                       <div className="flex justify-center">
                         <Ring 
+                          size={80}
+                          strokeWidth={8}
                           progress={log ? (() => {
                             const { completed, total } = getTrainingTotals();
                             return total > 0 ? completed / total : ((log.completedWorkouts || 0) > 0 ? 1 : 0);
@@ -2194,12 +2215,12 @@ export const ProGym = ({
                                 </div>
 
                                 {/* Quick Presets */}
-                                <div className="flex gap-2">
-                                  {[500, 1000, 2000, 5000].map((amount) => (
+                                <div className="grid grid-cols-3 gap-2">
+                                  {[500, 1000, 2000].map((amount) => (
                                     <Button 
                                       key={amount}
                                       variant="outline" 
-                                      className="flex-1 border-white/10 bg-white/[0.02] hover:border-emerald-500/40 hover:bg-emerald-500/10 text-xs font-bold text-emerald-400 py-2"
+                                      className="w-full border-white/10 bg-white/[0.02] hover:border-emerald-500/40 hover:bg-emerald-500/10 text-xs font-bold text-emerald-400 py-2 px-1 text-center"
                                       onClick={() => updateSteps(amount)}
                                     >
                                       +{amount >= 1000 ? `${amount / 1000}k` : amount} Steps
@@ -2288,27 +2309,14 @@ export const ProGym = ({
                 />
 
                 {!isTrainingCollapsed && latestReport && (
-                  <>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      className={cn(
-                        "text-[10px] font-black uppercase tracking-widest px-2.5 h-8 whitespace-nowrap",
-                        log?.useManualWorkout ? "bg-brand-primary/10 border-brand-primary/20 text-brand-primary" : "border-white/10 text-gray-300 hover:text-white"
-                      )}
-                      onClick={toggleManualMode}
-                    >
-                      {log?.useManualWorkout ? 'Manual Mode' : 'Guided Plan'}
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      className="border-brand-primary/20 hover:bg-brand-primary/10 text-brand-primary h-8 px-2.5 text-[10px] font-black uppercase tracking-widest whitespace-nowrap"
-                      onClick={importWorkoutFromPlan}
-                    >
-                      Sync Plan
-                    </Button>
-                  </>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="border-white/10 hover:bg-white/10 text-gray-300 h-8 px-2.5 text-[10px] font-black uppercase tracking-widest whitespace-nowrap"
+                    onClick={importWorkoutFromPlan}
+                  >
+                    Sync Plan
+                  </Button>
                 )}
 
                 {!isTrainingCollapsed && !latestReport && (
@@ -2570,7 +2578,7 @@ export const ProGym = ({
                   </>
                 )}
                 <Badge className="bg-brand-primary/10 text-brand-primary border-brand-primary/20 font-black text-[10px]">
-                  {log?.useManualWorkout ? 'MANUAL EDITS ENABLED' : 'GUIDED PLAN'}
+                  {log?.useManualWorkout ? 'MANUAL EDITS ENABLED' : 'PRESCRIBED PLAN'}
                 </Badge>
                 <Button 
                   variant="ghost" 

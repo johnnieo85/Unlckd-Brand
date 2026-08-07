@@ -3424,52 +3424,90 @@ export default function App() {
                                  </td>
                                 <td className="px-4 py-4 border-r border-gray-800 text-gray-400 text-xs">
   <div className="space-y-1">
-    {(Array.isArray(day.warmUp) ? day.warmUp : []).map((ex, idx) => (
-      <div key={idx} className="flex items-center gap-1">
-        <a 
-          href={`https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name + ' exercise demonstration')}`}
-          target="_blank" 
-          rel="noopener noreferrer" 
-          className="text-brand-primary hover:underline font-medium"
-        >
-          - {ex.name}
-        </a>
-      </div>
-    ))}
+    {(Array.isArray(day.warmUp) ? day.warmUp : []).map((ex, idx) => {
+      const rawName = typeof ex === 'string' ? ex : (ex?.name || '');
+      const name = rawName.replace(/\[(.*?)\]\(.*?\)/g, '$1').replace(/https?:\/\/[^\s\)]+/gi, '').replace(/[\(\)]/g, ' ').replace(/^[-*•]\s*/, '').replace(/\s+/g, ' ').trim();
+      if (!name) return null;
+      return (
+        <div key={idx} className="flex items-center gap-1">
+          <a 
+            href={`https://www.youtube.com/results?search_query=${encodeURIComponent(name + ' exercise demonstration')}`}
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="text-brand-primary hover:underline font-medium"
+            title={`Search "${name}" on YouTube`}
+          >
+            - {name}
+          </a>
+        </div>
+      );
+    })}
     {!Array.isArray(day.warmUp) && (
-      <ReactMarkdown components={{ a: ({node, ...props}) => {
-        const title = (props.children?.[0] as string) || 'Exercise';
-        const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(title + ' demonstration')}`;
-        return <a {...props} href={searchUrl} className="text-brand-primary hover:underline" target="_blank" rel="noopener noreferrer" />;
-      }}}>
-        {String(day.warmUp || '')}
-      </ReactMarkdown>
+      <div className="space-y-1">
+        {String(day.warmUp || '').split(/[\n,]/).map((line, idx) => {
+          const name = line.replace(/\[(.*?)\]\(.*?\)/g, '$1').replace(/https?:\/\/[^\s\)]+/gi, '').replace(/[\(\)]/g, ' ').replace(/^[-*•]\s*/, '').replace(/\s+/g, ' ').trim();
+          if (!name) return null;
+          return (
+            <div key={idx} className="flex items-center gap-1">
+              <a 
+                href={`https://www.youtube.com/results?search_query=${encodeURIComponent(name + ' exercise demonstration')}`}
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-brand-primary hover:underline font-medium"
+                title={`Search "${name}" on YouTube`}
+              >
+                - {name}
+              </a>
+            </div>
+          );
+        })}
+      </div>
     )}
   </div>
 </td>
 <td className="px-4 py-4 border-r border-gray-800 text-gray-300 font-medium">
   <div className="space-y-1">
-    {(Array.isArray(day.mainWork) ? day.mainWork : []).map((ex, idx) => (
-      <div key={idx} className="flex items-center gap-1">
-        <a 
-          href={`https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name + ' exercise tutorial')}`}
-          target="_blank" 
-          rel="noopener noreferrer" 
-          className="text-brand-primary hover:underline"
-        >
-          - {ex.name}
-        </a>
-        <span className="text-[10px] text-gray-500 font-mono ml-auto">{ex.sets}x{ex.reps}</span>
-      </div>
-    ))}
+    {(Array.isArray(day.mainWork) ? day.mainWork : []).map((ex, idx) => {
+      const rawName = typeof ex === 'string' ? ex : (ex?.name || '');
+      const name = rawName.replace(/\[(.*?)\]\(.*?\)/g, '$1').replace(/https?:\/\/[^\s\)]+/gi, '').replace(/[\(\)]/g, ' ').replace(/^[-*•]\s*/, '').replace(/\s+/g, ' ').trim();
+      if (!name) return null;
+      return (
+        <div key={idx} className="flex items-center gap-1">
+          <a 
+            href={`https://www.youtube.com/results?search_query=${encodeURIComponent(name + ' exercise tutorial')}`}
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="text-brand-primary hover:underline"
+            title={`Search "${name}" on YouTube`}
+          >
+            - {name}
+          </a>
+          {(typeof ex === 'object' && (ex?.sets || ex?.reps)) && (
+            <span className="text-[10px] text-gray-500 font-mono ml-auto">{ex.sets}x{ex.reps}</span>
+          )}
+        </div>
+      );
+    })}
     {!Array.isArray(day.mainWork) && (
-      <ReactMarkdown components={{ a: ({node, ...props}) => {
-        const title = (props.children?.[0] as string) || 'Exercise';
-        const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(title + ' tutorial')}`;
-        return <a {...props} href={searchUrl} className="text-brand-primary hover:underline" target="_blank" rel="noopener noreferrer" />;
-      }}}>
-        {String(day.mainWork || '')}
-      </ReactMarkdown>
+      <div className="space-y-1">
+        {String(day.mainWork || '').split('\n').map((line, idx) => {
+          const name = line.replace(/\[(.*?)\]\(.*?\)/g, '$1').replace(/https?:\/\/[^\s\)]+/gi, '').replace(/[\(\)]/g, ' ').replace(/^[-*•]\s*/, '').replace(/\s+/g, ' ').trim();
+          if (!name) return null;
+          return (
+            <div key={idx} className="flex items-center gap-1">
+              <a 
+                href={`https://www.youtube.com/results?search_query=${encodeURIComponent(name + ' exercise tutorial')}`}
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-brand-primary hover:underline"
+                title={`Search "${name}" on YouTube`}
+              >
+                - {name}
+              </a>
+            </div>
+          );
+        })}
+      </div>
     )}
   </div>
 </td>

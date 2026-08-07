@@ -15,6 +15,7 @@ import {
   ShieldCheck, 
   Sparkles,
   Camera,
+  Trash2,
   Activity
 } from 'lucide-react';
 import { Card, Badge as UiBadge } from './ui/Card';
@@ -71,6 +72,13 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   // State for editable profile fields
   const [fullName, setFullName] = useState(userProfile?.fullName || userName || 'Marcus Vance');
   const [avatarUrl, setAvatarUrl] = useState(userProfile?.avatarUrl || '');
+
+  // Keep avatar synced if userProfile updates
+  React.useEffect(() => {
+    if (userProfile?.avatarUrl !== undefined) {
+      setAvatarUrl(userProfile.avatarUrl || '');
+    }
+  }, [userProfile?.avatarUrl]);
   
   // Height state
   const initialHeightInches = userProfile?.height || 70;
@@ -126,28 +134,97 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
     return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
   };
 
+  const processImageFile = (file: File) => {
+    if (!file || !file.type.startsWith('image/')) return;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      if (!dataUrl) return;
+
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_SIZE = 320;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_SIZE) {
+            height = Math.round((height * MAX_SIZE) / width);
+            width = MAX_SIZE;
+          }
+        } else {
+          if (height > MAX_SIZE) {
+            width = Math.round((width * MAX_SIZE) / height);
+            height = MAX_SIZE;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressed = canvas.toDataURL('image/jpeg', 0.85);
+          setAvatarUrl(compressed);
+        } else {
+          setAvatarUrl(dataUrl);
+        }
+      };
+      img.onerror = () => {
+        setAvatarUrl(dataUrl);
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleAvatarDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        setAvatarUrl(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (file) {
+      processImageFile(file);
     }
   };
 
   const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        setAvatarUrl(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (file) {
+      processImageFile(file);
     }
+    // reset input value so re-selecting same file triggers onChange
+    e.target.value = '';
   };
+
+  const handleRemoveAvatar = () => {
+    setAvatarUrl('');
+  };
+
+  const isInitialMount = React.useRef(true);
+
+  React.useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    const timer = setTimeout(() => {
+      handleSaveProfile();
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [
+    fullName,
+    avatarUrl,
+    feetInput,
+    inchesInput,
+    heightCmInput,
+    heightUnit,
+    weight,
+    weightUnit,
+    goalWeight,
+    measurements,
+    measurementLengthUnit
+  ]);
 
   const handleSaveProfile = async () => {
     if (!userProfile?.userId) return;
@@ -184,7 +261,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
       });
       setSaveSuccess(true);
       onProfileUpdate();
-      setTimeout(() => setSaveSuccess(false), 2500);
+      setTimeout(() => setSaveSuccess(false), 2000);
     } catch (err) {
       console.error('Failed to update profile:', err);
     } finally {
@@ -243,7 +320,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
           className="flex items-center justify-between cursor-pointer group"
         >
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full overflow-hidden border border-brand-primary/50 bg-black/40 flex items-center justify-center text-xs font-black text-brand-primary">
+            <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-brand-primary/50 bg-black/40 flex items-center justify-center text-xs font-black text-brand-primary shrink-0 shadow-md">
               {avatarUrl ? (
                 <img src={avatarUrl} alt={fullName} className="w-full h-full object-cover" />
               ) : (
@@ -251,10 +328,10 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               )}
             </div>
             <div>
-              <h2 className="text-sm font-black text-white group-hover:text-brand-primary transition-colors flex items-center gap-2">
-                Athlete Profile Header
+              <h2 className="text-sm sm:text-base font-black text-white group-hover:text-brand-primary transition-colors flex items-center gap-2">
+                Athlete Profile
                 <UiBadge className={cn(
-                  "text-[8px] font-black uppercase tracking-wider",
+                  "text-[8px] font-black uppercase tracking-wider px-2 py-0.5",
                   isTrainer 
                     ? "bg-amber-400/20 text-amber-400 border-amber-400/40" 
                     : "bg-brand-primary/20 text-brand-primary border-brand-primary/40"
@@ -262,36 +339,25 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                   {isTrainer ? 'Pro Trainer' : 'Athlete Member'}
                 </UiBadge>
               </h2>
-              <p className="text-[10px] text-gray-400">Level {level} • Streak {userProfile?.streak || 14} Days • XP {userProfile?.xp || 1250}</p>
+              <p className="text-[11px] text-gray-400 font-medium mt-0.5">Level {level} • Streak {userProfile?.streak ?? 0} Days • XP {userProfile?.xp ?? 0}</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <Button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleSaveProfile();
-              }}
-              disabled={isSaving}
-              size="sm"
-              className={cn(
-                "gap-1.5 font-black text-[10px] uppercase px-4 py-1.5 transition-all",
-                saveSuccess 
-                  ? "bg-emerald-500 text-brand-dark" 
-                  : "bg-brand-primary text-brand-dark hover:bg-brand-primary/90"
+          <div className="flex items-center gap-2.5">
+            <AnimatePresence>
+              {saveSuccess && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  className="flex items-center gap-1 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold px-2.5 py-1 rounded-full"
+                >
+                  <Check className="w-3 h-3 text-emerald-400" />
+                  <span>Auto-saved</span>
+                </motion.div>
               )}
-            >
-              {saveSuccess ? (
-                <>
-                  <Check className="w-3.5 h-3.5" /> Saved!
-                </>
-              ) : (
-                <>
-                  <Save className="w-3.5 h-3.5" /> Save
-                </>
-              )}
-            </Button>
-            <div className="p-1.5 bg-white/5 rounded-lg border border-white/10 text-gray-400 group-hover:text-white">
+            </AnimatePresence>
+            <div className="p-1.5 bg-white/5 rounded-lg border border-white/10 text-gray-400 group-hover:text-white transition-colors">
               {isProfileHeaderOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </div>
           </div>
@@ -306,39 +372,59 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               className="overflow-hidden pt-4 border-t border-white/5"
             >
               <div className="flex flex-col sm:flex-row items-center gap-6">
-                {/* Avatar with Drag & Drop */}
-                <div className="relative group">
-                  <div 
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={handleAvatarDrop}
-                    className="w-24 h-24 rounded-full overflow-hidden border-2 border-brand-primary/50 bg-black/40 flex items-center justify-center relative cursor-pointer shadow-xl transition-all group-hover:border-brand-primary"
-                  >
-                    {avatarUrl ? (
-                      <img src={avatarUrl} alt={fullName} className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-3xl font-display font-black text-brand-primary tracking-wider">
-                        {computeInitials(fullName)}
+                {/* Avatar with Drag & Drop and Action Buttons */}
+                <div className="flex flex-col items-center gap-2 shrink-0">
+                  <div className="relative group">
+                    <div 
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={handleAvatarDrop}
+                      className="w-24 h-24 rounded-full overflow-hidden border-2 border-brand-primary/50 bg-black/40 flex items-center justify-center relative cursor-pointer shadow-xl transition-all group-hover:border-brand-primary"
+                    >
+                      {avatarUrl ? (
+                        <img src={avatarUrl} alt={fullName} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-3xl font-display font-black text-brand-primary tracking-wider">
+                          {computeInitials(fullName)}
+                        </span>
+                      )}
+                      <label className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-[10px] text-white font-bold cursor-pointer transition-opacity">
+                        <Camera className="w-5 h-5 mb-1 text-brand-primary" />
+                        <span>Upload</span>
+                        <input type="file" accept="image/*" onChange={handleAvatarSelect} className="hidden" />
+                      </label>
+                    </div>
+                    {isTrainer && (
+                      <span className="absolute -bottom-1 -right-1 bg-amber-400 text-brand-dark p-1 rounded-full text-[10px] shadow-lg" title="Trainer Tier Account">
+                        <ShieldCheck className="w-4 h-4" />
                       </span>
                     )}
-                    <label className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-[10px] text-white font-bold cursor-pointer transition-opacity">
-                      <Camera className="w-5 h-5 mb-1 text-brand-primary" />
-                      <span>Upload</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 pt-0.5">
+                    <label className="text-[10px] font-bold text-brand-primary hover:text-white cursor-pointer bg-brand-primary/10 hover:bg-brand-primary/20 border border-brand-primary/30 px-2 py-1 rounded transition-colors flex items-center gap-1">
+                      <Upload className="w-3 h-3" />
+                      <span>{avatarUrl ? 'Change' : 'Upload'}</span>
                       <input type="file" accept="image/*" onChange={handleAvatarSelect} className="hidden" />
                     </label>
+                    {avatarUrl && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveAvatar}
+                        className="text-[10px] font-bold text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 px-2 py-1 rounded transition-colors flex items-center gap-1"
+                        title="Remove photo"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>Remove</span>
+                      </button>
+                    )}
                   </div>
-                  {isTrainer && (
-                    <span className="absolute -bottom-1 -right-1 bg-amber-400 text-brand-dark p-1 rounded-full text-[10px] shadow-lg" title="Trainer Tier Account">
-                      <ShieldCheck className="w-4 h-4" />
-                    </span>
-                  )}
                 </div>
 
                 {/* Core Info */}
-                <div className="space-y-2 text-center sm:text-left flex-1">
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <div className="space-y-2.5 text-center sm:text-left flex-1">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 justify-center sm:justify-start">
                     <h1 className="text-2xl font-display font-black text-white">{fullName}</h1>
                     <UiBadge className={cn(
-                      "text-[9px] font-black uppercase tracking-wider self-center sm:self-auto",
+                      "text-[9px] font-black uppercase tracking-wider self-center sm:self-auto px-2.5 py-0.5",
                       isTrainer 
                         ? "bg-amber-400/20 text-amber-400 border-amber-400/40" 
                         : "bg-brand-primary/20 text-brand-primary border-brand-primary/40"
@@ -346,44 +432,20 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                       {isTrainer ? 'Pro Trainer' : 'Athlete Member'}
                     </UiBadge>
                   </div>
-                  <p className="text-xs text-gray-400">{userEmail || 'registered@unlckd.com'}</p>
+                  <p className="text-xs text-gray-400 font-medium">{userEmail || 'registered@unlckd.com'}</p>
                   <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 pt-1 text-xs">
                     <span className="text-gray-300 font-mono">
                       Level <strong className="text-brand-primary">{level}</strong>
                     </span>
                     <span className="text-gray-500">•</span>
                     <span className="text-gray-300 font-mono">
-                      Streak <strong className="text-amber-400">{userProfile?.streak || 14} Days</strong>
+                      Streak <strong className="text-amber-400">{userProfile?.streak ?? 0} Days</strong>
                     </span>
                     <span className="text-gray-500">•</span>
                     <span className="text-gray-300 font-mono">
                       XP <strong className="text-emerald-400">{userProfile?.xp || 1250}</strong>
                     </span>
                   </div>
-                </div>
-
-                {/* Save Button */}
-                <div className="w-full sm:w-auto">
-                  <Button
-                    onClick={handleSaveProfile}
-                    disabled={isSaving}
-                    className={cn(
-                      "w-full sm:w-auto gap-2 font-black text-xs uppercase px-6 py-2.5 transition-all",
-                      saveSuccess 
-                        ? "bg-emerald-500 text-brand-dark" 
-                        : "bg-brand-primary text-brand-dark hover:bg-brand-primary/90"
-                    )}
-                  >
-                    {saveSuccess ? (
-                      <>
-                        <Check className="w-4 h-4" /> Saved!
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-4 h-4" /> Save Changes
-                      </>
-                    )}
-                  </Button>
                 </div>
               </div>
             </motion.div>

@@ -98,11 +98,20 @@ export function ExerciseCard({
               </div>
             ) : (
               <div className="flex items-center gap-2 flex-wrap">
-                <h4 className={`text-base font-bold text-white transition-all ${
-                  isCompleted ? "line-through text-gray-400" : ""
-                }`}>
-                  {name}
-                </h4>
+                <a 
+                  href={url || getSearchUrl(name, 'Workouts')}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="group/title inline-flex items-center gap-1.5 hover:underline decoration-brand-primary decoration-2"
+                  title={`Search "${name}" demonstration on YouTube`}
+                >
+                  <h4 className={`text-base font-bold text-white group-hover/title:text-brand-primary transition-all ${
+                    isCompleted ? "line-through text-gray-400" : ""
+                  }`}>
+                    {name}
+                  </h4>
+                </a>
               </div>
             )}
 
