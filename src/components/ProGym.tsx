@@ -1843,11 +1843,11 @@ export const ProGym = ({
             <div className="text-[10px] md:text-xs font-black uppercase tracking-[0.2em] text-brand-primary/60 mt-1 md:mt-2 text-center md:text-left">
               {getLevelInfo(totalXP).title} • {currentStreak} Day Workout Streak
             </div>
-            <div className="flex items-center justify-center md:justify-start gap-4 mt-3">
+            <div className="flex items-center justify-center md:justify-start gap-3 sm:gap-4 mt-3 flex-wrap">
               <button 
                 onClick={() => setActiveView('hub')}
                 className={cn(
-                  "text-[10px] md:text-[11px] font-black uppercase tracking-widest transition-all",
+                  "text-[10px] md:text-[11px] font-black uppercase tracking-widest transition-all cursor-pointer",
                   activeView === 'hub' ? "text-brand-primary" : "text-gray-500 hover:text-gray-300"
                 )}
               >
@@ -1857,11 +1857,18 @@ export const ProGym = ({
               <button 
                 onClick={() => setActiveView('report')}
                 className={cn(
-                  "text-[10px] md:text-[11px] font-black uppercase tracking-widest transition-all",
+                  "text-[10px] md:text-[11px] font-black uppercase tracking-widest transition-all cursor-pointer",
                   activeView === 'report' ? "text-brand-primary" : "text-gray-500 hover:text-gray-300"
                 )}
               >
                 Consistency
+              </button>
+              <div className="w-1 h-1 rounded-full bg-gray-800" />
+              <button 
+                onClick={() => setIsProgressReportOpen(true)}
+                className="text-[10px] md:text-[11px] font-black uppercase tracking-widest text-gray-500 hover:text-brand-primary transition-all cursor-pointer"
+              >
+                Progress Report
               </button>
             </div>
           </div>
@@ -1872,8 +1879,8 @@ export const ProGym = ({
         <>
       {/* Daily Navigation */}
       <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between px-2">
-          <div className="relative group/header-date">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-2">
+          <div className="relative group/header-date inline-flex items-center">
             <input 
               type="date"
               className="absolute inset-0 opacity-0 cursor-pointer z-10 w-full"
@@ -1884,35 +1891,14 @@ export const ProGym = ({
                 setUnlockedDates(prev => new Set([...prev, e.target.value]));
               }}
             />
-            <div className="flex items-center gap-2 cursor-pointer">
-              <Calendar className="w-4 h-4 text-brand-primary group-hover/header-date:scale-110 transition-all" />
-              <span className="text-xs font-black uppercase tracking-widest text-gray-400 group-hover/header-date:text-white transition-colors">
+            <div className="flex items-center gap-2 cursor-pointer bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-1.5 rounded-xl transition-all shadow-sm">
+              <Calendar className="w-4 h-4 text-brand-primary group-hover/header-date:scale-110 transition-all shrink-0" />
+              <span className="text-xs font-black uppercase tracking-widest text-gray-300 group-hover/header-date:text-white transition-colors">
                 {latestReport ? `Report Schedule • Week ${currentWeekNumber}` : 'Weekly Activity'}
               </span>
             </div>
-            {latestReport && (
-              <Button 
-                variant="ghost" 
-                size="sm"
-                className="h-6 px-2 text-[10px] font-black uppercase tracking-widest text-brand-primary hover:bg-brand-primary/10 border border-brand-primary/20"
-                onClick={syncAllFutureDays}
-                disabled={isSyncing}
-              >
-                {isSyncing ? 'Syncing...' : 'Sync & Reset Hub'}
-              </Button>
-            )}
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsProgressReportOpen(true)}
-              className="bg-brand-primary/10 border-brand-primary/30 text-brand-primary hover:bg-brand-primary/20 text-xs font-bold rounded-xl gap-1.5 cursor-pointer shadow-sm"
-            >
-              <ClipboardList className="w-3.5 h-3.5" />
-              Progress Report
-            </Button>
-
+          <div className="flex items-center gap-2">
             <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-3 py-1.5 rounded-xl text-xs font-mono font-bold text-gray-200 shadow-inner">
               <span className="w-2 h-2 rounded-full bg-brand-primary animate-pulse shrink-0" />
               <span className="text-gray-400 font-sans text-[10px] uppercase tracking-wider font-extrabold">Today:</span>

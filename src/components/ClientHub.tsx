@@ -11,7 +11,8 @@ import {
   ChevronRight,
   Send,
   Eye,
-  UserCheck
+  UserCheck,
+  ClipboardList
 } from 'lucide-react';
 import { Card, Badge } from './ui/Card';
 import { Button } from './ui/Button';
@@ -22,6 +23,7 @@ interface ClientHubProps {
   userProfile: UserProfile | null;
   onProfileUpdate: () => void;
   onSyncToGymHub?: (report: SavedReport) => void;
+  onViewProgressReport?: (client: ClientData) => void;
 }
 
 export interface ClientData {
@@ -32,6 +34,38 @@ export interface ClientData {
   status: 'Active - Compliant' | 'Needs Meal Plan Sync' | 'Physique Assessed' | '3 Days Active';
   lastActive: string;
   avatar: string;
+  photoUrl?: string;
+  height?: number;
+  age?: number;
+  weight?: number;
+  goalWeight?: number;
+  startWeight?: number;
+  measurements?: {
+    chest?: number;
+    waist?: number;
+    shoulders?: number;
+    neck?: number;
+    hips?: number;
+    bicepLeft?: number;
+    bicepRight?: number;
+    thighLeft?: number;
+    thighRight?: number;
+    calf?: number;
+  };
+  lifts?: {
+    exercise: string;
+    start: number;
+    latest: number;
+  }[];
+  compliance?: {
+    workoutCompletedSets: number;
+    workoutPrescribedSets: number;
+    habitPercentage: number;
+    mealPercentage: number;
+    avgSteps: number;
+    avgWaterOz: number;
+  };
+  badges?: string[];
   reports: {
     id: string;
     type: 'full' | 'meal' | 'assessment';
@@ -45,12 +79,35 @@ export interface ClientData {
 const SAMPLE_CLIENTS: ClientData[] = [
   {
     id: 'client-1',
-    name: 'Marcus Vance',
-    email: 'marcus.v@example.com',
-    dietType: 'High Protein Keto',
+    name: 'Marcus Reyes',
+    email: 'marcus.reyes@example.com',
+    dietType: 'High Protein Recomp',
     status: 'Active - Compliant',
     lastActive: '2 hours ago',
-    avatar: 'MV',
+    avatar: 'MR',
+    height: 72,
+    age: 39,
+    weight: 132.5,
+    goalWeight: 133,
+    startWeight: 136.3,
+    measurements: {},
+    lifts: [
+      { exercise: 'Kettlebell Swings', start: 45, latest: 49 },
+      { exercise: 'Goblet Squats', start: 67, latest: 71 },
+      { exercise: 'Battle Ropes', start: 88, latest: 93 },
+      { exercise: 'Renegade Rows', start: 110, latest: 115 },
+      { exercise: 'Burpees', start: 131, latest: 137 },
+      { exercise: 'Med Ball Slams', start: 152, latest: 159 }
+    ],
+    compliance: {
+      workoutCompletedSets: 197,
+      workoutPrescribedSets: 280,
+      habitPercentage: 58,
+      mealPercentage: 70,
+      avgSteps: 6919,
+      avgWaterOz: 74
+    },
+    badges: ['Weight Goal On Track'],
     reports: [
       {
         id: 'rep-101',
@@ -137,7 +194,8 @@ const SAMPLE_CLIENTS: ClientData[] = [
 export const ClientHub: React.FC<ClientHubProps> = ({
   userProfile,
   onProfileUpdate,
-  onSyncToGymHub
+  onSyncToGymHub,
+  onViewProgressReport
 }) => {
   const isTrainer = userProfile?.membershipTier === 'trainer';
   const [selectedClient, setSelectedClient] = useState<ClientData>(SAMPLE_CLIENTS[0]);
@@ -261,7 +319,17 @@ export const ClientHub: React.FC<ClientHubProps> = ({
 
                   <div className="mt-3 pt-3 border-t border-white/5 flex items-center justify-between text-[10px]">
                     <span className="font-mono text-emerald-400 font-bold">{client.status}</span>
-                    <span className="text-gray-500">{client.lastActive}</span>
+                    <Button
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onViewProgressReport) onViewProgressReport(client);
+                      }}
+                      className="bg-brand-primary/10 hover:bg-brand-primary/20 text-brand-primary border border-brand-primary/30 text-[10px] h-7 font-bold py-1 px-2.5 rounded-lg gap-1 transition-all cursor-pointer"
+                    >
+                      <ClipboardList className="w-3 h-3" />
+                      Progress Report
+                    </Button>
                   </div>
                 </Card>
               );
@@ -273,7 +341,7 @@ export const ClientHub: React.FC<ClientHubProps> = ({
         <div className="lg:col-span-7 space-y-6">
           <Card className="p-6 bg-brand-surface border-white/10 space-y-6">
             {/* Selected Client Header */}
-            <div className="flex items-center justify-between border-b border-white/5 pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-4">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-brand-primary/20 border border-brand-primary/40 flex items-center justify-center font-black text-sm text-brand-primary">
                   {selectedClient.avatar}
@@ -284,9 +352,21 @@ export const ClientHub: React.FC<ClientHubProps> = ({
                 </div>
               </div>
 
-              <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-[10px] font-mono">
-                {selectedClient.status}
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    if (onViewProgressReport) onViewProgressReport(selectedClient);
+                  }}
+                  className="bg-brand-primary text-brand-dark hover:bg-brand-primary/90 font-bold text-xs px-3.5 py-1.5 rounded-xl gap-1.5 shadow-md transition-all cursor-pointer"
+                >
+                  <ClipboardList className="w-3.5 h-3.5" />
+                  View Progress Report
+                </Button>
+                <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 text-[10px] font-mono">
+                  {selectedClient.status}
+                </Badge>
+              </div>
             </div>
 
             {/* Reports Section */}

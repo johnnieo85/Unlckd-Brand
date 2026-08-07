@@ -62,24 +62,26 @@ export const LevelInfoModal = ({ isOpen, onClose, xp }: LevelInfoModalProps) => 
               </div>
 
               {/* Progress Summary */}
-              <div className="bg-brand-dark/50 rounded-2xl p-6 border border-white/5">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <span className="text-4xl font-display font-black text-brand-primary">Lvl {currentLevelInfo.level}</span>
-                    <Badge className="bg-brand-primary/10 text-brand-primary border-brand-primary/20">
+              <div className="bg-brand-dark/50 rounded-2xl p-6 border border-white/5 space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="text-3xl sm:text-4xl font-display font-black text-brand-primary whitespace-nowrap">
+                      Lvl {currentLevelInfo.level}
+                    </span>
+                    <Badge className="bg-brand-primary/10 text-brand-primary border-brand-primary/20 whitespace-nowrap px-2.5 py-1 text-[11px] font-bold tracking-wider">
                       {currentLevelInfo.title}
                     </Badge>
                   </div>
-                  <div className="text-right">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 block mb-1">Total XP</span>
-                    <span className="text-xl font-mono font-bold text-white">{xp.toLocaleString()}</span>
+                  <div className="flex items-center sm:flex-col sm:items-end justify-between sm:justify-center border-t sm:border-t-0 border-white/5 pt-3 sm:pt-0">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 block">Total XP</span>
+                    <span className="text-xl sm:text-2xl font-mono font-bold text-white whitespace-nowrap">{xp.toLocaleString()}</span>
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
                     <span className="text-brand-primary">Progress to Lvl {currentLevelInfo.level + 1}</span>
-                    <span className="text-gray-500">{Math.round(currentLevelInfo.progress)}%</span>
+                    <span className="text-gray-400 font-mono font-bold">{Math.round(currentLevelInfo.progress)}%</span>
                   </div>
                   <div className="h-3 bg-white/5 rounded-full overflow-hidden p-0.5 border border-white/10">
                     <motion.div 
@@ -120,12 +122,14 @@ export const LevelInfoModal = ({ isOpen, onClose, xp }: LevelInfoModalProps) => 
                     >
                       <div className="flex items-center gap-4">
                         <div className={cn(
-                          "w-12 h-12 rounded-xl flex items-center justify-center font-display font-black text-xl border",
-                          isReached 
-                            ? "bg-brand-primary/20 border-brand-primary/20 text-brand-primary" 
-                            : "bg-white/5 border-white/5 text-gray-600"
+                          "w-11 h-11 rounded-xl flex items-center justify-center font-display font-black text-lg border shrink-0",
+                          isCurrent
+                            ? "bg-brand-primary/20 border-brand-primary/40 text-brand-primary" 
+                            : isReached 
+                              ? "bg-brand-primary/10 border-brand-primary/20 text-brand-primary/80" 
+                              : "bg-white/5 border-white/5 text-gray-500"
                         )}>
-                          {lvl.level === 10 ? 'MAX' : lvl.level}
+                          {lvl.level}
                         </div>
                         
                         <div className="flex-1 min-w-0">

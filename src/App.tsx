@@ -68,6 +68,9 @@ import { ensureUserProfile, checkUserAccess, unlockPremium } from './services/ac
 
 import { Header } from './components/Header';
 import { Logo } from './components/Logo';
+import { LevelInfoModal } from './components/LevelInfoModal';
+import { ProgressReportModal } from './components/ProgressReportModal';
+import { ClientData } from './components/ClientHub';
 
 const RatingTable = ({ title, ratings = [], summary, photo }: { title: string; ratings?: Rating[]; summary?: string; photo?: string | null }) => (
   <div className="space-y-6">
@@ -667,6 +670,9 @@ export default function App() {
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
   const [selectedFaq, setSelectedFaq] = useState<any>(null);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+  const [isLevelModalOpen, setIsLevelModalOpen] = useState(false);
+  const [clientReportData, setClientReportData] = useState<ClientData | null>(null);
+  const [isClientReportOpen, setIsClientReportOpen] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
   const [accountError, setAccountError] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState('');
@@ -1433,6 +1439,7 @@ export default function App() {
         handleSignOut={handleSignOut}
         setShowGymAuth={setShowGymAuth}
         onShowAccount={() => setIsAccountModalOpen(true)}
+        onOpenLevelModal={() => setIsLevelModalOpen(true)}
       />
 
       <main className="relative pt-32 pb-20 px-6 max-w-6xl mx-auto">
@@ -1465,6 +1472,10 @@ export default function App() {
               <ClientHub
                 userProfile={userProfile}
                 onProfileUpdate={refreshProfile}
+                onViewProgressReport={(client) => {
+                  setClientReportData(client);
+                  setIsClientReportOpen(true);
+                }}
               />
             </motion.div>
           ) : activeTab === 'profile' ? (
@@ -1487,6 +1498,7 @@ export default function App() {
                 loadHistory={loadHistory}
                 hasAccess={hasAccess || false}
                 isPremium={isPremium}
+                onOpenLevelModal={() => setIsLevelModalOpen(true)}
               />
             </motion.div>
           ) : (
@@ -4234,6 +4246,26 @@ export default function App() {
           />
         )}
       </AnimatePresence>
+
+      <LevelInfoModal 
+        isOpen={isLevelModalOpen} 
+        onClose={() => setIsLevelModalOpen(false)} 
+        xp={userProfile?.xp || 0} 
+      />
+
+      <ProgressReportModal
+        isOpen={isClientReportOpen}
+        onClose={() => {
+          setIsClientReportOpen(false);
+          setClientReportData(null);
+        }}
+        userProfile={userProfile}
+        clientData={clientReportData}
+        onBackToClientHub={() => {
+          setIsClientReportOpen(false);
+          setClientReportData(null);
+        }}
+      />
     </div>
   );
 }

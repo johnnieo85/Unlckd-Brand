@@ -25,6 +25,7 @@ import { WeightProgressionChart } from './WeightProgressionChart';
 import { UserProfile, Badge as UserBadge } from '../types';
 import { cn } from '../lib/utils';
 import { updateUserProfile } from '../services/accessService';
+import { getLevelInfo } from '../lib/levels';
 
 interface ProfilePageProps {
   userProfile: UserProfile | null;
@@ -36,6 +37,7 @@ interface ProfilePageProps {
   loadHistory: () => Promise<void>;
   hasAccess: boolean;
   isPremium: boolean;
+  onOpenLevelModal?: () => void;
 }
 
 const DEFAULT_YEAR_BADGES: UserBadge[] = [
@@ -66,20 +68,25 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   setStep,
   loadHistory,
   hasAccess,
-  isPremium
+  isPremium,
+  onOpenLevelModal
 }) => {
   const isTrainer = userProfile?.membershipTier === 'trainer';
 
   // State for editable profile fields
   const [fullName, setFullName] = useState(userProfile?.fullName || userName || 'Marcus Vance');
   const [avatarUrl, setAvatarUrl] = useState(userProfile?.avatarUrl || '');
+  const [age, setAge] = useState<string | number>(userProfile?.age || '');
 
-  // Keep avatar synced if userProfile updates
+  // Keep avatar and age synced if userProfile updates
   React.useEffect(() => {
     if (userProfile?.avatarUrl !== undefined) {
       setAvatarUrl(userProfile.avatarUrl || '');
     }
-  }, [userProfile?.avatarUrl]);
+    if (userProfile?.age !== undefined) {
+      setAge(userProfile.age || '');
+    }
+  }, [userProfile?.avatarUrl, userProfile?.age]);
   
   // Height state
   const initialHeightInches = userProfile?.height || 70;
@@ -100,7 +107,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   const [weight, setWeight] = useState<string | number>(userProfile?.weight ?? 185);
   const [weightUnit, setWeightUnit] = useState<'lbs' | 'kg'>(userProfile?.weightUnit || 'lbs');
   const [goalWeight, setGoalWeight] = useState<string | number>(userProfile?.goalWeight ?? 175);
-  const [level, setLevel] = useState<number>(Math.floor((userProfile?.xp || 1250) / 500) + 1);
+  
+  // Dynamically calculate level using getLevelInfo to ensure exact match with Header and Level Progression modal
+  const level = getLevelInfo(userProfile?.xp || 0).level;
 
   // Membership / Account Status (Automatically associated with user database)
   const membershipTier: 'standard' | 'premium' | 'coach' = (
@@ -136,10 +145,10 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
     initialMeasurements.units?.length || 'in'
   );
 
-  const [isProfileHeaderOpen, setIsProfileHeaderOpen] = useState(false);
-  const [isPersonalMetricsOpen, setIsPersonalMetricsOpen] = useState(false);
-  const [isBodyMeasurementsOpen, setIsBodyMeasurementsOpen] = useState(false);
-  const [isBadgesOpen, setIsBadgesOpen] = useState(false);
+  const [isProfileHeaderOpen, setIsProfileHeaderOpen] = useState(true);
+  const [isPersonalMetricsOpen, setIsPersonalMetricsOpen] = useState(true);
+  const [isBodyMeasurementsOpen, setIsBodyMeasurementsOpen] = useState(true);
+  const [isBadgesOpen, setIsBadgesOpen] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -232,6 +241,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   }, [
     fullName,
     avatarUrl,
+    age,
     feetInput,
     inchesInput,
     heightCmInput,
@@ -263,6 +273,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
       await updateUserProfile(userProfile.userId, {
         fullName,
         avatarUrl,
+        age: age === '' ? '' : String(age),
         height: calcHeightInches,
         heightUnit,
         weight: numericWeight,
@@ -360,7 +371,23 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                   {accountStatusLabel}
                 </UiBadge>
               </div>
-              <p className="text-[11px] text-gray-400 font-medium">Level {level} • Streak {userProfile?.streak ?? 0} Days • XP {userProfile?.xp ?? 0}</p>
+              <p className="text-[11px] text-gray-400 font-medium flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onOpenLevelModal) onOpenLevelModal();
+                  }}
+                  className="hover:text-brand-primary transition-colors cursor-pointer font-bold underline decoration-brand-primary/40 underline-offset-2"
+                  title="Click to view Level Progression & XP"
+                >
+                  Level {level}
+                </button>
+                <span>•</span>
+                <span>Streak {userProfile?.streak ?? 0} Days</span>
+                <span>•</span>
+                <span>XP {userProfile?.xp ?? 0}</span>
+              </p>
             </div>
           </div>
 
@@ -457,9 +484,18 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                   </div>
                   <p className="text-xs text-gray-400 font-medium">{userEmail || 'registered@unlckd.com'}</p>
                   <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 pt-1 text-xs">
-                    <span className="text-gray-300 font-mono">
-                      Level <strong className="text-brand-primary">{level}</strong>
-                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onOpenLevelModal) onOpenLevelModal();
+                      }}
+                      className="text-gray-300 font-mono hover:text-brand-primary transition-colors cursor-pointer group flex items-center gap-1"
+                      title="Click to view Level Progression & XP"
+                    >
+                      <span>Level</span>
+                      <strong className="text-brand-primary group-hover:underline">{level}</strong>
+                    </button>
                     <span className="text-gray-500">•</span>
                     <span className="text-gray-300 font-mono">
                       Streak <strong className="text-amber-400">{userProfile?.streak ?? 0} Days</strong>
@@ -498,7 +534,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               exit={{ height: 0, opacity: 0 }}
               className="overflow-hidden pt-2 border-t border-white/5"
             >
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 pt-2">
                 {/* Full Name */}
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-gray-400 uppercase">Full Name</label>
@@ -507,6 +543,20 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-medium focus:border-brand-primary outline-none"
+                  />
+                </div>
+
+                {/* Age */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-gray-400 uppercase">Age</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="120"
+                    placeholder="28"
+                    value={age}
+                    onChange={(e) => setAge(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono focus:border-brand-primary outline-none"
                   />
                 </div>
 
@@ -723,7 +773,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
       </Card>
 
       {/* Weight Progression Chart (Moved to Profile) */}
-      <WeightProgressionChart defaultCollapsed={true} />
+      <WeightProgressionChart defaultCollapsed={false} />
 
       {/* Badges Section (Collapsible, Full Year Grid) */}
       <Card className="p-6 bg-brand-surface border-white/10 space-y-4">

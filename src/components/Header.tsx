@@ -36,6 +36,7 @@ export interface HeaderProps {
   handleSignOut: () => void;
   setShowGymAuth: (show: boolean) => void;
   onShowAccount: () => void;
+  onOpenLevelModal?: () => void;
 }
 
 const formatShortName = (fullName?: string | null, email?: string | null) => {
@@ -75,7 +76,8 @@ export const Header: React.FC<HeaderProps> = ({
   handleSignIn,
   handleSignOut,
   setShowGymAuth,
-  onShowAccount
+  onShowAccount,
+  onOpenLevelModal
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -173,9 +175,18 @@ export const Header: React.FC<HeaderProps> = ({
                 >
                   <div className="flex items-center gap-1.5 justify-end mb-0.5">
                     {userProfile && (
-                      <Badge className="text-[8px] h-3.5 px-1 py-0 border-brand-primary/20 bg-brand-primary/10 text-brand-primary uppercase font-black leading-none">
-                        Lvl {getLevelInfo(userProfile.xp || 0).level}
-                      </Badge>
+                      <span
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onOpenLevelModal) onOpenLevelModal();
+                        }}
+                        title="Click to view Level Progression & XP"
+                        className="inline-flex cursor-pointer"
+                      >
+                        <Badge className="text-[8px] h-3.5 px-1 py-0 border-brand-primary/30 bg-brand-primary/20 hover:bg-brand-primary/40 text-brand-primary uppercase font-black leading-none hover:scale-105 active:scale-95 transition-all shadow-sm">
+                          Lvl {getLevelInfo(userProfile.xp || 0).level}
+                        </Badge>
+                      </span>
                     )}
                     {hasAccess ? (
                       <Badge className="text-[8px] h-3.5 px-1 py-0 border-brand-primary/20 bg-brand-primary/10 text-brand-primary uppercase font-black leading-none">Pro</Badge>
