@@ -2270,16 +2270,15 @@ export const ProGym = ({
                     <h3 className="font-bold text-gray-100 text-lg sm:text-xl shrink-0">
                       {log?.useManualWorkout ? 'Manual Training Log' : 'Prescribed Training'}
                     </h3>
-                    {workoutDay?.focus && (
-                      <Badge className="bg-brand-primary/10 text-brand-primary border-brand-primary/20 font-bold text-xs py-0.5 px-2">
-                        {workoutDay.focus}
-                      </Badge>
-                    )}
+                    <Badge className="bg-brand-primary/10 text-brand-primary border-brand-primary/20 font-black text-xs py-1 px-2.5 shrink-0 flex items-center gap-1 shadow-sm">
+                      <span className="text-gray-400 font-semibold uppercase text-[10px] tracking-wider">Focus:</span>
+                      <span className="text-brand-primary font-extrabold">{workoutDay?.focus || 'Chest'}</span>
+                    </Badge>
                   </div>
                   {!isTrainingCollapsed && (
                     <span className="text-[11px] font-mono font-bold text-brand-primary/80 uppercase tracking-wider mt-0.5">
                       {parseLocalDate(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
-                      {workoutDay?.focus ? ` · ${workoutDay.focus.toUpperCase()}` : ''}
+                      {workoutDay?.focus ? ` · FOCUS: ${workoutDay.focus.toUpperCase()}` : ''}
                     </span>
                   )}
                   {isTrainingCollapsed && (
@@ -2288,7 +2287,7 @@ export const ProGym = ({
                         const { completed, total } = getTrainingTotals();
                         return (
                           <span className="text-[10px] font-mono text-brand-primary font-bold">
-                            {workoutDay?.focus ? `${workoutDay.focus.toUpperCase()} · ` : ''}{completed} / {total} EXERCISES DONE
+                            FOCUS: {(workoutDay?.focus || 'Chest').toUpperCase()} · {completed} / {total} EXERCISES DONE
                           </span>
                         );
                       })()}
@@ -2298,6 +2297,22 @@ export const ProGym = ({
               </div>
 
               <div className="flex items-center gap-2 flex-wrap shrink-0">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={toggleManualMode}
+                  className={cn(
+                    "h-8 px-2.5 text-[10px] font-black uppercase tracking-wider transition-all rounded-lg border flex items-center gap-1.5 shrink-0",
+                    log?.useManualWorkout 
+                      ? "bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20" 
+                      : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
+                  )}
+                  title={log?.useManualWorkout ? "Switch to Auto Mode (Prescribed Plan)" : "Switch to Manual Mode (Allow Editing)"}
+                >
+                  <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", log?.useManualWorkout ? "bg-amber-400 animate-pulse" : "bg-emerald-400")} />
+                  <span>{log?.useManualWorkout ? 'Manual Mode' : 'Auto Mode'}</span>
+                </Button>
+
                 <UnitToggle<'lbs' | 'kg'>
                   unitA="lbs"
                   unitB="kg"
@@ -2381,17 +2396,37 @@ export const ProGym = ({
                 <div className="space-y-4 mb-4">
                   <div className="p-4 bg-brand-primary/5 border border-brand-primary/20 rounded-xl flex items-center justify-between gap-4 flex-wrap">
                     <div>
-                      <p className="text-xs font-bold text-brand-primary mb-1">Manual Entry Mode</p>
-                      <p className="text-[10px] text-brand-primary/60">Add exercises directly in the tables below.</p>
+                      <p className="text-xs font-bold text-brand-primary mb-1">Manual Entry Mode (Editing Allowed)</p>
+                      <p className="text-[10px] text-brand-primary/60">Add or edit exercises directly in the tables below.</p>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={toggleManualMode}
-                      className="border-brand-primary/30 text-brand-primary hover:bg-brand-primary/10 hover:border-brand-primary/60 h-8 px-3 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all"
-                    >
-                      Auto Mode
-                    </Button>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <div className="flex items-center gap-1.5 bg-black/30 border border-white/10 rounded-lg px-2.5 py-1">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Focus:</span>
+                        <select
+                          value={log?.manualWorkout?.focus || workoutDay?.focus || 'Chest'}
+                          onChange={(e) => updateManualWorkout('focus', e.target.value)}
+                          className="bg-transparent text-brand-primary text-xs font-bold outline-none cursor-pointer"
+                        >
+                          <option value="Chest" className="bg-gray-900 text-white">Chest</option>
+                          <option value="Legs" className="bg-gray-900 text-white">Legs</option>
+                          <option value="Back & Biceps" className="bg-gray-900 text-white">Back & Biceps</option>
+                          <option value="Shoulders & Arms" className="bg-gray-900 text-white">Shoulders & Arms</option>
+                          <option value="Cardio" className="bg-gray-900 text-white">Cardio</option>
+                          <option value="Conditioning" className="bg-gray-900 text-white">Conditioning</option>
+                          <option value="Recovery" className="bg-gray-900 text-white">Recovery</option>
+                          <option value="Full Body" className="bg-gray-900 text-white">Full Body</option>
+                          <option value="Core & Abs" className="bg-gray-900 text-white">Core & Abs</option>
+                        </select>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={toggleManualMode}
+                        className="border-brand-primary/30 text-brand-primary hover:bg-brand-primary/10 hover:border-brand-primary/60 h-8 px-3 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all"
+                      >
+                        Auto Mode
+                      </Button>
+                    </div>
                   </div>
                 </div>
               )}
