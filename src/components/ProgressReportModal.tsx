@@ -384,6 +384,7 @@ export function ProgressReportModal({
   let mealCompliancePct = 70;
   let avgStepsDisplay = '6,919 steps';
   let avgWaterDisplay = '74 oz avg water';
+  let avgSleepDisplay = '7.5 hrs avg sleep';
 
   if (isClientReport && clientData.compliance) {
     const c = clientData.compliance;
@@ -404,9 +405,11 @@ export function ProgressReportModal({
 
     const totalSteps = logs.reduce((acc, l) => acc + (l.steps || 0), 0);
     const totalWater = logs.reduce((acc, l) => acc + (l.water || 0), 0);
+    const totalSleep = logs.reduce((acc, l) => acc + (l.sleepHours || 0), 0);
 
     avgStepsDisplay = `${Math.round(totalSteps / totalDays).toLocaleString()} steps`;
     avgWaterDisplay = `${Math.round(totalWater / totalDays)} oz avg water`;
+    avgSleepDisplay = `${(totalSleep / totalDays).toFixed(1)} hrs avg sleep`;
     habitCompliancePct = Math.min(100, Math.round((totalSteps / (totalDays * 10000)) * 100));
     mealCompliancePct = 85;
   }
@@ -779,7 +782,7 @@ export function ProgressReportModal({
               <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block">DAILY AVERAGES</span>
               <div className="space-y-0.5">
                 <span className="text-base font-bold text-white block">{avgStepsDisplay}</span>
-                <span className="text-xs text-gray-300 block font-mono">{avgWaterDisplay}</span>
+                <span className="text-xs text-gray-300 block font-mono">{avgWaterDisplay} · {avgSleepDisplay}</span>
               </div>
             </div>
           </div>

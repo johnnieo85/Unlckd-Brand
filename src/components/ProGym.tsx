@@ -62,9 +62,11 @@ import { Input } from './ui/Input';
 import { UnitToggle } from './UnitToggle';
 import { ExerciseCard } from './ExerciseCard';
 import { ProgressReportModal } from './ProgressReportModal';
+import { WhoopSyncModal } from './WhoopSyncModal';
 import { gymService } from '../services/gymService';
 import { DailyLog, SavedReport, Measurement, UserProfile, Badge as UserBadge } from '../types';
 import { cn, downloadFile, getLocalDateString, parseLocalDate, safeStorage, getPlanDurationWeeks } from '../lib/utils';
+import { assessWorkoutFocus } from '../utils/focusAssessor';
 import { getWeeklyQuote } from '../constants/quotes';
 import { updateUserProfile } from '../services/accessService';
 import { 
@@ -370,6 +372,37 @@ export const ProGym = ({
   const [isWeightCollapsed, setIsWeightCollapsed] = useState(true);
   const [isSavingHydration, setIsSavingHydration] = useState(false);
   const [isSavingSteps, setIsSavingSteps] = useState(false);
+  const [isSleepCollapsed, setIsSleepCollapsed] = useState(true);
+  const [isSavingSleep, setIsSavingSleep] = useState(false);
+  const [isWhoopModalOpen, setIsWhoopModalOpen] = useState(false);
+
+  const handleApplyWhoopData = async (data: {
+    sleepHours: number;
+    sleepQuality: 'Poor' | 'Fair' | 'Good' | 'Excellent';
+    sleepNotes: string;
+    recoveryScore?: number;
+    hrvMs?: number;
+    restingHeartRate?: number;
+    dayStrain?: number;
+  }) => {
+    if (!log) return;
+    const updatedLog: DailyLog = {
+      ...log,
+      sleepHours: data.sleepHours,
+      sleepQuality: data.sleepQuality,
+      sleepNotes: data.sleepNotes
+    };
+    setLog(updatedLog);
+    try {
+      await gymService.updateDailyLog(selectedDate, {
+        sleepHours: data.sleepHours,
+        sleepQuality: data.sleepQuality,
+        sleepNotes: data.sleepNotes
+      });
+    } catch (e) {
+      console.error("Error applying WHOOP data to daily log:", e);
+    }
+  };
 
   const handleSaveHydration = async () => {
     if (!log) return;
@@ -401,13 +434,38 @@ export const ProGym = ({
       setTimeout(() => setIsSavingSteps(false), 1500);
     }
   };
+
+  const handleSaveSleep = async () => {
+    if (!log) return;
+    setIsSavingSleep(true);
+    try {
+      await gymService.updateDailyLog(selectedDate, { 
+        sleepHours: log.sleepHours, 
+        sleepGoal: log.sleepGoal,
+        sleepQuality: log.sleepQuality,
+        sleepNotes: log.sleepNotes
+      });
+    } catch (e) {
+      console.error("Save sleep error:", e);
+    } finally {
+      setTimeout(() => setIsSavingSleep(false), 1500);
+    }
+  };
+
+  const updateSleepHours = (amount: number) => {
+    if (!log) return;
+    const current = Number(log.sleepHours) || 0;
+    const newHours = Math.max(0, Math.min(24, Math.round((current + amount) * 10) / 10));
+    setLog({ ...log, sleepHours: newHours });
+  };
+
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<number>(0);
   const [calendarDates, setCalendarDates] = useState<string[]>([]);
   const [activeView, setActiveView] = useState<'hub' | 'report'>('hub');
   const [isSyncing, setIsSyncing] = useState(false);
   const [isProgressReportOpen, setIsProgressReportOpen] = useState(false);
-  const [trackerOrder, setTrackerOrder] = useState<string[]>(['hydration', 'movement']);
+  const [trackerOrder, setTrackerOrder] = useState<string[]>(['hydration', 'movement', 'sleep']);
 
   const getLastPerformance = (exRaw: any) => {
     const parsed = parseExercise(exRaw);
@@ -457,6 +515,16 @@ export const ProGym = ({
     if (value > 50000) return 10000;     // Case: too high
     
     return Math.round(value);
+  };
+
+  const parseSleepGoal = (goalStr?: string) => {
+    if (!goalStr) return 8;
+    const match = goalStr.match(/(\d+(\.\d+)?)/);
+    if (match) {
+      const parsed = parseFloat(match[1]);
+      if (parsed >= 4 && parsed <= 12) return parsed;
+    }
+    return 8;
   };
 
   const today = getLocalDateString(new Date());
@@ -771,6 +839,25 @@ export const ProGym = ({
     gymService.updateDailyLog(selectedDate, updatedLog);
   };
 
+  const toggleManualNutritionMode = async () => {
+    if (!log) return;
+    const newManualState = !log.useManualNutrition;
+    const updatedLog = { ...log, useManualNutrition: newManualState };
+    if (!newManualState) {
+      const mealDay = getMealsForSelectedDate();
+      if (mealDay) {
+        updatedLog.meals = [
+          { name: mealDay.breakfast, type: 'breakfast', completed: false, url: mealDay.breakfastUrl, calories: mealDay.breakfastMacros?.calories, protein: mealDay.breakfastMacros?.protein, fat: mealDay.breakfastMacros?.fat, carbs: mealDay.breakfastMacros?.carbs },
+          { name: mealDay.lunch, type: 'lunch', completed: false, url: mealDay.lunchUrl, calories: mealDay.lunchMacros?.calories, protein: mealDay.lunchMacros?.protein, fat: mealDay.lunchMacros?.fat, carbs: mealDay.lunchMacros?.carbs },
+          { name: mealDay.dinner, type: 'dinner', completed: false, url: mealDay.dinnerUrl, calories: mealDay.dinnerMacros?.calories, protein: mealDay.dinnerMacros?.protein, fat: mealDay.dinnerMacros?.fat, carbs: mealDay.dinnerMacros?.carbs },
+          { name: mealDay.snack, type: 'snack', completed: false, url: mealDay.snackUrl, calories: mealDay.snackMacros?.calories, protein: mealDay.snackMacros?.protein, fat: mealDay.snackMacros?.fat, carbs: mealDay.snackMacros?.carbs }
+        ];
+      }
+    }
+    setLog(updatedLog);
+    await gymService.updateDailyLog(selectedDate, updatedLog);
+  };
+
   const updateManualWorkout = (field: 'warmUp' | 'mainWork' | 'focus', value: string) => {
     if (!log) return;
     const updatedManual = {
@@ -837,6 +924,10 @@ export const ProGym = ({
 
   const workoutDay = getWorkoutForSelectedDate();
   const mealDay = getMealsForSelectedDate();
+  const evaluatedFocus = assessWorkoutFocus(
+    log?.useManualWorkout ? log?.manualWorkout?.mainWork : (workoutDay?.mainWork || log?.manualWorkout?.mainWork),
+    workoutDay?.focus
+  );
 
   // Helper to parse exercise name, sets, and reps
   const parseExercise = (rawEx: any) => {
@@ -1332,6 +1423,21 @@ export const ProGym = ({
       // Ensure goals and current values are numbers
       logData.steps = Number(logData.steps) || 0;
       logData.water = Number(logData.water) || 0;
+      logData.sleepHours = Number(logData.sleepHours) || 0;
+
+      const reportSleepGoal = latestReport ? parseSleepGoal(latestReport.report.sleepRecommendation?.duration) : 8;
+      if (!logData.sleepGoal || Number(logData.sleepGoal) > 16 || Number(logData.sleepGoal) < 4) {
+        logData.sleepGoal = reportSleepGoal;
+        hasChanges = true;
+      } else {
+        logData.sleepGoal = Number(logData.sleepGoal);
+      }
+      if (!logData.sleepQuality) {
+        logData.sleepQuality = 'Good';
+      }
+      if (logData.sleepNotes === undefined) {
+        logData.sleepNotes = '';
+      }
       
       // Sync step goal with latest report if available
       const reportStepGoal = latestReport ? parseStepGoal(latestReport.report.stepGoals) : 10000;
@@ -1524,6 +1630,8 @@ export const ProGym = ({
         { name: 'Snack', type: 'snack', completed: false }
       ];
 
+      const initialSleepGoal = latestReport ? parseSleepGoal(latestReport.report.sleepRecommendation?.duration) : 8;
+
       const initialLog: DailyLog = {
         id: selectedDate,
         date: selectedDate,
@@ -1532,6 +1640,10 @@ export const ProGym = ({
         water: 0,
         waterGoal,
         waterUnit,
+        sleepHours: 0,
+        sleepGoal: initialSleepGoal,
+        sleepQuality: 'Good',
+        sleepNotes: '',
         completedWorkouts: 0,
         meals: initialMeals,
         habits: {
@@ -1542,7 +1654,8 @@ export const ProGym = ({
           'Adequate Sleep': false,
           'Water Consumption': false
         },
-        useManualWorkout: !latestReport,
+        useManualWorkout: false,
+        useManualNutrition: false,
         weight: dayMeasurement?.weight || 0,
         weightUnit: dayMeasurement?.units.weight || measurementUnits.weight
       };
@@ -1599,9 +1712,11 @@ export const ProGym = ({
     let xp = 0;
     const stepProg = Math.min((Number(log.steps) || 0) / (Number(log.stepGoal) || 10000), 1);
     const waterProg = Math.min((Number(log.water) || 0) / (Number(log.waterGoal) || 3000), 1);
+    const sleepProg = Math.min((Number(log.sleepHours) || 0) / (Number(log.sleepGoal) || 8), 1);
     
     xp += stepProg * 500;
     xp += waterProg * 300;
+    xp += sleepProg * 400;
     xp += (Number(log.completedWorkouts) || 0) * 1000;
     
     // Add XP for completed individual exercises
@@ -2054,7 +2169,7 @@ export const ProGym = ({
                   className="overflow-hidden"
                 >
                   <div className="flex flex-col md:flex-row items-center gap-6 md:gap-10 relative z-10 pt-4 border-t border-white/5 w-full overflow-hidden">
-                    <div className="grid grid-cols-3 gap-2 sm:gap-4 md:flex md:gap-6 w-full md:w-auto items-center justify-center max-w-full overflow-hidden py-1 px-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 md:flex md:gap-6 w-full md:w-auto items-center justify-center max-w-full overflow-hidden py-1 px-2">
                       <div className="flex justify-center">
                         <Ring 
                           size={80}
@@ -2088,6 +2203,16 @@ export const ProGym = ({
                           label="Workout" 
                         />
                       </div>
+                      <div className="flex justify-center">
+                        <Ring 
+                          size={80}
+                          strokeWidth={8}
+                          progress={log ? Math.min((Number(log.sleepHours) || 0) / (Number(log.sleepGoal) || 8), 1) : 0} 
+                          color="#a855f7" 
+                          icon={Moon} 
+                          label="Sleep" 
+                        />
+                      </div>
                     </div>
                     
                     <div className="flex-1 space-y-4 md:space-y-6 w-full text-center md:text-left">
@@ -2119,7 +2244,7 @@ export const ProGym = ({
           </Card>
 
           {/* Quick Logs */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <DndContext 
               sensors={sensors}
               collisionDetection={closestCenter}
@@ -2381,6 +2506,188 @@ export const ProGym = ({
                           )}
                         </AnimatePresence>
                       </Card>
+                    ) : id === 'sleep' ? (
+                      <Card className="p-6 md:p-8 bg-brand-surface border-white/5 h-full">
+                        <div className="flex items-center justify-between">
+                          <div 
+                            className="flex items-center gap-3 cursor-pointer group"
+                            onClick={() => setIsSleepCollapsed(!isSleepCollapsed)}
+                          >
+                            <div className="p-2 bg-purple-500/10 rounded-lg group-hover:bg-purple-500/20 transition-colors">
+                              <Moon className="w-5 h-5 text-purple-400" />
+                            </div>
+                            <div className="flex flex-col">
+                              <h3 className="font-bold text-gray-200">Sleep & Recovery</h3>
+                              <span className={cn("text-[10px] font-black uppercase tracking-widest", isSleepCollapsed ? "text-purple-400" : "text-gray-500")}>
+                                {isSleepCollapsed 
+                                  ? `${log.sleepHours || 0} / ${log.sleepGoal || 8} hrs · ${log.sleepQuality || 'Good'}` 
+                                  : "Track Sleep Quality"}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setIsWhoopModalOpen(true);
+                              }}
+                              className="h-8 px-2.5 bg-purple-500/10 hover:bg-purple-500/20 border-purple-500/30 text-purple-300 text-[10px] font-bold tracking-wider uppercase cursor-pointer rounded-lg flex items-center gap-1.5 shrink-0 transition-colors"
+                              title="Sync Sleep & Recovery biometrics with WHOOP"
+                            >
+                              <Activity className="w-3.5 h-3.5 text-purple-400" />
+                              <span>Sync WHOOP</span>
+                            </Button>
+
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              className="p-1 text-gray-400 hover:text-white"
+                              onClick={() => setIsSleepCollapsed(!isSleepCollapsed)}
+                            >
+                              {isSleepCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+                            </Button>
+                          </div>
+                        </div>
+                        
+                        <AnimatePresence>
+                          {!isSleepCollapsed && (
+                            <motion.div 
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              className="overflow-hidden"
+                            >
+                              <div className="space-y-4 pt-5">
+                                {/* Dedicated Counter Row */}
+                                <div className="flex items-center justify-between bg-black/30 border border-white/10 rounded-xl p-2.5 sm:p-3 gap-1.5 sm:gap-2">
+                                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm"
+                                      className="w-7 h-7 sm:w-8 sm:h-8 p-0 border-white/10 hover:border-purple-500/40 text-purple-400 shrink-0"
+                                      onClick={() => updateSleepHours(-0.5)}
+                                    >
+                                      <Minus className="w-3.5 h-3.5" />
+                                    </Button>
+                                    <input 
+                                      type="number"
+                                      step="0.5"
+                                      min="0"
+                                      max="24"
+                                      value={log.sleepHours || 0}
+                                      onChange={(e) => {
+                                        const val = parseFloat(e.target.value) || 0;
+                                        setLog({ ...log, sleepHours: val });
+                                      }}
+                                      className="w-16 sm:w-20 bg-white/5 border border-white/10 rounded-lg px-1.5 py-1 text-center font-mono text-sm font-bold text-gray-100 focus:border-purple-500 outline-none transition-colors"
+                                    />
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm"
+                                      className="w-7 h-7 sm:w-8 sm:h-8 p-0 border-white/10 hover:border-purple-500/40 text-purple-400 shrink-0"
+                                      onClick={() => updateSleepHours(0.5)}
+                                    >
+                                      <Plus className="w-3.5 h-3.5" />
+                                    </Button>
+                                  </div>
+                                  <span className="text-xs font-mono font-bold text-gray-400 shrink-0 whitespace-nowrap">
+                                    / {log.sleepGoal || 8} hrs target
+                                  </span>
+                                </div>
+
+                                {/* Quick Presets */}
+                                <div className="grid grid-cols-4 gap-1.5">
+                                  {[6.0, 7.0, 8.0, 9.0].map((hours) => (
+                                    <Button 
+                                      key={hours}
+                                      variant="outline" 
+                                      className={cn(
+                                        "border-white/10 text-xs font-bold py-1.5 px-1 text-center transition-all",
+                                        log.sleepHours === hours 
+                                          ? "bg-purple-500/20 border-purple-500/50 text-purple-300"
+                                          : "bg-white/[0.02] hover:border-purple-500/40 hover:bg-purple-500/10 text-purple-400"
+                                      )}
+                                      onClick={() => setLog({ ...log, sleepHours: hours })}
+                                    >
+                                      {hours}h
+                                    </Button>
+                                  ))}
+                                </div>
+
+                                {/* Sleep Quality Selection */}
+                                <div className="space-y-1.5">
+                                  <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-gray-400">Sleep Quality</label>
+                                  <div className="grid grid-cols-4 gap-1.5">
+                                    {[
+                                      { label: 'Poor', emoji: '😴' },
+                                      { label: 'Fair', emoji: '😐' },
+                                      { label: 'Good', emoji: '🙂' },
+                                      { label: 'Excellent', emoji: '🌟' }
+                                    ].map((q) => (
+                                      <button
+                                        key={q.label}
+                                        type="button"
+                                        onClick={() => setLog({ ...log, sleepQuality: q.label as any })}
+                                        className={cn(
+                                          "flex flex-col items-center justify-center p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer",
+                                          log.sleepQuality === q.label
+                                            ? "bg-purple-500/20 border-purple-500/60 text-purple-200 shadow-sm"
+                                            : "bg-black/20 border-white/5 text-gray-400 hover:border-purple-500/30 hover:text-gray-200"
+                                        )}
+                                      >
+                                        <span className="text-sm">{q.emoji}</span>
+                                        <span className="text-[10px] mt-0.5">{q.label}</span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {/* Sleep Notes */}
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-gray-400">Recovery & Sleep Notes</label>
+                                  <input 
+                                    type="text"
+                                    placeholder="e.g. Slept 11pm - 7am, felt rested"
+                                    value={log.sleepNotes || ''}
+                                    onChange={(e) => setLog({ ...log, sleepNotes: e.target.value })}
+                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs font-semibold text-gray-200 placeholder:text-gray-600 outline-none focus:border-purple-500/50 transition-colors"
+                                  />
+                                </div>
+
+                                {/* Progress Bar */}
+                                <div className="space-y-1.5">
+                                  <div className="flex justify-between text-[10px] font-mono text-gray-500">
+                                    <span>Target Progress</span>
+                                    <span>{Math.round(Math.min(((log.sleepHours || 0) / (log.sleepGoal || 8)) * 100, 100))}%</span>
+                                  </div>
+                                  <div className="h-2 bg-white/5 rounded-full overflow-hidden border border-white/5">
+                                    <motion.div 
+                                      className="h-full bg-purple-500"
+                                      initial={{ width: 0 }}
+                                      animate={{ width: `${Math.min(((log.sleepHours || 0) / (log.sleepGoal || 8)) * 100, 100)}%` }}
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* Save Button for Sleep */}
+                                <div className="pt-2">
+                                  <Button 
+                                    size="sm"
+                                    onClick={handleSaveSleep}
+                                    disabled={isSavingSleep}
+                                    className="w-full bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 font-bold text-xs py-2 rounded-xl gap-2 cursor-pointer transition-all"
+                                  >
+                                    <Save className="w-3.5 h-3.5" />
+                                    {isSavingSleep ? "Sleep Log Saved!" : "Save Sleep Log"}
+                                  </Button>
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </Card>
                     ) : (
                       <Card className="p-8 bg-brand-surface border-white/5 h-full flex items-center justify-center">
                          <span className="text-[10px] font-black uppercase text-gray-600">Unknown Tracker</span>
@@ -2406,13 +2713,13 @@ export const ProGym = ({
                     </h3>
                     <Badge className="bg-brand-primary/10 text-brand-primary border-brand-primary/20 font-black text-xs py-1 px-2.5 shrink-0 flex items-center gap-1 shadow-sm">
                       <span className="text-gray-400 font-semibold uppercase text-[10px] tracking-wider">Focus:</span>
-                      <span className="text-brand-primary font-extrabold">{workoutDay?.focus || 'Chest'}</span>
+                      <span className="text-brand-primary font-extrabold">{evaluatedFocus}</span>
                     </Badge>
                   </div>
                   {!isTrainingCollapsed && (
                     <span className="text-[11px] font-mono font-bold text-brand-primary/80 uppercase tracking-wider mt-0.5">
                       {parseLocalDate(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
-                      {workoutDay?.focus ? ` · FOCUS: ${workoutDay.focus.toUpperCase()}` : ''}
+                      {evaluatedFocus ? ` · FOCUS: ${evaluatedFocus.toUpperCase()}` : ''}
                     </span>
                   )}
                   {isTrainingCollapsed && (
@@ -2421,7 +2728,7 @@ export const ProGym = ({
                         const { completed, total } = getTrainingTotals();
                         return (
                           <span className="text-[10px] font-mono text-brand-primary font-bold">
-                            FOCUS: {(workoutDay?.focus || 'Chest').toUpperCase()} · {completed} / {total} EXERCISES DONE
+                            FOCUS: {evaluatedFocus.toUpperCase()} · {completed} / {total} EXERCISES DONE
                           </span>
                         );
                       })()}
@@ -2537,7 +2844,7 @@ export const ProGym = ({
                       <div className="flex items-center gap-1.5 bg-black/30 border border-white/10 rounded-lg px-2.5 py-1">
                         <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Focus:</span>
                         <select
-                          value={log?.manualWorkout?.focus || workoutDay?.focus || 'Chest'}
+                          value={log?.manualWorkout?.focus || evaluatedFocus}
                           onChange={(e) => updateManualWorkout('focus', e.target.value)}
                           className="bg-transparent text-brand-primary text-xs font-bold outline-none cursor-pointer"
                         >
@@ -2635,7 +2942,7 @@ export const ProGym = ({
                       className="flex items-center gap-2 text-xs font-mono font-black uppercase text-gray-400 tracking-widest hover:text-white transition-colors cursor-pointer"
                     >
                       {isMainWorkCollapsed ? <ChevronDown className="w-4 h-4 text-brand-primary" /> : <ChevronUp className="w-4 h-4 text-brand-primary" />}
-                      <span>{workoutDay?.focus ? `${workoutDay.focus.toUpperCase()} (MAIN WORK)` : 'MAIN WORKOUT'}</span>
+                      <span>{evaluatedFocus ? `${evaluatedFocus.toUpperCase()} (MAIN WORK)` : 'MAIN WORKOUT'}</span>
                     </button>
                     {(log?.useManualWorkout || !latestReport) && (
                       <Button 
@@ -2725,6 +3032,22 @@ export const ProGym = ({
               </div>
 
               <div className="flex items-center gap-2 flex-wrap">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={toggleManualNutritionMode}
+                  className={cn(
+                    "h-8 px-2.5 text-[10px] font-black uppercase tracking-wider transition-all rounded-lg border flex items-center gap-1.5 shrink-0 cursor-pointer",
+                    log?.useManualNutrition 
+                      ? "bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20" 
+                      : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
+                  )}
+                  title={log?.useManualNutrition ? "Switch to Auto Mode (Prescribed Plan)" : "Switch to Manual Mode (Allow Editing)"}
+                >
+                  <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", log?.useManualNutrition ? "bg-amber-400 animate-pulse" : "bg-emerald-400")} />
+                  <span>{log?.useManualNutrition ? 'Manual Mode' : 'Auto Mode'}</span>
+                </Button>
+
                 {!isNutritionCollapsed && (
                   <>
                     <Button 
@@ -2747,9 +3070,7 @@ export const ProGym = ({
                     )}
                   </>
                 )}
-                <Badge className="bg-brand-primary/10 text-brand-primary border-brand-primary/20 font-black text-[10px]">
-                  {log?.useManualWorkout ? 'MANUAL EDITS ENABLED' : 'PRESCRIBED PLAN'}
-                </Badge>
+                
                 <Button 
                   variant="ghost" 
                   size="sm" 
@@ -2800,7 +3121,7 @@ export const ProGym = ({
                             </button>
 
                             <div className="flex items-center gap-2">
-                              {log.useManualWorkout ? (
+                              {(log.useManualNutrition || log.useManualWorkout) ? (
                                 <div className="flex items-center gap-1.5">
                                   <select 
                                     className="bg-black/40 border border-white/10 rounded px-1.5 py-0.5 text-[10px] uppercase font-mono font-bold text-gray-300 outline-none focus:border-brand-primary"
@@ -2832,7 +3153,7 @@ export const ProGym = ({
 
                           {/* Meal Title */}
                           <div>
-                            {log.useManualWorkout ? (
+                            {(log.useManualNutrition || log.useManualWorkout) ? (
                               <input 
                                 type="text"
                                 className="bg-black/40 border border-white/10 rounded-lg px-2.5 py-1 text-sm font-bold text-brand-primary outline-none focus:border-brand-primary w-full"
@@ -2853,7 +3174,7 @@ export const ProGym = ({
                           </div>
 
                           {/* Macros Pills / Editable Inputs */}
-                          {log.useManualWorkout ? (
+                          {(log.useManualNutrition || log.useManualWorkout) ? (
                             <div className="grid grid-cols-4 gap-1.5 pt-1">
                               <div className="flex flex-col gap-0.5">
                                 <span className="text-[9px] font-mono text-gray-500 uppercase text-center">Cal</span>
@@ -3796,6 +4117,13 @@ export const ProGym = ({
         onClose={() => setIsProgressReportOpen(false)}
         userProfile={userProfile}
         onReportSaved={onReportSaved}
+      />
+
+      <WhoopSyncModal 
+        isOpen={isWhoopModalOpen}
+        onClose={() => setIsWhoopModalOpen(false)}
+        currentLog={log}
+        onApplyWhoopData={handleApplyWhoopData}
       />
     </div>
   );

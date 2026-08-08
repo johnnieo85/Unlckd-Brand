@@ -330,7 +330,8 @@ export const gymService = {
       const meals = getMealsForDateIdx(iso);
       
       const updates: Partial<DailyLog> = {
-        useManualWorkout: true
+        useManualWorkout: false,
+        useManualNutrition: false
       };
 
       if (workout) {

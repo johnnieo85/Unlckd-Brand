@@ -240,6 +240,10 @@ export interface DailyLog {
   water: number;
   waterGoal: number;
   waterUnit: 'ml' | 'oz';
+  sleepHours?: number;
+  sleepGoal?: number;
+  sleepQuality?: 'Poor' | 'Fair' | 'Good' | 'Excellent';
+  sleepNotes?: string;
   meals?: {
     name: string;
     completed: boolean;
@@ -258,6 +262,7 @@ export interface DailyLog {
   generalNotes?: string;
   lastUpdated?: any;
   useManualWorkout?: boolean;
+  useManualNutrition?: boolean;
   weight?: number;
   weightUnit?: 'kg' | 'lbs';
   manualWorkout?: {
