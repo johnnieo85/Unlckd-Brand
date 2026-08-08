@@ -74,10 +74,45 @@ import { LevelInfoModal } from './components/LevelInfoModal';
 import { ProgressReportModal } from './components/ProgressReportModal';
 import { ClientData } from './components/ClientHub';
 
+const cleanEvaluationText = (text: string) => {
+  if (!text) return '';
+  return text.replace(/,?\s*search_query=[^\s\)]+/gi, '');
+};
+
+const FormattedEvaluation = ({ content }: { content: string }) => {
+  if (!content) return null;
+  const cleaned = cleanEvaluationText(content);
+  return (
+    <div className="markdown-body text-xs text-gray-300 leading-relaxed print:text-gray-700 break-words [word-break:break-word] overflow-wrap-anywhere">
+      <ReactMarkdown
+        components={{
+          a: ({ node, children, href, ...props }) => {
+            const title = Array.isArray(children) ? children.join('') : (children as string) || 'Link';
+            return (
+              <a
+                {...props}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-brand-primary underline hover:text-brand-primary/80 font-semibold break-all"
+              >
+                {title}
+              </a>
+            );
+          },
+          p: ({ children }) => <p className="mb-1 last:mb-0">{children}</p>
+        }}
+      >
+        {cleaned}
+      </ReactMarkdown>
+    </div>
+  );
+};
+
 const RatingTable = ({ title, ratings = [], summary, photo }: { title: string; ratings?: Rating[]; summary?: string; photo?: string | null }) => (
   <div className="space-y-6">
-    <h2 className="text-3xl font-display font-bold text-brand-primary tracking-tight flex items-center gap-3 print:text-black">
-      <div className="w-8 h-8 rounded-lg bg-brand-primary/10 flex items-center justify-center no-print">
+    <h2 className="text-2xl sm:text-3xl font-display font-bold text-brand-primary tracking-tight flex items-center gap-3 print:text-black">
+      <div className="w-8 h-8 rounded-lg bg-brand-primary/10 flex items-center justify-center no-print shrink-0">
         <Activity className="w-4 h-4 text-brand-primary" />
       </div>
       {title}
@@ -89,22 +124,22 @@ const RatingTable = ({ title, ratings = [], summary, photo }: { title: string; r
           <img src={photo} alt={title} className="w-full h-full object-cover" />
         </div>
       )}
-      <div className="space-y-6">
-        <div className="bg-white/[0.02] backdrop-blur-sm border border-white/5 rounded-2xl overflow-hidden shadow-xl print:bg-white print:border-gray-200">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-white/[0.05] text-gray-400 uppercase text-[10px] tracking-[0.2em] font-bold print:bg-gray-100 print:text-gray-600">
+      <div className="space-y-6 min-w-0">
+        <div className="bg-white/[0.02] backdrop-blur-sm border border-white/5 rounded-2xl overflow-x-auto max-w-full w-full shadow-xl print:bg-white print:border-gray-200">
+          <table className="w-full text-xs sm:text-sm text-left border-collapse min-w-[280px]">
+            <thead className="bg-white/[0.05] text-gray-400 uppercase text-[10px] tracking-wider font-bold print:bg-gray-100 print:text-gray-600">
               <tr>
-                <th className="px-6 py-4 border-r border-white/5 print:border-gray-200">Area</th>
-                <th className="px-6 py-4 border-r border-white/5 print:border-gray-200">Rating</th>
-                <th className="px-6 py-4">Evaluation</th>
+                <th className="px-3 sm:px-6 py-3.5 border-r border-white/5 print:border-gray-200 w-1/4 min-w-[85px] sm:min-w-[110px]">Area</th>
+                <th className="px-3 sm:px-6 py-3.5 border-r border-white/5 print:border-gray-200 w-1/4 min-w-[80px] sm:min-w-[110px]">Rating</th>
+                <th className="px-3 sm:px-6 py-3.5 w-2/4 min-w-[130px]">Evaluation</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5 print:divide-gray-200">
               {ratings?.map((r, i) => (
                 <tr key={i} className="hover:bg-white/[0.02] transition-colors print:text-black">
-                  <td className="px-6 py-4 font-semibold text-gray-200 border-r border-white/5 print:text-black print:border-gray-200">{r.category}</td>
-                  <td className="px-6 py-4 border-r border-white/5 print:border-gray-200">
-                    <div className="flex flex-col gap-2">
+                  <td className="px-3 sm:px-6 py-3.5 font-semibold text-gray-200 border-r border-white/5 print:text-black print:border-gray-200 break-words text-xs sm:text-sm">{r.category}</td>
+                  <td className="px-3 sm:px-6 py-3.5 border-r border-white/5 print:border-gray-200">
+                    <div className="flex flex-col gap-1.5">
                       <div className="flex items-center justify-between">
                         <span className="font-mono text-[10px] text-brand-primary font-bold print:text-black">{r.rating * 10}%</span>
                         <span className="font-mono text-[10px] text-gray-500 print:text-gray-400">{r.rating}/10</span>
@@ -124,14 +159,16 @@ const RatingTable = ({ title, ratings = [], summary, photo }: { title: string; r
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-gray-400 text-xs leading-relaxed print:text-gray-700">{r.evaluation}</td>
+                  <td className="px-3 sm:px-6 py-3.5 break-words [word-break:break-word]">
+                    <FormattedEvaluation content={r.evaluation} />
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
         {summary && (
-          <div className="p-6 bg-brand-primary/5 border border-brand-primary/10 rounded-2xl text-sm text-gray-300 leading-relaxed italic relative overflow-hidden print:bg-gray-50 print:border-gray-200 print:text-gray-700">
+          <div className="p-4 sm:p-6 bg-brand-primary/5 border border-brand-primary/10 rounded-2xl text-xs sm:text-sm text-gray-300 leading-relaxed italic relative overflow-hidden print:bg-gray-50 print:border-gray-200 print:text-gray-700 break-words">
             <div className="absolute top-0 left-0 w-1 h-full bg-brand-primary/40 print:bg-gray-400" />
             <div className="markdown-body">
               <ReactMarkdown>{summary}</ReactMarkdown>
@@ -156,8 +193,8 @@ const ProgressComparison = ({ title, ratings = [], summary, beforePhoto, afterPh
   weightUnit?: string;
 }) => (
   <div className="space-y-6">
-    <h2 className="text-3xl font-display font-bold text-brand-primary tracking-tight flex items-center gap-3 print:text-black">
-      <div className="w-8 h-8 rounded-lg bg-brand-primary/10 flex items-center justify-center no-print">
+    <h2 className="text-2xl sm:text-3xl font-display font-bold text-brand-primary tracking-tight flex items-center gap-3 print:text-black">
+      <div className="w-8 h-8 rounded-lg bg-brand-primary/10 flex items-center justify-center no-print shrink-0">
         <Activity className="w-4 h-4 text-brand-primary" />
       </div>
       {title}
@@ -189,22 +226,22 @@ const ProgressComparison = ({ title, ratings = [], summary, beforePhoto, afterPh
           </div>
         </div>
       </div>
-      <div className="space-y-6">
-        <div className="bg-white/[0.02] backdrop-blur-sm border border-white/5 rounded-2xl overflow-hidden shadow-xl print:bg-white print:border-gray-200">
-          <table className="w-full text-xs text-left border-collapse">
-            <thead className="bg-white/[0.05] text-gray-400 uppercase text-[10px] tracking-[0.2em] font-bold print:bg-gray-100 print:text-gray-600">
+      <div className="space-y-6 min-w-0">
+        <div className="bg-white/[0.02] backdrop-blur-sm border border-white/5 rounded-2xl overflow-x-auto max-w-full w-full shadow-xl print:bg-white print:border-gray-200">
+          <table className="w-full text-xs text-left border-collapse min-w-[280px]">
+            <thead className="bg-white/[0.05] text-gray-400 uppercase text-[10px] tracking-wider font-bold print:bg-gray-100 print:text-gray-600">
               <tr>
-                <th className="px-6 py-4 border-r border-white/5 print:border-gray-200">Area</th>
-                <th className="px-6 py-4 border-r border-white/5 print:border-gray-200">Rating</th>
-                <th className="px-6 py-4">Evaluation</th>
+                <th className="px-3 sm:px-6 py-3.5 border-r border-white/5 print:border-gray-200 w-1/4 min-w-[85px] sm:min-w-[110px]">Area</th>
+                <th className="px-3 sm:px-6 py-3.5 border-r border-white/5 print:border-gray-200 w-1/4 min-w-[80px] sm:min-w-[110px]">Rating</th>
+                <th className="px-3 sm:px-6 py-3.5 w-2/4 min-w-[130px]">Evaluation</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5 print:divide-gray-200">
               {ratings?.map((r, i) => (
                 <tr key={i} className="hover:bg-white/[0.02] transition-colors print:text-black">
-                  <td className="px-6 py-4 font-semibold text-gray-200 border-r border-white/5 print:text-black print:border-gray-200">{r.category}</td>
-                  <td className="px-6 py-4 border-r border-white/5 print:border-gray-200">
-                    <div className="flex flex-col gap-2">
+                  <td className="px-3 sm:px-6 py-3.5 font-semibold text-gray-200 border-r border-white/5 print:text-black print:border-gray-200 break-words text-xs">{r.category}</td>
+                  <td className="px-3 sm:px-6 py-3.5 border-r border-white/5 print:border-gray-200">
+                    <div className="flex flex-col gap-1.5">
                       <div className="flex items-center justify-between">
                         <span className="font-mono text-[10px] text-brand-primary font-bold print:text-black">{r.rating * 10}%</span>
                         <span className="font-mono text-[10px] text-gray-500 print:text-gray-400">{r.rating}/10</span>
@@ -224,14 +261,16 @@ const ProgressComparison = ({ title, ratings = [], summary, beforePhoto, afterPh
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-gray-400 text-[10px] leading-relaxed italic print:text-gray-700">{r.evaluation}</td>
+                  <td className="px-3 sm:px-6 py-3.5 break-words [word-break:break-word]">
+                    <FormattedEvaluation content={r.evaluation} />
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
         {summary && (
-          <div className="p-6 bg-brand-primary/5 border border-brand-primary/10 rounded-2xl text-sm text-gray-300 leading-relaxed italic relative overflow-hidden print:bg-gray-50 print:border-gray-200 print:text-gray-700">
+          <div className="p-4 sm:p-6 bg-brand-primary/5 border border-brand-primary/10 rounded-2xl text-xs sm:text-sm text-gray-300 leading-relaxed italic relative overflow-hidden print:bg-gray-50 print:border-gray-200 print:text-gray-700 break-words">
             <div className="absolute top-0 left-0 w-1 h-full bg-brand-primary/40 print:bg-gray-400" />
             <div className="markdown-body">
               <ReactMarkdown>{summary}</ReactMarkdown>
@@ -3088,15 +3127,6 @@ export default function App() {
                   Print Ready
                 </div>
                 <Button 
-                  variant="outline" 
-                  size="md" 
-                  className="gap-2 border-brand-primary/20 hover:bg-brand-primary/10 text-gray-300"
-                  onClick={() => setShowLinkAudit(true)}
-                >
-                  <CheckCircle2 className="w-5 h-5 text-brand-primary" />
-                  Audit Links
-                </Button>
-                <Button 
                   variant="primary" 
                   size="md" 
                   className="gap-2 bg-brand-primary text-brand-dark font-bold hover:bg-brand-primary/90 shadow-xl shadow-brand-primary/20"
@@ -3151,8 +3181,8 @@ export default function App() {
                   </p>
                 </div>
 
-                <div className="bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl overflow-hidden print-break-inside-avoid">
-                  <table className="w-full text-sm text-left border-collapse">
+                <div className="bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl overflow-x-auto max-w-full w-full print-break-inside-avoid">
+                  <table className="w-full text-xs sm:text-sm text-left border-collapse min-w-[260px]">
                     <tbody className="divide-y divide-gray-800">
                       {[
                         { label: 'Client Name', value: userData.name },
@@ -3182,8 +3212,8 @@ export default function App() {
                           : (path === 'progress' ? [] : [{ label: 'Primary Goals', value: userData.goals }])),
                       ].map((row, i) => (
                         <tr key={i}>
-                          <td className="px-6 py-3 bg-brand-secondary/20 font-bold text-gray-200 w-1/3">{row.label}</td>
-                          <td className="px-6 py-3 text-gray-300">{row.value}</td>
+                          <td className="px-3 sm:px-6 py-2.5 sm:py-3 bg-brand-secondary/20 font-bold text-gray-200 w-1/3 min-w-[90px] break-words text-xs sm:text-sm">{row.label}</td>
+                          <td className="px-3 sm:px-6 py-2.5 sm:py-3 text-gray-300 break-words text-xs sm:text-sm">{row.value}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -4005,19 +4035,19 @@ export default function App() {
 
                   <div className="space-y-4">
                     <h3 className="text-xl font-display font-bold text-gray-200">Suggested Recovery Schedule</h3>
-                    <div className="bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl overflow-hidden">
-                      <table className="w-full text-sm text-left border-collapse">
+                    <div className="bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl overflow-x-auto max-w-full w-full">
+                      <table className="w-full text-xs sm:text-sm text-left border-collapse min-w-[260px]">
                         <thead className="bg-brand-secondary/20 text-gray-400 uppercase text-[10px] tracking-wider">
                           <tr>
-                            <th className="px-6 py-3 font-semibold border-r border-gray-800 w-1/3">Day</th>
-                            <th className="px-6 py-3 font-semibold">Recovery Focus</th>
+                            <th className="px-3 sm:px-6 py-3 font-semibold border-r border-gray-800 w-1/3 min-w-[80px]">Day</th>
+                            <th className="px-3 sm:px-6 py-3 font-semibold">Recovery Focus</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-800">
                           {report.recoverySchedule?.map((row, i) => (
                             <tr key={i}>
-                              <td className="px-6 py-4 bg-brand-secondary/20 font-bold text-gray-200 border-r border-gray-800">{row.day}</td>
-                              <td className="px-6 py-4 text-gray-300">{row.focus}</td>
+                              <td className="px-3 sm:px-6 py-2.5 sm:py-3.5 bg-brand-secondary/20 font-bold text-gray-200 border-r border-gray-800 break-words text-xs sm:text-sm">{row.day}</td>
+                              <td className="px-3 sm:px-6 py-2.5 sm:py-3.5 text-gray-300 break-words text-xs sm:text-sm">{row.focus}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -4044,8 +4074,8 @@ export default function App() {
               {(path !== 'meal' && path !== 'progress') && (
                 <section className="pt-16 border-t border-gray-800">
                   <h2 className="text-3xl font-display font-bold text-brand-primary mb-8">Trainer Follow-Up Summary</h2>
-                  <div className="bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl overflow-hidden">
-                    <table className="w-full text-sm text-left border-collapse">
+                  <div className="bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl overflow-x-auto max-w-full w-full">
+                    <table className="w-full text-xs sm:text-sm text-left border-collapse min-w-[260px]">
                       <tbody className="divide-y divide-gray-800">
                         {[
                           { label: 'Name', value: userData.name },
@@ -4057,8 +4087,8 @@ export default function App() {
                           { label: 'Water Intake', value: report.hydrationTargets },
                         ].map((row, i) => (
                           <tr key={i}>
-                            <td className="px-6 py-3 bg-brand-secondary/20 font-bold text-gray-200 w-1/3">{row.label}</td>
-                            <td className="px-6 py-3 text-gray-300">{row.value}</td>
+                            <td className="px-3 sm:px-6 py-2.5 sm:py-3 bg-brand-secondary/20 font-bold text-gray-200 w-1/3 min-w-[90px] break-words text-xs sm:text-sm">{row.label}</td>
+                            <td className="px-3 sm:px-6 py-2.5 sm:py-3 text-gray-300 break-words text-xs sm:text-sm">{row.value}</td>
                           </tr>
                         ))}
                       </tbody>
