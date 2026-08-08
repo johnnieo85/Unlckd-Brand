@@ -1980,30 +1980,6 @@ export default function App() {
                     </a>
                   ) : null}
                 </div>
-
-                {/* Social Media Logos Only */}
-                <div className="pt-2 flex items-center justify-center gap-3">
-                  <a 
-                    href="https://instagram.com/unlckd_brand" 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    aria-label="Instagram"
-                    className="p-3 rounded-full bg-white/5 border border-white/10 text-gray-300 hover:text-brand-primary hover:bg-white/10 hover:border-brand-primary/40 transition-all hover:scale-110 shadow-sm"
-                    title="Instagram"
-                  >
-                    <Instagram className="w-5 h-5" />
-                  </a>
-                  <a 
-                    href="https://facebook.com/unlckdbrand" 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    aria-label="Facebook"
-                    className="p-3 rounded-full bg-white/5 border border-white/10 text-gray-300 hover:text-brand-primary hover:bg-white/10 hover:border-brand-primary/40 transition-all hover:scale-110 shadow-sm"
-                    title="Facebook"
-                  >
-                    <Facebook className="w-5 h-5" />
-                  </a>
-                </div>
               </div>
 
               <div className="space-y-6">
