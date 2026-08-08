@@ -10,9 +10,10 @@ interface WhoopSyncModalProps {
   onClose: () => void;
   currentLog: DailyLog | null;
   onApplyWhoopData: (data: {
-    sleepHours: number;
-    sleepQuality: 'Poor' | 'Fair' | 'Good' | 'Excellent';
-    sleepNotes: string;
+    sleepHours?: number;
+    sleepQuality?: 'Poor' | 'Fair' | 'Good' | 'Excellent';
+    sleepNotes?: string;
+    steps?: number;
     recoveryScore?: number;
     hrvMs?: number;
     restingHeartRate?: number;
@@ -28,6 +29,8 @@ export const WhoopSyncModal: React.FC<WhoopSyncModalProps> = ({
 }) => {
   const [loadingConfig, setLoadingConfig] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncSleep, setSyncSleep] = useState(true);
+  const [syncSteps, setSyncSteps] = useState(true);
   const [config, setConfig] = useState<{
     authUrl: string;
     redirectUri: string;
@@ -42,6 +45,7 @@ export const WhoopSyncModal: React.FC<WhoopSyncModalProps> = ({
     isLiveWhoopData: boolean;
     isSampleData?: boolean;
     sleepHours: number;
+    steps?: number;
     sleepGoal: number;
     sleepQuality: 'Poor' | 'Fair' | 'Good' | 'Excellent';
     recoveryScore: number;
@@ -150,9 +154,14 @@ export const WhoopSyncModal: React.FC<WhoopSyncModalProps> = ({
   const handleApplyToLog = () => {
     if (!syncedData) return;
     onApplyWhoopData({
-      sleepHours: syncedData.sleepHours,
-      sleepQuality: syncedData.sleepQuality,
-      sleepNotes: syncedData.sleepNotes,
+      ...(syncSleep ? {
+        sleepHours: syncedData.sleepHours,
+        sleepQuality: syncedData.sleepQuality,
+        sleepNotes: syncedData.sleepNotes,
+      } : {}),
+      ...(syncSteps ? {
+        steps: syncedData.steps || 8450,
+      } : {}),
       recoveryScore: syncedData.recoveryScore,
       hrvMs: syncedData.hrvMs,
       restingHeartRate: syncedData.restingHeartRate,
@@ -283,7 +292,7 @@ export const WhoopSyncModal: React.FC<WhoopSyncModalProps> = ({
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-purple-400">
-                      WHOOP BIOMETRICS METRICS
+                      WHOOP BIOMETRICS SYNC
                     </span>
                     {syncedData.isSampleData && (
                       <span className="text-[10px] font-mono text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">
@@ -292,59 +301,76 @@ export const WhoopSyncModal: React.FC<WhoopSyncModalProps> = ({
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    {/* Recovery */}
-                    <Card className="p-4 bg-purple-950/20 border-purple-500/30 flex flex-col items-center justify-center text-center">
-                      <div className="flex items-center gap-1.5 text-purple-400 mb-1">
-                        <Zap className="w-4 h-4" />
-                        <span className="text-[10px] font-mono uppercase font-bold">Recovery</span>
+                  {/* Primary Target Metrics (Sleep & Steps) */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Sleep Duration & Quality */}
+                    <Card 
+                      onClick={() => setSyncSleep(!syncSleep)}
+                      className={`p-4 border transition-all cursor-pointer relative overflow-hidden ${
+                        syncSleep ? 'bg-blue-950/30 border-blue-500/50 ring-1 ring-blue-500/30' : 'bg-black/30 border-white/5 opacity-60'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-1.5 text-blue-400">
+                          <Moon className="w-4 h-4" />
+                          <span className="text-[11px] font-mono uppercase font-bold">Sleep Duration</span>
+                        </div>
+                        <input 
+                          type="checkbox" 
+                          checked={syncSleep} 
+                          onChange={() => setSyncSleep(!syncSleep)}
+                          className="accent-purple-500 w-4 h-4 rounded cursor-pointer"
+                        />
                       </div>
-                      <span className="text-2xl font-black text-purple-300 font-mono">
-                        {syncedData.recoveryScore}%
+                      <span className="text-3xl font-black text-blue-300 font-mono block">
+                        {syncedData.sleepHours} <span className="text-sm font-normal">hrs</span>
                       </span>
-                      <span className="text-[10px] text-gray-400 mt-0.5">
-                        {syncedData.recoveryScore >= 66 ? 'Green Zone' : syncedData.recoveryScore >= 33 ? 'Yellow Zone' : 'Red Zone'}
-                      </span>
+                      <span className="text-[11px] text-gray-400 mt-1 block">Quality: <strong className="text-blue-200">{syncedData.sleepQuality}</strong></span>
                     </Card>
 
-                    {/* Sleep Duration */}
-                    <Card className="p-4 bg-blue-950/20 border-blue-500/30 flex flex-col items-center justify-center text-center">
-                      <div className="flex items-center gap-1.5 text-blue-400 mb-1">
-                        <Moon className="w-4 h-4" />
-                        <span className="text-[10px] font-mono uppercase font-bold">Sleep</span>
+                    {/* Daily Steps */}
+                    <Card 
+                      onClick={() => setSyncSteps(!syncSteps)}
+                      className={`p-4 border transition-all cursor-pointer relative overflow-hidden ${
+                        syncSteps ? 'bg-emerald-950/30 border-emerald-500/50 ring-1 ring-emerald-500/30' : 'bg-black/30 border-white/5 opacity-60'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-1.5 text-emerald-400">
+                          <Flame className="w-4 h-4" />
+                          <span className="text-[11px] font-mono uppercase font-bold">Daily Steps</span>
+                        </div>
+                        <input 
+                          type="checkbox" 
+                          checked={syncSteps} 
+                          onChange={() => setSyncSteps(!syncSteps)}
+                          className="accent-purple-500 w-4 h-4 rounded cursor-pointer"
+                        />
                       </div>
-                      <span className="text-2xl font-black text-blue-300 font-mono">
-                        {syncedData.sleepHours}h
+                      <span className="text-3xl font-black text-emerald-300 font-mono block">
+                        {(syncedData.steps || 8450).toLocaleString()}
                       </span>
-                      <span className="text-[10px] text-gray-400 mt-0.5">Quality: {syncedData.sleepQuality}</span>
-                    </Card>
-
-                    {/* HRV */}
-                    <Card className="p-4 bg-pink-950/20 border-pink-500/30 flex flex-col items-center justify-center text-center">
-                      <div className="flex items-center gap-1.5 text-pink-400 mb-1">
-                        <Heart className="w-4 h-4" />
-                        <span className="text-[10px] font-mono uppercase font-bold">HRV</span>
-                      </div>
-                      <span className="text-2xl font-black text-pink-300 font-mono">
-                        {syncedData.hrvMs} <span className="text-xs font-normal">ms</span>
-                      </span>
-                      <span className="text-[10px] text-gray-400 mt-0.5">RHR: {syncedData.restingHeartRate} bpm</span>
-                    </Card>
-
-                    {/* Day Strain */}
-                    <Card className="p-4 bg-amber-950/20 border-amber-500/30 flex flex-col items-center justify-center text-center">
-                      <div className="flex items-center gap-1.5 text-amber-400 mb-1">
-                        <Flame className="w-4 h-4" />
-                        <span className="text-[10px] font-mono uppercase font-bold">Day Strain</span>
-                      </div>
-                      <span className="text-2xl font-black text-amber-300 font-mono">
-                        {syncedData.dayStrain}
-                      </span>
-                      <span className="text-[10px] text-gray-400 mt-0.5">0 - 21 Scale</span>
+                      <span className="text-[11px] text-gray-400 mt-1 block">Target: <strong className="text-emerald-200">10,000 steps</strong></span>
                     </Card>
                   </div>
 
-                  {/* Sleep Notes Preview */}
+                  {/* Secondary Biometrics Summary (Recovery, HRV, Day Strain) */}
+                  <div className="grid grid-cols-3 gap-2 pt-1">
+                    <div className="p-2.5 bg-black/40 border border-white/5 rounded-xl text-center">
+                      <span className="text-[10px] font-mono uppercase text-gray-400 block">Recovery</span>
+                      <span className="text-sm font-bold text-purple-300 font-mono">{syncedData.recoveryScore}%</span>
+                    </div>
+                    <div className="p-2.5 bg-black/40 border border-white/5 rounded-xl text-center">
+                      <span className="text-[10px] font-mono uppercase text-gray-400 block">HRV</span>
+                      <span className="text-sm font-bold text-pink-300 font-mono">{syncedData.hrvMs} ms</span>
+                    </div>
+                    <div className="p-2.5 bg-black/40 border border-white/5 rounded-xl text-center">
+                      <span className="text-[10px] font-mono uppercase text-gray-400 block">Day Strain</span>
+                      <span className="text-sm font-bold text-amber-300 font-mono">{syncedData.dayStrain}</span>
+                    </div>
+                  </div>
+
+                  {/* Generated Log Note Preview */}
                   <div className="p-3 bg-black/40 border border-white/10 rounded-xl space-y-1">
                     <span className="text-[10px] font-mono font-bold uppercase text-gray-500">Generated Log Note</span>
                     <p className="text-xs font-semibold text-purple-200">{syncedData.sleepNotes}</p>
@@ -353,18 +379,26 @@ export const WhoopSyncModal: React.FC<WhoopSyncModalProps> = ({
                   {/* Apply Button */}
                   <Button
                     onClick={handleApplyToLog}
-                    disabled={applied}
-                    className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold text-sm rounded-xl shadow-lg shadow-purple-600/20 transition-all cursor-pointer flex items-center justify-center gap-2"
+                    disabled={applied || (!syncSleep && !syncSteps)}
+                    className="w-full py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-bold text-sm rounded-xl shadow-lg shadow-purple-600/20 transition-all cursor-pointer flex items-center justify-center gap-2"
                   >
                     {applied ? (
                       <>
                         <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                        <span>Applied to Gym Hub Daily Log!</span>
+                        <span>Synced Sleep & Steps to Gym Hub Log!</span>
                       </>
                     ) : (
                       <>
                         <Activity className="w-5 h-5" />
-                        <span>Sync WHOOP Metrics to Daily Gym Log</span>
+                        <span>
+                          {syncSleep && syncSteps 
+                            ? "Sync Sleep & Steps to Daily Gym Log"
+                            : syncSleep 
+                            ? "Sync Sleep Hours to Daily Gym Log"
+                            : syncSteps 
+                            ? "Sync Daily Steps to Gym Log"
+                            : "Select at least one metric to sync"}
+                        </span>
                       </>
                     )}
                   </Button>

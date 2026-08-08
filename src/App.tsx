@@ -49,7 +49,9 @@ import {
   Facebook,
   Users,
   Apple,
-  Folder
+  Folder,
+  HelpCircle,
+  Mail
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Button } from './components/ui/Button';
@@ -601,7 +603,7 @@ const LinkAuditModal = ({
 export default function App() {
   const [activeTab, setActiveTab] = useState<'reports' | 'gym' | 'client' | 'profile'>('reports');
   const [latestReport, setLatestReport] = useState<SavedReport | null>(null);
-  const [step, setStep] = useState<'landing' | 'intake' | 'photos' | 'progress-photos' | 'processing' | 'report' | 'history' | 'no-access' | 'error'>('landing');
+  const [step, setStep] = useState<'landing' | 'intake' | 'photos' | 'progress-photos' | 'processing' | 'report' | 'history' | 'no-access' | 'error' | 'support'>('landing');
   const [lastError, setLastError] = useState<string | null>(null);
   const [showLinkAudit, setShowLinkAudit] = useState(false);
 
@@ -669,6 +671,7 @@ export default function App() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
   const [selectedFaq, setSelectedFaq] = useState<any>(null);
+  const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [isLevelModalOpen, setIsLevelModalOpen] = useState(false);
   const [clientReportData, setClientReportData] = useState<ClientData | null>(null);
@@ -713,19 +716,7 @@ export default function App() {
         </div>
       )
     },
-    {
-      id: 'pin-reset',
-      title: 'Reset my Gym Hub PIN?',
-      icon: Lock,
-      content: (
-        <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
-          <p>To reset your Gym Hub PIN, open the Gym Hub and select the gear icon in the top-right corner of the screen.</p>
-          <p>From there, choose the option to update or reset your PIN, then enter a new PIN you’ll remember.</p>
-          <p>If you are a new customer, your default PIN is: <code className="bg-white/5 px-1.5 py-0.5 rounded text-brand-primary font-mono font-bold">123456</code></p>
-          <p className="text-[10px] uppercase tracking-widest opacity-60">We recommend changing this immediately after your first login for better account security.</p>
-        </div>
-      )
-    },
+
     {
       id: 'community',
       title: 'Join the Community',
@@ -820,6 +811,17 @@ export default function App() {
       };
       performGlobalReset();
     }
+  }, []);
+
+  useEffect(() => {
+    const checkHash = () => {
+      if (window.location.hash === '#support' || window.location.search.includes('page=support')) {
+        setStep('support');
+      }
+    };
+    checkHash();
+    window.addEventListener('hashchange', checkHash);
+    return () => window.removeEventListener('hashchange', checkHash);
   }, []);
 
   useEffect(() => {
@@ -1839,6 +1841,92 @@ export default function App() {
             </motion.div>
           )}
 
+          {step === 'support' && (
+            <motion.div
+              key="support"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              className="max-w-4xl mx-auto py-8 sm:py-12 px-4 space-y-10"
+            >
+              {/* Navigation Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-6">
+                <Button 
+                  variant="outline" 
+                  className="w-fit rounded-xl border-white/10 hover:bg-white/10 gap-2 text-xs font-bold uppercase tracking-wider text-gray-300 cursor-pointer"
+                  onClick={() => {
+                    setStep('landing');
+                    window.location.hash = '';
+                  }}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Back to Main App
+                </Button>
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-brand-primary/10 border-brand-primary/30 text-brand-primary text-xs px-3 py-1 font-mono">
+                    UNLCKD Support Center
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Title Header */}
+              <div className="text-center space-y-4">
+                <div className="w-16 h-16 rounded-2xl bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center mx-auto">
+                  <HelpCircle className="w-8 h-8 text-brand-primary" />
+                </div>
+                <h1 className="text-3xl md:text-5xl font-display font-bold tracking-tight text-white">Support & FAQ</h1>
+                <p className="text-gray-400 max-w-xl mx-auto text-sm sm:text-base leading-relaxed">
+                  Helpful troubleshooting guides, account access solutions, device setup instructions, and direct support options.
+                </p>
+              </div>
+
+              {/* All FAQ Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {faqs.map((faq) => (
+                  <Card key={faq.id} className="p-6 bg-brand-surface/80 border border-white/10 hover:border-brand-primary/40 transition-all space-y-4 rounded-2xl">
+                    <div className="flex items-center gap-3">
+                      <div className="w-11 h-11 rounded-xl bg-brand-primary/15 flex items-center justify-center shrink-0">
+                        <faq.icon className="w-5 h-5 text-brand-primary" />
+                      </div>
+                      <h2 className="text-lg font-display font-bold italic uppercase tracking-tight text-white">{faq.title}</h2>
+                    </div>
+                    <div className="pt-2 border-t border-white/5">
+                      {faq.content}
+                    </div>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Contact Support Banner */}
+              <Card className="p-8 bg-gradient-to-br from-brand-primary/10 via-brand-surface to-brand-dark border border-brand-primary/30 rounded-3xl text-center space-y-6">
+                <div className="space-y-2 max-w-xl mx-auto">
+                  <h3 className="text-2xl font-display font-bold text-white uppercase italic">Still Need Assistance?</h3>
+                  <p className="text-sm text-gray-400">
+                    If your issue persists or you need custom assistance with your Pro membership, reach out directly to our dedicated support team.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
+                  <a
+                    href="mailto:unlocksupport@unlckdbrand.com?subject=UNLCKD%20Pro%20Trainer%20Support%20Request"
+                    className="px-6 py-3.5 bg-brand-primary text-brand-dark font-black text-xs uppercase tracking-widest rounded-xl hover:scale-105 transition-all shadow-lg shadow-brand-primary/20 flex items-center gap-2 cursor-pointer"
+                  >
+                    <Mail className="w-4 h-4" />
+                    Email Support Team
+                  </a>
+                  <a
+                    href="https://unlckdbrand.com/unlckd-pro-trainer"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-6 py-3.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-xs uppercase tracking-widest rounded-xl transition-all flex items-center gap-2 cursor-pointer"
+                  >
+                    <ExternalLink className="w-4 h-4 text-brand-primary" />
+                    Visit Official Site
+                  </a>
+                </div>
+              </Card>
+            </motion.div>
+          )}
+
           {step === 'landing' && (
             <motion.div
               key="landing"
@@ -1891,6 +1979,30 @@ export default function App() {
                       Upgrade to Premium
                     </a>
                   ) : null}
+                </div>
+
+                {/* Social Media Logos Only */}
+                <div className="pt-2 flex items-center justify-center gap-3">
+                  <a 
+                    href="https://instagram.com/unlckd_brand" 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    aria-label="Instagram"
+                    className="p-3 rounded-full bg-white/5 border border-white/10 text-gray-300 hover:text-brand-primary hover:bg-white/10 hover:border-brand-primary/40 transition-all hover:scale-110 shadow-sm"
+                    title="Instagram"
+                  >
+                    <Instagram className="w-5 h-5" />
+                  </a>
+                  <a 
+                    href="https://facebook.com/unlckdbrand" 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    aria-label="Facebook"
+                    className="p-3 rounded-full bg-white/5 border border-white/10 text-gray-300 hover:text-brand-primary hover:bg-white/10 hover:border-brand-primary/40 transition-all hover:scale-110 shadow-sm"
+                    title="Facebook"
+                  >
+                    <Facebook className="w-5 h-5" />
+                  </a>
                 </div>
               </div>
 
@@ -2077,80 +2189,124 @@ export default function App() {
                   </Card>
                 </div>
 
-                {/* FAQ Section */}
-                <div className="pt-24 border-t border-white/5 space-y-12">
-                  <div className="space-y-4">
-                    <h2 className="text-3xl md:text-5xl font-display font-bold tracking-tight">Support & FAQ</h2>
-                    <p className="text-gray-400 max-w-xl mx-auto">Solutions for common access issues and technical questions.</p>
-                  </div>
-                  
-                  <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
-                    {faqs.map((faq) => (
-                      <button
-                        key={faq.id}
-                        onClick={() => setSelectedFaq(faq)}
-                        className="w-full text-left p-6 bg-white/[0.02] border border-white/5 rounded-2xl hover:border-brand-primary/30 transition-all flex items-center gap-4 group"
+                {/* Support & FAQ Modal */}
+                <AnimatePresence>
+                  {(isSupportModalOpen || selectedFaq) && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4">
+                      <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => {
+                          setIsSupportModalOpen(false);
+                          setSelectedFaq(null);
+                        }}
+                        className="absolute inset-0 bg-brand-dark/90 backdrop-blur-md" 
+                      />
+                      <motion.div 
+                        initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                        className="relative w-full max-w-2xl max-h-[88vh] sm:max-h-[85vh] bg-brand-surface border border-white/10 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col"
                       >
-                        <div className="w-10 h-10 rounded-lg bg-brand-primary/10 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                          <faq.icon className="w-5 h-5 text-brand-primary" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-lg font-bold font-display italic uppercase truncate tracking-tight text-white">{faq.title}</h3>
-                          <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mt-0.5">Click for Details</p>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-gray-600 group-hover:text-brand-primary transition-colors" />
-                      </button>
-                    ))}
-                  </div>
+                        {/* Modal Header */}
+                        <div className="p-5 sm:p-6 bg-gradient-to-br from-brand-primary/10 to-transparent border-b border-white/5 relative shrink-0">
+                          <button 
+                            onClick={() => {
+                              setIsSupportModalOpen(false);
+                              setSelectedFaq(null);
+                            }}
+                            className="absolute top-4 right-4 sm:top-5 sm:right-5 p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer shrink-0 z-10"
+                            aria-label="Close Support & FAQ"
+                          >
+                            <X className="w-4 h-4 sm:w-5 sm:h-5" />
+                          </button>
 
-                  {/* FAQ Detail Modal */}
-                  <AnimatePresence>
-                    {selectedFaq && (
-                      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                        <motion.div 
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          onClick={() => setSelectedFaq(null)}
-                          className="absolute inset-0 bg-brand-dark/90 backdrop-blur-md" 
-                        />
-                        <motion.div 
-                          initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                          animate={{ opacity: 1, scale: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                          className="relative w-full max-w-xl bg-brand-surface border border-white/10 rounded-3xl shadow-2xl overflow-hidden"
-                        >
-                          <div className="p-8 space-y-6">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-xl bg-brand-primary/10 flex items-center justify-center">
-                                  <selectedFaq.icon className="w-6 h-6 text-brand-primary" />
-                                </div>
-                                <h3 className="text-2xl font-display font-bold italic uppercase tracking-tight text-white">{selectedFaq.title}</h3>
-                              </div>
-                              <button 
+                          {selectedFaq ? (
+                            <div className="pr-10 sm:pr-12">
+                              <button
                                 onClick={() => setSelectedFaq(null)}
-                                className="p-2 hover:bg-white/5 rounded-full transition-colors"
+                                className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-brand-primary hover:text-brand-primary/80 transition-colors mb-3 cursor-pointer"
                               >
-                                <X className="w-6 h-6 text-gray-500" />
+                                <ChevronLeft className="w-4 h-4" />
+                                <span>Back to All Topics</span>
                               </button>
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-brand-primary/20 flex items-center justify-center shrink-0">
+                                  <selectedFaq.icon className="w-5 h-5 sm:w-6 sm:h-6 text-brand-primary" />
+                                </div>
+                                <h3 className="text-lg sm:text-2xl font-display font-bold italic uppercase tracking-tight text-white">{selectedFaq.title}</h3>
+                              </div>
                             </div>
+                          ) : (
+                            <div className="flex items-center gap-3.5 pr-10 sm:pr-12">
+                              <div className="p-2.5 sm:p-3 bg-brand-primary/20 rounded-xl sm:rounded-2xl shrink-0">
+                                <HelpCircle className="w-5 h-5 sm:w-6 sm:h-6 text-brand-primary" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <h2 className="text-xl sm:text-2xl font-display font-bold text-white leading-tight">Support & FAQ</h2>
+                                <p className="text-gray-400 text-xs sm:text-sm">Solutions for common access issues and technical questions.</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
 
-                            <div className="content">
+                        {/* Modal Scrollable Body */}
+                        <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4 custom-scrollbar">
+                          {selectedFaq ? (
+                            <div className="p-2 sm:p-3">
                               {selectedFaq.content}
                             </div>
+                          ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                              {faqs.map((faq) => (
+                                <button
+                                  key={faq.id}
+                                  onClick={() => setSelectedFaq(faq)}
+                                  className="w-full text-left p-4 sm:p-5 bg-white/[0.02] hover:bg-white/[0.05] border border-white/5 hover:border-brand-primary/30 rounded-xl sm:rounded-2xl transition-all flex items-center gap-3.5 group cursor-pointer"
+                                >
+                                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-brand-primary/10 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                                    <faq.icon className="w-4 h-4 sm:w-5 sm:h-5 text-brand-primary" />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <h3 className="text-sm sm:text-base font-bold font-display italic uppercase truncate tracking-tight text-white">{faq.title}</h3>
+                                    <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase font-black tracking-widest mt-0.5">Click for Details</p>
+                                  </div>
+                                  <ChevronRight className="w-4 h-4 text-gray-600 group-hover:text-brand-primary transition-colors shrink-0" />
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
 
+                        {/* Modal Footer */}
+                        <div className="p-3.5 sm:p-4 bg-brand-dark/50 border-t border-white/5 flex items-center justify-between shrink-0 gap-3">
+                          {selectedFaq ? (
                             <button
                               onClick={() => setSelectedFaq(null)}
-                              className="w-full py-4 bg-brand-primary text-brand-dark font-black uppercase tracking-tighter rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all"
+                              className="px-4 py-2 bg-white/5 hover:bg-white/10 text-gray-300 font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer"
                             >
-                              Close Information
+                              ← All Topics
                             </button>
-                          </div>
-                        </motion.div>
-                      </div>
-                    )}
-                  </AnimatePresence>
+                          ) : (
+                            <span className="text-[10px] text-gray-500 uppercase tracking-wider font-mono hidden sm:inline">
+                              UNLCKD Support Portal
+                            </span>
+                          )}
+                          <button
+                            onClick={() => {
+                              setIsSupportModalOpen(false);
+                              setSelectedFaq(null);
+                            }}
+                            className="w-full sm:w-auto px-6 py-2.5 bg-brand-primary text-brand-dark font-black text-xs uppercase tracking-wider rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all ml-auto cursor-pointer"
+                          >
+                            Close
+                          </button>
+                        </div>
+                      </motion.div>
+                    </div>
+                  )}
+                </AnimatePresence>
                   
                   {/* Account Settings Modal */}
                   <AnimatePresence>
@@ -2275,12 +2431,8 @@ export default function App() {
                     )}
                   </AnimatePresence>
 
-                  {/* Footer */}
-                  <div className="pt-12 pb-8 text-center text-gray-500 text-xs uppercase tracking-widest font-medium">
-                    <p>&copy; {new Date().getFullYear()} UNLCKD PRO TRAINER. ALL RIGHTS RESERVED.</p>
-                  </div>
+
                 </div>
-              </div>
             </motion.div>
           )}
 
@@ -2489,13 +2641,32 @@ export default function App() {
                           value={userData.currentWorkout}
                           onChange={e => setUserData({...userData, currentWorkout: e.target.value})}
                         />
-                        <Input 
-                          label="Event Focus" 
-                          placeholder="e.g. Wedding in 3 months, Beach holiday" 
-                          required
-                          value={userData.eventFocus}
-                          onChange={e => setUserData({...userData, eventFocus: e.target.value})}
-                        />
+                        <div>
+                          <Input 
+                            label="Event Focus" 
+                            placeholder="e.g. Postpartum, Wedding in 3 months, Beach holiday" 
+                            required
+                            value={userData.eventFocus}
+                            onChange={e => setUserData({...userData, eventFocus: e.target.value})}
+                          />
+                          <div className="flex flex-wrap gap-1.5 mt-2">
+                            {['Postpartum', 'Wedding in 3 months', 'Beach Holiday', 'General Fitness'].map((preset) => (
+                              <button
+                                key={preset}
+                                type="button"
+                                onClick={() => setUserData({ ...userData, eventFocus: preset })}
+                                className={cn(
+                                  "px-2.5 py-1 text-[11px] rounded-lg border transition-all cursor-pointer font-medium",
+                                  userData.eventFocus === preset
+                                    ? "bg-brand-primary/20 border-brand-primary text-brand-primary"
+                                    : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-white"
+                                )}
+                              >
+                                + {preset}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                       </>
                     )}
 
@@ -4023,8 +4194,8 @@ export default function App() {
                 Cancel Request
               </button>
 
-              <div className="pt-4 border-t border-white/5">
-                <p className="text-[10px] text-gray-400 mb-3 uppercase tracking-widest font-bold">Don't have a PIN yet?</p>
+              <div className="pt-4 border-t border-white/5 space-y-3">
+                <p className="text-[10px] text-gray-400 mb-2 uppercase tracking-widest font-bold">Don't have a PIN yet?</p>
                 <a 
                   href="https://unlckdbrand.com/unlckd-pro-trainer-premium" 
                   target="_blank" 
@@ -4034,6 +4205,24 @@ export default function App() {
                   <Trophy className="w-3.5 h-3.5" />
                   Get Premium Access
                 </a>
+                <div className="flex flex-wrap items-center justify-center gap-1.5 text-xs text-slate-400 font-sans pt-1">
+                  <span>Need help?</span>
+                  <a 
+                    href="#support"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setShowGymAuth(false);
+                      window.location.hash = 'support';
+                      setStep('support');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="text-blue-400 underline hover:text-blue-300 transition-colors font-medium cursor-pointer"
+                  >
+                    Support & FAQ
+                  </a>
+                  <span className="text-slate-600">·</span>
+                  <span className="text-slate-400">Note: Activation PIN required</span>
+                </div>
               </div>
             </div>
           </div>
@@ -4044,6 +4233,48 @@ export default function App() {
 
       <footer className="py-12 border-t border-gray-800 bg-brand-dark">
         <div className="max-w-7xl mx-auto px-4 text-center space-y-4">
+          <div className="flex flex-wrap items-center justify-center gap-1.5 text-xs sm:text-sm text-slate-400 font-sans">
+            <span>Need help?</span>
+            <a 
+              href="#support"
+              onClick={(e) => {
+                e.preventDefault();
+                window.location.hash = 'support';
+                setStep('support');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="text-blue-400 underline hover:text-blue-300 transition-colors font-medium cursor-pointer"
+            >
+              Support & FAQ
+            </a>
+            <span className="text-slate-600">·</span>
+            <span className="text-slate-400">Note: AI-generated assessments are for informational purposes only</span>
+          </div>
+
+          {/* Social Media Logos Only */}
+          <div className="flex items-center justify-center gap-3 pt-1">
+            <a 
+              href="https://instagram.com/unlckd_brand" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              aria-label="Instagram"
+              className="p-2.5 rounded-full bg-white/5 border border-white/10 text-gray-400 hover:text-brand-primary hover:bg-white/10 hover:border-brand-primary/30 transition-all hover:scale-110 cursor-pointer"
+              title="Instagram"
+            >
+              <Instagram className="w-4 h-4" />
+            </a>
+            <a 
+              href="https://facebook.com/unlckdbrand" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              aria-label="Facebook"
+              className="p-2.5 rounded-full bg-white/5 border border-white/10 text-gray-400 hover:text-brand-primary hover:bg-white/10 hover:border-brand-primary/30 transition-all hover:scale-110 cursor-pointer"
+              title="Facebook"
+            >
+              <Facebook className="w-4 h-4" />
+            </a>
+          </div>
+
           <Logo 
             size="sm"
             className="opacity-50 hover:opacity-100 justify-center"
@@ -4053,7 +4284,7 @@ export default function App() {
             }}
           />
           <p className="text-xs text-gray-600">
-            © 2026 UNLCKD Pro Trainer. AI-generated assessments are for informational purposes only. Consult a professional before starting any new fitness or nutrition program.
+            © 2026 UNLCKD Pro Trainer. Consult a professional before starting any new fitness or nutrition program.
           </p>
         </div>
       </footer>
@@ -4224,9 +4455,24 @@ export default function App() {
                       {isSignUp ? "Sign In" : "Sign Up"}
                     </button>
                   </p>
-                  <p className="text-[10px] text-gray-600 italic">
-                    Note: Pro membership is required for premium features.
-                  </p>
+                  <div className="flex flex-wrap items-center justify-center gap-1.5 text-xs text-slate-400 font-sans pt-1">
+                    <span>Need help?</span>
+                    <a 
+                      href="#support"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setIsAuthModalOpen(false);
+                        window.location.hash = 'support';
+                        setStep('support');
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="text-blue-400 underline hover:text-blue-300 transition-colors font-medium cursor-pointer"
+                    >
+                      Support & FAQ
+                    </a>
+                    <span className="text-slate-600">·</span>
+                    <span className="text-slate-400">Note: Pro membership required</span>
+                  </div>
                 </div>
               </div>
             </motion.div>

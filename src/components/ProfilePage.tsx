@@ -22,10 +22,11 @@ import { Card, Badge as UiBadge } from './ui/Card';
 import { Button } from './ui/Button';
 import { UnitToggle } from './UnitToggle';
 import { WeightProgressionChart } from './WeightProgressionChart';
-import { UserProfile, Badge as UserBadge } from '../types';
+import { UserProfile, Badge as UserBadge, Measurement } from '../types';
 import { cn } from '../lib/utils';
 import { updateUserProfile } from '../services/accessService';
 import { getLevelInfo } from '../lib/levels';
+import { gymService } from '../services/gymService';
 
 interface ProfilePageProps {
   userProfile: UserProfile | null;
@@ -107,6 +108,46 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   const [weight, setWeight] = useState<string | number>(userProfile?.weight ?? 185);
   const [weightUnit, setWeightUnit] = useState<'lbs' | 'kg'>(userProfile?.weightUnit || 'lbs');
   const [goalWeight, setGoalWeight] = useState<string | number>(userProfile?.goalWeight ?? 175);
+  const [latestWeightLog, setLatestWeightLog] = useState<Measurement | null>(null);
+  const [isLoadingWeightLog, setIsLoadingWeightLog] = useState(true);
+
+  // Automatically fetch latest weight log entry and pull weight if available
+  React.useEffect(() => {
+    let isMounted = true;
+    async function loadWeightLog() {
+      try {
+        setIsLoadingWeightLog(true);
+        const measurementsList = await gymService.getLatestMeasurements(50);
+        if (!isMounted) return;
+        const validLogs = (measurementsList || [])
+          .filter(m => typeof m.weight === 'number' && m.weight > 0)
+          .sort((a, b) => b.date.localeCompare(a.date));
+
+        if (validLogs.length > 0) {
+          const latest = validLogs[0];
+          setLatestWeightLog(latest);
+          const loggedUnit = latest.units?.weight || 'lbs';
+          let weightVal = latest.weight;
+          if (loggedUnit === 'kg' && weightUnit === 'lbs') {
+            weightVal = Math.round(weightVal / 0.453592);
+          } else if (loggedUnit === 'lbs' && weightUnit === 'kg') {
+            weightVal = Math.round(weightVal * 0.453592);
+          }
+          setWeight(weightVal);
+        } else {
+          setLatestWeightLog(null);
+        }
+      } catch (err) {
+        console.error('Error fetching weight log for profile:', err);
+      } finally {
+        if (isMounted) setIsLoadingWeightLog(false);
+      }
+    }
+    loadWeightLog();
+    return () => {
+      isMounted = false;
+    };
+  }, [userProfile?.userId]);
   
   // Dynamically calculate level using getLevelInfo to ensure exact match with Header and Level Progression modal
   const level = getLevelInfo(userProfile?.xp || 0).level;
@@ -534,10 +575,10 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               exit={{ height: 0, opacity: 0 }}
               className="overflow-hidden pt-2 border-t border-white/5"
             >
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-5 pt-2">
                 {/* Full Name */}
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-gray-400 uppercase">Full Name</label>
+                <div className="space-y-1.5 min-w-0">
+                  <label className="text-[11px] font-bold text-gray-400 uppercase truncate block">Full Name</label>
                   <input
                     type="text"
                     value={fullName}
@@ -547,8 +588,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 </div>
 
                 {/* Age */}
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-gray-400 uppercase">Age</label>
+                <div className="space-y-1.5 min-w-0">
+                  <label className="text-[11px] font-bold text-gray-400 uppercase truncate block">Age</label>
                   <input
                     type="number"
                     min="1"
@@ -561,9 +602,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 </div>
 
                 {/* Height */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[11px] font-bold text-gray-400 uppercase">Height</label>
+                <div className="space-y-1.5 min-w-0">
+                  <div className="flex items-center justify-between gap-1 min-w-0">
+                    <label className="text-[11px] font-bold text-gray-400 uppercase truncate">Height</label>
                     <UnitToggle<'ftin' | 'cm'>
                       unitA="ftin"
                       unitB="cm"
@@ -628,9 +669,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 </div>
 
                 {/* Weight */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[11px] font-bold text-gray-400 uppercase">Current Weight</label>
+                <div className="space-y-1.5 min-w-0">
+                  <div className="flex items-center justify-between gap-1 min-w-0">
+                    <label className="text-[11px] font-bold text-gray-400 uppercase truncate">Current Weight</label>
                     <UnitToggle<'lbs' | 'kg'>
                       unitA="lbs"
                       unitB="kg"
@@ -638,14 +679,29 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                       labelB="[KG]"
                       value={weightUnit}
                       onChange={(u) => {
-                        const numW = weight === '' ? 0 : Number(weight);
+                        if (latestWeightLog) {
+                          const loggedUnit = latestWeightLog.units?.weight || 'lbs';
+                          let weightVal = latestWeightLog.weight;
+                          if (loggedUnit === 'kg' && u === 'lbs') {
+                            weightVal = Math.round(weightVal / 0.453592);
+                          } else if (loggedUnit === 'lbs' && u === 'kg') {
+                            weightVal = Math.round(weightVal * 0.453592);
+                          }
+                          setWeight(weightVal);
+                        } else {
+                          const numW = weight === '' ? 0 : Number(weight);
+                          if (u === 'kg' && weightUnit === 'lbs') {
+                            setWeight(numW > 0 ? Math.round(numW * 0.453592) : '');
+                          }
+                          if (u === 'lbs' && weightUnit === 'kg') {
+                            setWeight(numW > 0 ? Math.round(numW / 0.453592) : '');
+                          }
+                        }
                         const numGW = goalWeight === '' ? 0 : Number(goalWeight);
                         if (u === 'kg' && weightUnit === 'lbs') {
-                          setWeight(numW > 0 ? Math.round(numW * 0.453592) : '');
                           setGoalWeight(numGW > 0 ? Math.round(numGW * 0.453592) : '');
                         }
                         if (u === 'lbs' && weightUnit === 'kg') {
-                          setWeight(numW > 0 ? Math.round(numW / 0.453592) : '');
                           setGoalWeight(numGW > 0 ? Math.round(numGW / 0.453592) : '');
                         }
                         setWeightUnit(u);
@@ -656,14 +712,19 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                   <input
                     type="number"
                     value={weight}
-                    onChange={(e) => setWeight(e.target.value)}
+                    readOnly={Boolean(latestWeightLog)}
+                    onChange={(e) => {
+                      if (!latestWeightLog) {
+                        setWeight(e.target.value);
+                      }
+                    }}
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono focus:border-brand-primary outline-none"
                   />
                 </div>
 
                 {/* Goal Weight */}
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-gray-400 uppercase">Goal Weight ({weightUnit})</label>
+                <div className="space-y-1.5 min-w-0">
+                  <label className="text-[11px] font-bold text-gray-400 uppercase truncate block">Goal Weight ({weightUnit})</label>
                   <input
                     type="number"
                     value={goalWeight}

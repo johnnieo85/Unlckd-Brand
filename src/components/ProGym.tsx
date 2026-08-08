@@ -354,8 +354,9 @@ export const ProGym = ({
   const [isAddingMeasurement, setIsAddingMeasurement] = useState(false);
   const [hasDayMeasurement, setHasDayMeasurement] = useState(false);
   const [isMeasurementsExpanded, setIsMeasurementsExpanded] = useState(false);
+  const [measurementPage, setMeasurementPage] = useState(1);
   const [unlockedDates, setUnlockedDates] = useState<Set<string>>(new Set([getLocalDateString(new Date())]));
-  const [isConsistencyCollapsed, setIsConsistencyCollapsed] = useState(true);
+  const [isConsistencyCollapsed, setIsConsistencyCollapsed] = useState(false);
   const [isNutritionCollapsed, setIsNutritionCollapsed] = useState(true);
   const [isTrainingCollapsed, setIsTrainingCollapsed] = useState(true);
   const [isWarmUpCollapsed, setIsWarmUpCollapsed] = useState(true);
@@ -377,9 +378,10 @@ export const ProGym = ({
   const [isWhoopModalOpen, setIsWhoopModalOpen] = useState(false);
 
   const handleApplyWhoopData = async (data: {
-    sleepHours: number;
-    sleepQuality: 'Poor' | 'Fair' | 'Good' | 'Excellent';
-    sleepNotes: string;
+    sleepHours?: number;
+    sleepQuality?: 'Poor' | 'Fair' | 'Good' | 'Excellent';
+    sleepNotes?: string;
+    steps?: number;
     recoveryScore?: number;
     hrvMs?: number;
     restingHeartRate?: number;
@@ -388,17 +390,20 @@ export const ProGym = ({
     if (!log) return;
     const updatedLog: DailyLog = {
       ...log,
-      sleepHours: data.sleepHours,
-      sleepQuality: data.sleepQuality,
-      sleepNotes: data.sleepNotes
+      ...(data.sleepHours !== undefined ? { sleepHours: data.sleepHours } : {}),
+      ...(data.sleepQuality !== undefined ? { sleepQuality: data.sleepQuality } : {}),
+      ...(data.sleepNotes !== undefined ? { sleepNotes: data.sleepNotes } : {}),
+      ...(data.steps !== undefined ? { steps: data.steps } : {})
     };
     setLog(updatedLog);
     try {
-      await gymService.updateDailyLog(selectedDate, {
-        sleepHours: data.sleepHours,
-        sleepQuality: data.sleepQuality,
-        sleepNotes: data.sleepNotes
-      });
+      const updates: Partial<DailyLog> = {};
+      if (data.sleepHours !== undefined) updates.sleepHours = data.sleepHours;
+      if (data.sleepQuality !== undefined) updates.sleepQuality = data.sleepQuality;
+      if (data.sleepNotes !== undefined) updates.sleepNotes = data.sleepNotes;
+      if (data.steps !== undefined) updates.steps = data.steps;
+
+      await gymService.updateDailyLog(selectedDate, updates);
     } catch (e) {
       console.error("Error applying WHOOP data to daily log:", e);
     }
@@ -1762,11 +1767,19 @@ export const ProGym = ({
       });
       setHasDayMeasurement(true);
 
-      // Sync with DailyLog consistency tracker
+      // Sync with DailyLog consistency tracker & user profile
       await gymService.updateDailyLog(selectedDate, { 
         weight: Number(newMeasurement.weight),
         weightUnit: measurementUnits.weight 
       });
+
+      if (userProfile?.userId) {
+        await updateUserProfile(userProfile.userId, {
+          weight: Number(newMeasurement.weight),
+          weightUnit: measurementUnits.weight
+        });
+        if (onProfileUpdate) onProfileUpdate();
+      }
 
       setIsAddingMeasurement(false);
       // Refresh to be sure
@@ -2141,23 +2154,23 @@ export const ProGym = ({
               <Activity className="w-32 h-32 text-brand-primary" />
             </div>
             
-            <div className="flex items-center justify-between mb-2 cursor-pointer group" onClick={() => setIsConsistencyCollapsed(!isConsistencyCollapsed)}>
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-brand-primary/10 rounded-lg group-hover:bg-brand-primary/20 transition-colors">
+            <div className="flex items-center justify-between mb-2 cursor-pointer group select-none" onClick={() => setIsConsistencyCollapsed(!isConsistencyCollapsed)}>
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="p-2 bg-brand-primary/10 rounded-lg group-hover:bg-brand-primary/20 transition-colors shrink-0">
                   <Activity className="w-5 h-5 text-brand-primary" />
                 </div>
-                <div>
-                  <h3 className="text-lg md:text-xl font-display font-bold text-white">Daily Consistency</h3>
+                <div className="min-w-0">
+                  <h3 className="text-lg md:text-xl font-display font-bold text-white truncate">Daily Consistency</h3>
                   {isConsistencyCollapsed && (
-                    <span className="text-xs font-mono text-brand-primary font-bold">
+                    <span className="text-xs font-mono text-brand-primary font-bold block truncate">
                       {currentStreak} Days Streak · {calculateXP().toLocaleString()} XP
                     </span>
                   )}
                 </div>
               </div>
-              <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white p-1">
+              <div className="p-1.5 bg-white/5 rounded-lg border border-white/10 text-gray-400 group-hover:text-white shrink-0 ml-2 transition-colors">
                 {isConsistencyCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-              </Button>
+              </div>
             </div>
 
             <AnimatePresence>
@@ -2244,7 +2257,7 @@ export const ProGym = ({
           </Card>
 
           {/* Quick Logs */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
             <DndContext 
               sensors={sensors}
               collisionDetection={closestCenter}
@@ -2257,44 +2270,30 @@ export const ProGym = ({
                 {trackerOrder.map((id) => (
                   <SortableTracker key={id} id={id}>
                     {id === 'hydration' ? (
-                      <Card className="p-6 md:p-8 bg-brand-surface border-white/5 h-full">
-                        <div className="flex items-center justify-between">
+                      <Card className="p-4 sm:p-5 bg-brand-surface border-white/5 h-full overflow-hidden">
+                        <div className="flex items-center justify-between gap-2.5 min-w-0 w-full">
                           <div 
-                            className="flex items-center gap-3 cursor-pointer group"
+                            className="flex items-center gap-2.5 cursor-pointer group flex-1 min-w-0"
                             onClick={() => setIsWaterCollapsed(!isWaterCollapsed)}
                           >
-                            <div className="p-2 bg-blue-500/10 rounded-lg group-hover:bg-blue-500/20 transition-colors">
+                            <div className="p-2 bg-blue-500/10 rounded-lg group-hover:bg-blue-500/20 transition-colors shrink-0">
                               <Droplets className="w-5 h-5 text-blue-500" />
                             </div>
-                            <div className="flex flex-col">
-                              <h3 className="font-bold text-gray-200">Hydration</h3>
-                              <span className={cn("text-[10px] font-black uppercase tracking-widest", isWaterCollapsed ? "text-blue-400" : "text-gray-500")}>
+                            <div className="flex flex-col min-w-0 flex-1">
+                              <h3 className="font-bold text-gray-200 text-sm sm:text-base leading-tight truncate">Hydration</h3>
+                              <span className={cn("text-xs font-mono font-bold leading-tight truncate mt-0.5", isWaterCollapsed ? "text-blue-400" : "text-gray-500")}>
                                 {isWaterCollapsed ? `${log.water} / ${log.waterGoal} ${log.waterUnit}` : "Track Intake"}
                               </span>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <UnitToggle<'oz' | 'ml'>
-                              unitA="oz"
-                              unitB="ml"
-                              labelA="[OZ]"
-                              labelB="[ML]"
-                              value={log.waterUnit || 'oz'}
-                              onChange={(u) => {
-                                if (log.waterUnit !== u) {
-                                  toggleWaterUnit();
-                                }
-                              }}
-                              size="sm"
-                            />
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              className="p-1 text-gray-400 hover:text-white"
-                              onClick={() => setIsWaterCollapsed(!isWaterCollapsed)}
-                            >
-                              {isWaterCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-                            </Button>
+                          <div 
+                            className="p-1.5 text-gray-400 hover:text-white cursor-pointer rounded-lg hover:bg-white/5 transition-colors shrink-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsWaterCollapsed(!isWaterCollapsed);
+                            }}
+                          >
+                            {isWaterCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
                           </div>
                         </div>
                         
@@ -2306,14 +2305,14 @@ export const ProGym = ({
                               exit={{ height: 0, opacity: 0 }}
                               className="overflow-hidden"
                             >
-                              <div className="space-y-4 pt-5">
+                              <div className="space-y-4 pt-4">
                                 {/* Dedicated Counter Row */}
-                                <div className="flex items-center justify-between bg-black/30 border border-white/10 rounded-xl p-2.5 sm:p-3 gap-1.5 sm:gap-2">
-                                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                                <div className="flex items-center justify-between bg-black/30 border border-white/10 rounded-xl p-2.5 gap-2 w-full">
+                                  <div className="flex items-center gap-1.5 shrink-0">
                                     <Button 
                                       variant="outline" 
                                       size="sm"
-                                      className="w-7 h-7 sm:w-8 sm:h-8 p-0 border-white/10 hover:border-blue-500/40 text-blue-400 shrink-0"
+                                      className="w-7 h-7 sm:w-8 sm:h-8 p-0 border-white/10 hover:border-blue-500/40 text-blue-400 shrink-0 cursor-pointer"
                                       onClick={() => updateWater(log.waterUnit === 'oz' ? -8 : -250)}
                                     >
                                       <Minus className="w-3.5 h-3.5" />
@@ -2325,31 +2324,33 @@ export const ProGym = ({
                                         const val = parseInt(e.target.value) || 0;
                                         setLog({ ...log, water: val });
                                       }}
-                                      className="w-16 sm:w-20 bg-white/5 border border-white/10 rounded-lg px-1.5 py-1 text-center font-mono text-sm font-bold text-gray-100 focus:border-blue-500 outline-none transition-colors"
+                                      className="w-12 sm:w-14 bg-white/5 border border-white/10 rounded-lg px-1 py-1 text-center font-mono text-xs sm:text-sm font-bold text-gray-100 focus:border-blue-500 outline-none transition-colors"
                                     />
                                     <Button 
                                       variant="outline" 
                                       size="sm"
-                                      className="w-7 h-7 sm:w-8 sm:h-8 p-0 border-white/10 hover:border-blue-500/40 text-blue-400 shrink-0"
+                                      className="w-7 h-7 sm:w-8 sm:h-8 p-0 border-white/10 hover:border-blue-500/40 text-blue-400 shrink-0 cursor-pointer"
                                       onClick={() => updateWater(log.waterUnit === 'oz' ? 8 : 250)}
                                     >
                                       <Plus className="w-3.5 h-3.5" />
                                     </Button>
                                   </div>
-                                  <span className="text-xs font-mono font-bold text-gray-400 shrink-0 whitespace-nowrap">
-                                    / {log.waterGoal} {log.waterUnit}
-                                  </span>
+                                  <div className="flex-1 min-w-0 text-right">
+                                    <span className="text-xs font-mono font-bold text-gray-400 truncate block">
+                                      / {log.waterGoal} {log.waterUnit}
+                                    </span>
+                                  </div>
                                 </div>
 
                                 {/* Quick Presets */}
-                                <div className="flex gap-2">
+                                <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                                   {(() => {
                                     const increments = log.waterUnit === 'oz' ? [18, 20, 32] : [500, 750, 1000];
                                     return increments.map((amount) => (
                                       <Button 
                                         key={amount}
                                         variant="outline"
-                                        className="flex-1 border-white/10 bg-white/[0.02] hover:border-blue-500/40 hover:bg-blue-500/10 transition-all text-xs font-bold text-blue-400 py-2"
+                                        className="w-full border-white/10 bg-white/[0.02] hover:border-blue-500/40 hover:bg-blue-500/10 transition-all text-[11px] sm:text-xs font-bold text-blue-400 py-1.5 px-1 text-center truncate"
                                         onClick={() => updateWater(amount)}
                                       >
                                         +{amount} {log.waterUnit}
@@ -2373,8 +2374,26 @@ export const ProGym = ({
                                   </div>
                                 </div>
 
+                                {/* Unit System Selector */}
+                                <div className="flex items-center justify-between pt-1 border-t border-white/5">
+                                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-gray-400">Unit System</span>
+                                  <UnitToggle<'oz' | 'ml'>
+                                    unitA="oz"
+                                    unitB="ml"
+                                    labelA="oz"
+                                    labelB="ml"
+                                    value={log.waterUnit || 'oz'}
+                                    onChange={(u) => {
+                                      if (log.waterUnit !== u) {
+                                        toggleWaterUnit();
+                                      }
+                                    }}
+                                    size="sm"
+                                  />
+                                </div>
+
                                 {/* Save Button for Hydration */}
-                                <div className="pt-2">
+                                <div className="pt-1">
                                   <Button 
                                     size="sm"
                                     onClick={handleSaveHydration}
@@ -2391,30 +2410,31 @@ export const ProGym = ({
                         </AnimatePresence>
                       </Card>
                     ) : id === 'movement' ? (
-                      <Card className="p-6 md:p-8 bg-brand-surface border-white/5 h-full">
-                        <div className="flex items-center justify-between">
+                      <Card className="p-4 sm:p-5 bg-brand-surface border-white/5 h-full overflow-hidden">
+                        <div className="flex items-center justify-between gap-2.5 min-w-0 w-full">
                           <div 
-                            className="flex items-center gap-3 cursor-pointer group"
+                            className="flex items-center gap-2.5 cursor-pointer group flex-1 min-w-0"
                             onClick={() => setIsStepsCollapsed(!isStepsCollapsed)}
                           >
-                            <div className="p-2 bg-emerald-500/10 rounded-lg group-hover:bg-emerald-500/20 transition-colors">
+                            <div className="p-2 bg-emerald-500/10 rounded-lg group-hover:bg-emerald-500/20 transition-colors shrink-0">
                               <Footprints className="w-5 h-5 text-emerald-500" />
                             </div>
-                            <div className="flex flex-col">
-                              <h3 className="font-bold text-gray-200">Movement</h3>
-                              <span className={cn("text-[10px] font-black uppercase tracking-widest", isStepsCollapsed ? "text-emerald-400" : "text-gray-500")}>
-                                {isStepsCollapsed ? `${log.steps.toLocaleString()} / ${log.stepGoal.toLocaleString()}` : "Daily Progress"}
+                            <div className="flex flex-col min-w-0 flex-1">
+                              <h3 className="font-bold text-gray-200 text-sm sm:text-base leading-tight truncate">Movement</h3>
+                              <span className={cn("text-xs font-mono font-bold leading-tight truncate mt-0.5", isStepsCollapsed ? "text-emerald-400" : "text-gray-500")}>
+                                {isStepsCollapsed ? `${log.steps.toLocaleString()} / ${log.stepGoal.toLocaleString()} steps` : "Daily Progress"}
                               </span>
                             </div>
                           </div>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            className="p-1 text-gray-400 hover:text-white"
-                            onClick={() => setIsStepsCollapsed(!isStepsCollapsed)}
+                          <div 
+                            className="p-1.5 text-gray-400 hover:text-white cursor-pointer rounded-lg hover:bg-white/5 transition-colors shrink-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsStepsCollapsed(!isStepsCollapsed);
+                            }}
                           >
                             {isStepsCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-                          </Button>
+                          </div>
                         </div>
                         
                         <AnimatePresence>
@@ -2425,14 +2445,14 @@ export const ProGym = ({
                               exit={{ height: 0, opacity: 0 }}
                               className="overflow-hidden"
                             >
-                              <div className="space-y-4 pt-5">
+                              <div className="space-y-4 pt-4">
                                 {/* Dedicated Counter Row */}
-                                <div className="flex items-center justify-between bg-black/30 border border-white/10 rounded-xl p-2.5 sm:p-3 gap-1.5 sm:gap-2">
-                                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                                <div className="flex items-center justify-between bg-black/30 border border-white/10 rounded-xl p-2.5 gap-2 w-full">
+                                  <div className="flex items-center gap-1.5 shrink-0">
                                     <Button 
                                       variant="outline" 
                                       size="sm"
-                                      className="w-7 h-7 sm:w-8 sm:h-8 p-0 border-white/10 hover:border-emerald-500/40 text-emerald-400 shrink-0"
+                                      className="w-7 h-7 sm:w-8 sm:h-8 p-0 border-white/10 hover:border-emerald-500/40 text-emerald-400 shrink-0 cursor-pointer"
                                       onClick={() => updateSteps(-500)}
                                     >
                                       <Minus className="w-3.5 h-3.5" />
@@ -2444,29 +2464,31 @@ export const ProGym = ({
                                         const val = parseInt(e.target.value) || 0;
                                         setLog({ ...log, steps: val });
                                       }}
-                                      className="w-18 sm:w-20 bg-white/5 border border-white/10 rounded-lg px-1.5 py-1 text-center font-mono text-xs sm:text-sm font-bold text-gray-100 focus:border-emerald-500 outline-none transition-colors"
+                                      className="w-14 sm:w-16 bg-white/5 border border-white/10 rounded-lg px-1 py-1 text-center font-mono text-xs sm:text-sm font-bold text-gray-100 focus:border-emerald-500 outline-none transition-colors"
                                     />
                                     <Button 
                                       variant="outline" 
                                       size="sm"
-                                      className="w-7 h-7 sm:w-8 sm:h-8 p-0 border-white/10 hover:border-emerald-500/40 text-emerald-400 shrink-0"
+                                      className="w-7 h-7 sm:w-8 sm:h-8 p-0 border-white/10 hover:border-emerald-500/40 text-emerald-400 shrink-0 cursor-pointer"
                                       onClick={() => updateSteps(500)}
                                     >
                                       <Plus className="w-3.5 h-3.5" />
                                     </Button>
                                   </div>
-                                  <span className="text-[11px] sm:text-xs font-mono font-bold text-gray-400 shrink-0 whitespace-nowrap">
-                                    / {log.stepGoal.toLocaleString()}
-                                  </span>
+                                  <div className="flex-1 min-w-0 text-right">
+                                    <span className="text-xs font-mono font-bold text-gray-400 truncate block">
+                                      / {log.stepGoal.toLocaleString()}
+                                    </span>
+                                  </div>
                                 </div>
 
                                 {/* Quick Presets */}
-                                <div className="grid grid-cols-3 gap-2">
+                                <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                                   {[500, 1000, 2000].map((amount) => (
                                     <Button 
                                       key={amount}
                                       variant="outline" 
-                                      className="w-full border-white/10 bg-white/[0.02] hover:border-emerald-500/40 hover:bg-emerald-500/10 text-xs font-bold text-emerald-400 py-2 px-1 text-center"
+                                      className="w-full border-white/10 bg-white/[0.02] hover:border-emerald-500/40 hover:bg-emerald-500/10 text-[11px] sm:text-xs font-bold text-emerald-400 py-1.5 px-1 text-center truncate"
                                       onClick={() => updateSteps(amount)}
                                     >
                                       +{amount >= 1000 ? `${amount / 1000}k` : amount} Steps
@@ -2490,7 +2512,7 @@ export const ProGym = ({
                                 </div>
 
                                 {/* Save Button for Movement */}
-                                <div className="pt-2">
+                                <div className="pt-1">
                                   <Button 
                                     size="sm"
                                     onClick={handleSaveMovement}
@@ -2507,47 +2529,32 @@ export const ProGym = ({
                         </AnimatePresence>
                       </Card>
                     ) : id === 'sleep' ? (
-                      <Card className="p-6 md:p-8 bg-brand-surface border-white/5 h-full">
-                        <div className="flex items-center justify-between">
+                      <Card className="p-4 sm:p-5 bg-brand-surface border-white/5 h-full overflow-hidden">
+                        <div className="flex items-center justify-between gap-2.5 min-w-0 w-full">
                           <div 
-                            className="flex items-center gap-3 cursor-pointer group"
+                            className="flex items-center gap-2.5 cursor-pointer group flex-1 min-w-0"
                             onClick={() => setIsSleepCollapsed(!isSleepCollapsed)}
                           >
-                            <div className="p-2 bg-purple-500/10 rounded-lg group-hover:bg-purple-500/20 transition-colors">
+                            <div className="p-2 bg-purple-500/10 rounded-lg group-hover:bg-purple-500/20 transition-colors shrink-0">
                               <Moon className="w-5 h-5 text-purple-400" />
                             </div>
-                            <div className="flex flex-col">
-                              <h3 className="font-bold text-gray-200">Sleep & Recovery</h3>
-                              <span className={cn("text-[10px] font-black uppercase tracking-widest", isSleepCollapsed ? "text-purple-400" : "text-gray-500")}>
+                            <div className="flex flex-col min-w-0 flex-1">
+                              <h3 className="font-bold text-gray-200 text-sm sm:text-base leading-tight truncate" title="Sleep & Recovery">Sleep & Recovery</h3>
+                              <span className={cn("text-xs font-mono font-bold leading-tight truncate mt-0.5", isSleepCollapsed ? "text-purple-400" : "text-gray-500")}>
                                 {isSleepCollapsed 
-                                  ? `${log.sleepHours || 0} / ${log.sleepGoal || 8} hrs · ${log.sleepQuality || 'Good'}` 
+                                  ? `${log.sleepHours || 0} / ${log.sleepGoal || 8} hrs` 
                                   : "Track Sleep Quality"}
                               </span>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setIsWhoopModalOpen(true);
-                              }}
-                              className="h-8 px-2.5 bg-purple-500/10 hover:bg-purple-500/20 border-purple-500/30 text-purple-300 text-[10px] font-bold tracking-wider uppercase cursor-pointer rounded-lg flex items-center gap-1.5 shrink-0 transition-colors"
-                              title="Sync Sleep & Recovery biometrics with WHOOP"
-                            >
-                              <Activity className="w-3.5 h-3.5 text-purple-400" />
-                              <span>Sync WHOOP</span>
-                            </Button>
-
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              className="p-1 text-gray-400 hover:text-white"
-                              onClick={() => setIsSleepCollapsed(!isSleepCollapsed)}
-                            >
-                              {isSleepCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-                            </Button>
+                          <div 
+                            className="p-1.5 text-gray-400 hover:text-white cursor-pointer rounded-lg hover:bg-white/5 transition-colors shrink-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsSleepCollapsed(!isSleepCollapsed);
+                            }}
+                          >
+                            {isSleepCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
                           </div>
                         </div>
                         
@@ -2559,14 +2566,14 @@ export const ProGym = ({
                               exit={{ height: 0, opacity: 0 }}
                               className="overflow-hidden"
                             >
-                              <div className="space-y-4 pt-5">
+                              <div className="space-y-4 pt-4">
                                 {/* Dedicated Counter Row */}
-                                <div className="flex items-center justify-between bg-black/30 border border-white/10 rounded-xl p-2.5 sm:p-3 gap-1.5 sm:gap-2">
-                                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                                <div className="flex items-center justify-between bg-black/30 border border-white/10 rounded-xl p-2.5 gap-2 w-full">
+                                  <div className="flex items-center gap-1.5 shrink-0">
                                     <Button 
                                       variant="outline" 
                                       size="sm"
-                                      className="w-7 h-7 sm:w-8 sm:h-8 p-0 border-white/10 hover:border-purple-500/40 text-purple-400 shrink-0"
+                                      className="w-7 h-7 sm:w-8 sm:h-8 p-0 border-white/10 hover:border-purple-500/40 text-purple-400 shrink-0 cursor-pointer"
                                       onClick={() => updateSleepHours(-0.5)}
                                     >
                                       <Minus className="w-3.5 h-3.5" />
@@ -2581,20 +2588,22 @@ export const ProGym = ({
                                         const val = parseFloat(e.target.value) || 0;
                                         setLog({ ...log, sleepHours: val });
                                       }}
-                                      className="w-16 sm:w-20 bg-white/5 border border-white/10 rounded-lg px-1.5 py-1 text-center font-mono text-sm font-bold text-gray-100 focus:border-purple-500 outline-none transition-colors"
+                                      className="w-12 sm:w-14 bg-white/5 border border-white/10 rounded-lg px-1 py-1 text-center font-mono text-xs sm:text-sm font-bold text-gray-100 focus:border-purple-500 outline-none transition-colors"
                                     />
                                     <Button 
                                       variant="outline" 
                                       size="sm"
-                                      className="w-7 h-7 sm:w-8 sm:h-8 p-0 border-white/10 hover:border-purple-500/40 text-purple-400 shrink-0"
+                                      className="w-7 h-7 sm:w-8 sm:h-8 p-0 border-white/10 hover:border-purple-500/40 text-purple-400 shrink-0 cursor-pointer"
                                       onClick={() => updateSleepHours(0.5)}
                                     >
                                       <Plus className="w-3.5 h-3.5" />
                                     </Button>
                                   </div>
-                                  <span className="text-xs font-mono font-bold text-gray-400 shrink-0 whitespace-nowrap">
-                                    / {log.sleepGoal || 8} hrs target
-                                  </span>
+                                  <div className="flex-1 min-w-0 text-right">
+                                    <span className="text-xs font-mono font-bold text-gray-400 truncate block">
+                                      / {log.sleepGoal || 8} hrs target
+                                    </span>
+                                  </div>
                                 </div>
 
                                 {/* Quick Presets */}
@@ -2604,7 +2613,7 @@ export const ProGym = ({
                                       key={hours}
                                       variant="outline" 
                                       className={cn(
-                                        "border-white/10 text-xs font-bold py-1.5 px-1 text-center transition-all",
+                                        "border-white/10 text-xs font-bold py-1.5 px-1 text-center transition-all truncate",
                                         log.sleepHours === hours 
                                           ? "bg-purple-500/20 border-purple-500/50 text-purple-300"
                                           : "bg-white/[0.02] hover:border-purple-500/40 hover:bg-purple-500/10 text-purple-400"
@@ -2619,7 +2628,7 @@ export const ProGym = ({
                                 {/* Sleep Quality Selection */}
                                 <div className="space-y-1.5">
                                   <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-gray-400">Sleep Quality</label>
-                                  <div className="grid grid-cols-4 gap-1.5">
+                                  <div className="grid grid-cols-4 gap-1 sm:gap-1.5">
                                     {[
                                       { label: 'Poor', emoji: '😴' },
                                       { label: 'Fair', emoji: '😐' },
@@ -2631,14 +2640,14 @@ export const ProGym = ({
                                         type="button"
                                         onClick={() => setLog({ ...log, sleepQuality: q.label as any })}
                                         className={cn(
-                                          "flex flex-col items-center justify-center p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer",
+                                          "flex flex-col items-center justify-center p-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer min-w-0",
                                           log.sleepQuality === q.label
                                             ? "bg-purple-500/20 border-purple-500/60 text-purple-200 shadow-sm"
                                             : "bg-black/20 border-white/5 text-gray-400 hover:border-purple-500/30 hover:text-gray-200"
                                         )}
                                       >
                                         <span className="text-sm">{q.emoji}</span>
-                                        <span className="text-[10px] mt-0.5">{q.label}</span>
+                                        <span className="text-[10px] mt-0.5 truncate w-full text-center leading-tight">{q.label}</span>
                                       </button>
                                     ))}
                                   </div>
@@ -3371,101 +3380,165 @@ export const ProGym = ({
                 </div>
               </div>
             ) : isMeasurementsExpanded && measurements.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead className="text-[10px] uppercase tracking-widest text-gray-500 border-b border-white/5">
-                    <tr>
-                      <th className="pb-4 font-bold">Date</th>
-                      <th className="pb-4 font-bold">Weight</th>
-                      <th className="pb-4 font-bold">Fat %</th>
-                      <th className="pb-4 font-bold">Waist/Neck</th>
-                      <th className="pb-4 font-bold">Arms (L/R)</th>
-                      <th className="pb-4 font-bold">Thighs (L/R)</th>
-                      <th className="pb-4 font-bold">Calves (L/R)</th>
-                      <th className="pb-4 font-bold text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="text-sm">
-                    {[...measurements].sort((a, b) => b.date.localeCompare(a.date)).map((m) => {
-                      const convertWeight = (w: number, from: string) => {
-                        if (from === measurementUnits.weight) return w;
-                        if (measurementUnits.weight === 'kg' && from === 'lbs') return w * 0.453592;
-                        if (measurementUnits.weight === 'lbs' && from === 'kg') return w / 0.453592;
-                        return w;
-                      };
-                      const convertLen = (l: number, from: string) => {
-                        if (from === measurementUnits.length) return l;
-                        if (measurementUnits.length === 'cm' && from === 'in') return l * 2.54;
-                        if (measurementUnits.length === 'in' && from === 'cm') return l / 2.54;
-                        return l;
-                      };
+              (() => {
+                const sortedMeasurements = [...measurements].sort((a, b) => b.date.localeCompare(a.date));
+                const itemsPerPage = 5;
+                const totalPages = Math.ceil(sortedMeasurements.length / itemsPerPage) || 1;
+                const safePage = Math.min(Math.max(1, measurementPage), totalPages);
+                const startIndex = (safePage - 1) * itemsPerPage;
+                const endIndex = startIndex + itemsPerPage;
+                const paginatedMeasurements = sortedMeasurements.slice(startIndex, endIndex);
 
-                      const displayWeight = convertWeight(Number(m.weight), m.units?.weight || 'kg');
-                      const displayWaist = convertLen(Number(m.waist), m.units?.length || 'cm');
-                      const displayNeck = convertLen(Number(m.neck), m.units?.length || 'cm');
-                      const displayLArm = convertLen(Number(m.leftArm), m.units?.length || 'cm');
-                      const displayRArm = convertLen(Number(m.rightArm), m.units?.length || 'cm');
-                      const displayLThigh = convertLen(Number(m.leftThigh), m.units?.length || 'cm');
-                      const displayRThigh = convertLen(Number(m.rightThigh), m.units?.length || 'cm');
-                      const displayLCalf = convertLen(Number(m.leftCalf || m.calves || 0), m.units?.length || 'cm');
-                      const displayRCalf = convertLen(Number(m.rightCalf || m.calves || 0), m.units?.length || 'cm');
+                return (
+                  <div className="space-y-4">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left">
+                        <thead className="text-[10px] uppercase tracking-widest text-gray-500 border-b border-white/5">
+                          <tr>
+                            <th className="pb-4 font-bold">Date</th>
+                            <th className="pb-4 font-bold">Weight</th>
+                            <th className="pb-4 font-bold">Fat %</th>
+                            <th className="pb-4 font-bold">Waist/Neck</th>
+                            <th className="pb-4 font-bold">Arms (L/R)</th>
+                            <th className="pb-4 font-bold">Thighs (L/R)</th>
+                            <th className="pb-4 font-bold">Calves (L/R)</th>
+                            <th className="pb-4 font-bold text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="text-sm">
+                          {paginatedMeasurements.map((m) => {
+                            const convertWeight = (w: number, from: string) => {
+                              if (from === measurementUnits.weight) return w;
+                              if (measurementUnits.weight === 'kg' && from === 'lbs') return w * 0.453592;
+                              if (measurementUnits.weight === 'lbs' && from === 'kg') return w / 0.453592;
+                              return w;
+                            };
+                            const convertLen = (l: number, from: string) => {
+                              if (from === measurementUnits.length) return l;
+                              if (measurementUnits.length === 'cm' && from === 'in') return l * 2.54;
+                              if (measurementUnits.length === 'in' && from === 'cm') return l / 2.54;
+                              return l;
+                            };
 
-                      // Safe local date parsing
-                      const displayDate = parseLocalDate(m.date).toLocaleDateString();
+                            const displayWeight = convertWeight(Number(m.weight), m.units?.weight || 'kg');
+                            const displayWaist = convertLen(Number(m.waist), m.units?.length || 'cm');
+                            const displayNeck = convertLen(Number(m.neck), m.units?.length || 'cm');
+                            const displayLArm = convertLen(Number(m.leftArm), m.units?.length || 'cm');
+                            const displayRArm = convertLen(Number(m.rightArm), m.units?.length || 'cm');
+                            const displayLThigh = convertLen(Number(m.leftThigh), m.units?.length || 'cm');
+                            const displayRThigh = convertLen(Number(m.rightThigh), m.units?.length || 'cm');
+                            const displayLCalf = convertLen(Number(m.leftCalf || m.calves || 0), m.units?.length || 'cm');
+                            const displayRCalf = convertLen(Number(m.rightCalf || m.calves || 0), m.units?.length || 'cm');
 
-                      return (
-                        <tr key={m.id} className="border-b border-white/[0.02] last:border-0 group">
-                          <td className="py-4 text-gray-400 font-mono text-[10px] uppercase font-bold">{displayDate}</td>
-                          <td className="py-4 font-mono text-gray-200">
-                            <span className="block">{displayWeight.toFixed(1)}{measurementUnits.weight}</span>
-                            {m.units?.weight && m.units.weight !== measurementUnits.weight && (
-                              <span className="text-[9px] text-gray-600 block">orig: {m.weight}{m.units.weight}</span>
-                            )}
-                          </td>
-                          <td className="py-4 font-mono text-gray-200">{m.bodyFat || 0}%</td>
-                          <td className="py-4 font-mono text-gray-200">
-                            <span className="block">{displayWaist.toFixed(1)} / {displayNeck.toFixed(1)}{measurementUnits.length}</span>
-                            {m.units?.length && m.units.length !== measurementUnits.length && (
-                              <span className="text-[9px] text-gray-600 block">orig: {m.waist}/{m.neck}{m.units.length}</span>
-                            )}
-                          </td>
-                          <td className="py-4 font-mono text-gray-200">
-                            <span className="block">{displayLArm.toFixed(1)}/{displayRArm.toFixed(1)}{measurementUnits.length}</span>
-                          </td>
-                          <td className="py-4 font-mono text-gray-200">
-                            <span className="block">{displayLThigh.toFixed(1)}/{displayRThigh.toFixed(1)}{measurementUnits.length}</span>
-                          </td>
-                          <td className="py-4 font-mono text-gray-200">
-                            <span className="block">{displayLCalf.toFixed(1)}/{displayRCalf.toFixed(1)}{measurementUnits.length}</span>
-                          </td>
-                          <td className="py-4 text-right">
-                            <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button 
-                                onClick={() => {
-                                  setSelectedDate(m.date);
-                                  setIsAddingMeasurement(true);
-                                  document.getElementById('measurements-section')?.scrollIntoView({ behavior: 'smooth' });
-                                }}
-                                className="p-1.5 hover:bg-white/5 rounded-lg text-gray-500 hover:text-brand-primary"
-                                title="Edit Entry"
+                            // Safe local date parsing
+                            const displayDate = parseLocalDate(m.date).toLocaleDateString();
+
+                            return (
+                              <tr key={m.id} className="border-b border-white/[0.02] last:border-0 group">
+                                <td className="py-4 text-gray-400 font-mono text-[10px] uppercase font-bold">{displayDate}</td>
+                                <td className="py-4 font-mono text-gray-200">
+                                  <span className="block">{displayWeight.toFixed(1)}{measurementUnits.weight}</span>
+                                  {m.units?.weight && m.units.weight !== measurementUnits.weight && (
+                                    <span className="text-[9px] text-gray-600 block">orig: {m.weight}{m.units.weight}</span>
+                                  )}
+                                </td>
+                                <td className="py-4 font-mono text-gray-200">{m.bodyFat || 0}%</td>
+                                <td className="py-4 font-mono text-gray-200">
+                                  <span className="block">{displayWaist.toFixed(1)} / {displayNeck.toFixed(1)}{measurementUnits.length}</span>
+                                  {m.units?.length && m.units.length !== measurementUnits.length && (
+                                    <span className="text-[9px] text-gray-600 block">orig: {m.waist}/{m.neck}{m.units.length}</span>
+                                  )}
+                                </td>
+                                <td className="py-4 font-mono text-gray-200">
+                                  <span className="block">{displayLArm.toFixed(1)}/{displayRArm.toFixed(1)}{measurementUnits.length}</span>
+                                </td>
+                                <td className="py-4 font-mono text-gray-200">
+                                  <span className="block">{displayLThigh.toFixed(1)}/{displayRThigh.toFixed(1)}{measurementUnits.length}</span>
+                                </td>
+                                <td className="py-4 font-mono text-gray-200">
+                                  <span className="block">{displayLCalf.toFixed(1)}/{displayRCalf.toFixed(1)}{measurementUnits.length}</span>
+                                </td>
+                                <td className="py-4 text-right">
+                                  <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button 
+                                      onClick={() => {
+                                        setSelectedDate(m.date);
+                                        setIsAddingMeasurement(true);
+                                        document.getElementById('measurements-section')?.scrollIntoView({ behavior: 'smooth' });
+                                      }}
+                                      className="p-1.5 hover:bg-white/5 rounded-lg text-gray-500 hover:text-brand-primary cursor-pointer"
+                                      title="Edit Entry"
+                                    >
+                                      <Edit2 className="w-4 h-4" />
+                                    </button>
+                                    <button 
+                                      onClick={() => handleDeleteMeasurement(m.id, m.date)}
+                                      className="p-1.5 hover:bg-white/5 rounded-lg text-gray-500 hover:text-red-500 cursor-pointer"
+                                      title="Delete Entry"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Pagination Bar */}
+                    {totalPages > 1 && (
+                      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-white/5 text-xs">
+                        <div className="text-gray-400 font-mono text-[11px]">
+                          Showing <span className="font-bold text-gray-200">{startIndex + 1}</span>–<span className="font-bold text-gray-200">{Math.min(endIndex, sortedMeasurements.length)}</span> of <span className="font-bold text-gray-200">{sortedMeasurements.length}</span> entries
+                        </div>
+                        
+                        <div className="flex items-center gap-1.5">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={safePage <= 1}
+                            onClick={() => setMeasurementPage(safePage - 1)}
+                            className="h-7 px-2.5 border-white/10 hover:bg-white/5 text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed text-xs gap-1 cursor-pointer"
+                          >
+                            <ChevronLeft className="w-3.5 h-3.5" />
+                            <span>Prev</span>
+                          </Button>
+
+                          <div className="flex items-center gap-1 px-1">
+                            {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((p) => (
+                              <button
+                                key={p}
+                                onClick={() => setMeasurementPage(p)}
+                                className={cn(
+                                  "w-7 h-7 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer",
+                                  safePage === p
+                                    ? "bg-purple-500/20 border border-purple-500/50 text-purple-300 shadow-sm"
+                                    : "hover:bg-white/5 text-gray-400"
+                                )}
                               >
-                                <Edit2 className="w-4 h-4" />
+                                {p}
                               </button>
-                              <button 
-                                onClick={() => handleDeleteMeasurement(m.id, m.date)}
-                                className="p-1.5 hover:bg-white/5 rounded-lg text-gray-500 hover:text-red-500"
-                                title="Delete Entry"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                            ))}
+                          </div>
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={safePage >= totalPages}
+                            onClick={() => setMeasurementPage(safePage + 1)}
+                            className="h-7 px-2.5 border-white/10 hover:bg-white/5 text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed text-xs gap-1 cursor-pointer"
+                          >
+                            <span>Next</span>
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()
             ) : measurements.length > 0 && !isMeasurementsExpanded ? (
               <div className="text-center py-4">
                 <p className="text-xs text-gray-500 font-mono">Expand entries to see historical tracking</p>

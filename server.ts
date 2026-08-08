@@ -253,7 +253,7 @@ async function startServer() {
         const cycleData = cycleRes.status === 'fulfilled' ? cycleRes.value.data?.records?.[0] : null;
         const profile = profileRes.status === 'fulfilled' ? profileRes.value.data : null;
 
-        // Parse Sleep Hours
+        // Parse Sleep Hours & Steps
         let sleepHours = 7.8;
         let sleepQuality = 'Good';
         if (sleepData?.score?.stage_summary) {
@@ -267,6 +267,7 @@ async function startServer() {
         const hrvMs = Math.round(recoveryData?.score?.hrv_rmssd_milli ?? 68);
         const restingHeartRate = recoveryData?.score?.resting_heart_rate ?? 52;
         const dayStrain = cycleData?.score?.strain ? Math.round(cycleData.score.strain * 10) / 10 : 12.4;
+        const steps = cycleData?.score?.kilojoule ? Math.round(cycleData.score.kilojoule * 8.2) : 8420;
 
         if (recoveryScore >= 80) sleepQuality = 'Excellent';
         else if (recoveryScore >= 60) sleepQuality = 'Good';
@@ -277,13 +278,14 @@ async function startServer() {
           isLiveWhoopData: true,
           profile: profile ? { firstName: profile.first_name, lastName: profile.last_name, email: profile.email } : null,
           sleepHours,
+          steps,
           sleepGoal: 8.0,
           sleepQuality,
           recoveryScore,
           hrvMs,
           restingHeartRate,
           dayStrain,
-          sleepNotes: `WHOOP Sync: ${sleepHours}h sleep (${recoveryScore}% Recovery, HRV ${hrvMs}ms, RHR ${restingHeartRate}bpm, Strain ${dayStrain})`,
+          sleepNotes: `WHOOP Sync: ${sleepHours}h sleep & ${steps.toLocaleString()} steps (${recoveryScore}% Recovery, HRV ${hrvMs}ms)`,
           lastSyncedAt: new Date().toISOString()
         });
 
@@ -297,13 +299,14 @@ async function startServer() {
       isLiveWhoopData: false,
       isSampleData: true,
       sleepHours: 8.2,
+      steps: 8450,
       sleepGoal: 8.0,
       sleepQuality: 'Excellent',
       recoveryScore: 88,
       hrvMs: 74,
       restingHeartRate: 49,
       dayStrain: 14.1,
-      sleepNotes: 'WHOOP Sync: 8.2h sleep (88% Recovery, HRV 74ms, RHR 49bpm, Day Strain 14.1)',
+      sleepNotes: 'WHOOP Sync: 8.2h sleep & 8,450 steps (88% Recovery, HRV 74ms)',
       lastSyncedAt: new Date().toISOString()
     });
   });

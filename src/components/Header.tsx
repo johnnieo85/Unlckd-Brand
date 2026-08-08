@@ -108,11 +108,11 @@ export const Header: React.FC<HeaderProps> = ({
             <ExternalLink className="w-3 h-3" />
           </a>
 
-          <div className="hidden xl:flex items-center gap-3 pr-2 mr-2 border-r border-white/10">
-            <a href="https://instagram.com/unlckd_brand" target="_blank" rel="noreferrer" className="text-gray-400 hover:text-brand-primary transition-colors" title="Instagram">
+          <div className="flex items-center gap-2 sm:gap-3 pr-2 mr-1 sm:mr-2 border-r border-white/10">
+            <a href="https://instagram.com/unlckd_brand" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-brand-primary transition-colors p-1" title="Instagram" aria-label="Instagram">
               <Instagram className="w-4 h-4" />
             </a>
-            <a href="https://facebook.com/unlckdbrand" target="_blank" rel="noreferrer" className="text-gray-400 hover:text-brand-primary transition-colors" title="Facebook">
+            <a href="https://facebook.com/unlckdbrand" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-brand-primary transition-colors p-1" title="Facebook" aria-label="Facebook">
               <Facebook className="w-4 h-4" />
             </a>
           </div>
