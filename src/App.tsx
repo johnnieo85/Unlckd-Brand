@@ -51,17 +51,19 @@ import {
   Apple,
   Folder,
   HelpCircle,
-  Mail
+  Mail,
+  AlertTriangle
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Button } from './components/ui/Button';
 import { Input, Select, Checkbox } from './components/ui/Input';
 import { Card, Badge } from './components/ui/Card';
 import { cn, downloadFile, getLocalDateString, parseLocalDate, safeStorage, getPlanDurationWeeks } from './lib/utils';
+import { checkReportOverlaps, getReportConflicts, getReportDateRange } from './utils/reportOverlap';
 import { getWeeklyQuote } from './constants/quotes';
 import { SecurityGuard } from './components/SecurityGuard';
 import { Path, UserData, Photos, ProgressPhotos, AssessmentResult, Rating, SavedReport, UserProfile } from './types';
-import { generateTransformationReport } from './services/gemini';
+import { generateTransformationReport, generateRecoveryGuidance } from './services/gemini';
 import { getLevelInfo } from './lib/levels';
 import { auth } from './lib/firebase';
 import { onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, OAuthProvider, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, setPersistence, browserSessionPersistence, sendPasswordResetEmail, updatePassword, browserPopupRedirectResolver } from 'firebase/auth';
@@ -1232,7 +1234,55 @@ export default function App() {
     }
   };
 
+  const [currentSavedReportId, setCurrentSavedReportId] = useState<string | null>(null);
+  const [isRefreshingRecovery, setIsRefreshingRecovery] = useState(false);
+
+  const handleRefreshReportRecovery = async (savedReportToUpdate?: SavedReport) => {
+    if (isRefreshingRecovery) return;
+    setIsRefreshingRecovery(true);
+
+    try {
+      const targetUserData = savedReportToUpdate?.userData || userData;
+      const targetReport = savedReportToUpdate?.report || report;
+      const targetSavedId = savedReportToUpdate?.id || currentSavedReportId;
+
+      if (!targetReport) return;
+
+      console.log("Refreshing recovery guidance while preserving all recorded data...");
+      const newRecoverySchedule = await generateRecoveryGuidance(targetUserData, targetReport.workoutPlan);
+
+      const updatedReport: AssessmentResult = {
+        ...targetReport,
+        recoverySchedule: newRecoverySchedule
+      };
+
+      // Update current report state if active
+      if (!savedReportToUpdate || savedReportToUpdate.id === currentSavedReportId) {
+        setReport(updatedReport);
+      }
+
+      // Update in savedReports list in state
+      if (targetSavedId) {
+        setSavedReports(prev => prev.map(r => r.id === targetSavedId ? { ...r, report: updatedReport } : r));
+        try {
+          await historyService.updateReport(targetSavedId, updatedReport);
+          console.log("Updated saved report in Firestore with new recovery schedule.");
+        } catch (e) {
+          console.error("Error updating saved report in Firestore:", e);
+        }
+      }
+
+      alert("Report refreshed successfully! Targeted 7-day Recovery Protocol added while preserving all recorded workout, nutrition, and photo data.");
+    } catch (e) {
+      console.error("Failed to refresh recovery guidance:", e);
+      alert("Unable to refresh recovery guidance at this time. Please try again.");
+    } finally {
+      setIsRefreshingRecovery(false);
+    }
+  };
+
   const handleViewSavedReport = (saved: SavedReport) => {
+    setCurrentSavedReportId(saved.id);
     setPath(saved.path);
     setUserData(saved.userData);
     setPhotos(saved.photos);
@@ -1336,17 +1386,26 @@ export default function App() {
         try {
           console.log("Saving report to history for user:", currentAuthUser.uid);
           const savedId = await historyService.saveReport(path, userData, result, photos, path === 'progress' ? progressPhotos : undefined);
+          setCurrentSavedReportId(savedId);
           await loadHistory();
           console.log("Report saved and history reloaded successfully");
 
-          // Auto-sync to Gym Hub if requested (only for Transformation Reports)
-          if (path === 'full' && userData.syncToGymHub) {
-            setLoadingMessage('Syncing plan to Gym Hub...');
-            const reports = await historyService.getReports();
-            const newlySaved = reports.find(r => r.id === savedId);
-            if (newlySaved) {
-              await gymService.syncPlanToHub(newlySaved);
-              console.log("Plan synced to Gym Hub successfully");
+          // Check for date range overlap conflicts among full transformation reports
+          if (path === 'full') {
+            const allReports = await historyService.getReports();
+            const conflicts = checkReportOverlaps(allReports);
+            if (conflicts.length > 0) {
+              const conflictLines = conflicts.map(c => 
+                `• "${c.report1.userData?.name || 'Report 1'}" (${c.range1.startISO} to ${c.range1.endISO}) overlaps with "${c.report2.userData?.name || 'Report 2'}" (${c.range2.startISO} to ${c.range2.endISO}) by ${c.overlapDays} days.`
+              ).join('\n');
+              alert(`⚠️ OVERLAPPING TRANSFORMATION REPORTS DETECTED\n\nNo overlapping days are allowed between full transformation reports to prevent conflicting information.\n\nConflicting Reports:\n${conflictLines}\n\nPlease delete one of the conflicting reports in your Saved Reports history to prevent Gym Hub plan conflicts.`);
+            } else if (userData.syncToGymHub) {
+              setLoadingMessage('Syncing plan to Gym Hub...');
+              const newlySaved = allReports.find(r => r.id === savedId);
+              if (newlySaved) {
+                await gymService.syncPlanToHub(newlySaved);
+                console.log("Plan synced to Gym Hub successfully");
+              }
             }
           }
         } catch (saveError) {
@@ -1494,6 +1553,7 @@ export default function App() {
             >
               <ProGym 
                 latestReport={latestReport} 
+                savedReports={savedReports}
                 userProfile={userProfile} 
                 onProfileUpdate={refreshProfile}
                 onReportSaved={loadHistory}
@@ -1628,127 +1688,220 @@ export default function App() {
                     </div>
                   )}
 
-                  {selectedReportFolder === 'all' ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {[
-                        { id: 'assessment', name: 'Assessments', icon: Search, desc: 'Detailed physique analysis' },
-                        { id: 'workout', name: 'Workout Plans', icon: Dumbbell, desc: 'Custom training protocols' },
-                        { id: 'meal', name: 'Nutrition Plans', icon: Utensils, desc: 'Meal and macro strategies' },
-                        { id: 'progress', name: 'Progress History', icon: LineChart, desc: 'Transformation comparisons' },
-                        { id: 'full', name: 'Transformation Reports', icon: FileText, desc: 'Complete unified strategies' },
-                      ].map((folder) => {
-                        const count = savedReports.filter(r => r.path === folder.id).length;
-                        return (
-                          <Card 
-                            key={folder.id}
-                            className={cn(
-                              "group p-6 cursor-pointer bg-white/[0.02] border-white/5 hover:border-brand-primary/50 transition-all rounded-3xl relative overflow-hidden",
-                              count === 0 && "opacity-40 grayscale pointer-events-none"
-                            ) }
-                            onClick={() => count > 0 && setSelectedReportFolder(folder.id as Path)}
-                          >
-                            <div className="absolute -right-4 -top-4 w-24 h-24 bg-brand-primary/5 rounded-full blur-2xl group-hover:bg-brand-primary/10 transition-colors" />
-                            <div className="flex items-start gap-4 relative z-10">
-                              <div className="w-14 h-14 bg-brand-primary/10 rounded-2xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-500">
-                                <folder.icon className="w-7 h-7 text-brand-primary" />
+                  {(() => {
+                    const reportConflicts = checkReportOverlaps(savedReports);
+                    return (
+                      <>
+                        {reportConflicts.length > 0 && (
+                          <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-2xl flex items-start gap-3 text-red-300 text-xs mb-6">
+                            <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                            <div className="space-y-1.5 flex-1">
+                              <div className="flex items-center justify-between flex-wrap gap-2">
+                                <p className="font-bold text-red-400 text-sm">Overlapping Full Transformation Reports Detected</p>
+                                <Badge className="bg-red-500/20 text-red-300 border-red-500/30 text-[10px]">Action Required: Delete 1 Report</Badge>
                               </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between">
-                                  <h3 className="text-xl font-display font-bold uppercase tracking-tight group-hover:text-brand-primary transition-colors">
-                                    {folder.name}
-                                  </h3>
-                                  <div className="w-6 h-6 rounded-lg bg-white/5 flex items-center justify-center text-[10px] font-black font-mono text-gray-500">
-                                    {count}
-                                  </div>
-                                </div>
-                                <p className="text-xs text-gray-400 mt-1 line-clamp-1 font-light italic">"{folder.desc}"</p>
-                                <div className="mt-6 flex items-center justify-between border-t border-white/5 pt-4">
-                                  <span className="text-[10px] font-mono font-black text-brand-primary/60 uppercase tracking-widest flex items-center gap-1.5">
-                                    <Clock className="w-3 h-3" />
-                                    {count > 0 ? 'Managed' : 'Empty'}
-                                  </span>
-                                  {count > 0 && (
-                                    <div className="flex items-center gap-1 text-brand-primary text-[10px] font-black uppercase tracking-widest">
-                                      Open Folder
-                                      <ChevronRight className="w-3 h-3 transition-transform group-hover:translate-x-1" />
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </Card>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {savedReports.filter(r => r.path === selectedReportFolder).map((saved) => (
-                        <Card 
-                          key={saved.id} 
-                          className="group cursor-pointer bg-white/[0.02] border-white/5 hover:border-brand-primary/50 transition-all overflow-hidden relative rounded-3xl"
-                          onClick={() => handleViewSavedReport(saved)}
-                        >
-                          <div className="aspect-video relative overflow-hidden bg-brand-surface">
-                            {saved.photos.front ? (
-                              <img 
-                                src={saved.photos.front} 
-                                alt="Report thumbnail"
-                                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 blur-sm brightness-50"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-brand-primary/5">
-                                {saved.path === 'meal' ? (
-                                  <Utensils className="w-12 h-12 text-brand-primary/40" />
-                                ) : saved.path === 'workout' ? (
-                                  <Dumbbell className="w-12 h-12 text-brand-primary/40" />
-                                ) : (
-                                  <Activity className="w-12 h-12 text-brand-primary/40" />
-                                )}
-                                <span className="text-[10px] font-black uppercase tracking-widest text-brand-primary/40">Report Data Only</span>
-                              </div>
-                            )}
-                            <div className="absolute inset-0 bg-gradient-to-t from-brand-dark via-transparent to-transparent" />
-                            <div className="absolute top-4 right-4 z-20 flex gap-2">
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-full"
-                                onClick={(e) => handleDeleteReport(saved.id, e)}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Button className="bg-brand-primary text-brand-dark font-bold rounded-full gap-2">
-                                View Report
-                                <ArrowRight className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </div>
-                          <div className="p-6 space-y-4">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <Badge className="bg-brand-primary/10 text-brand-primary border-none mb-2">
-                                  {saved.path.toUpperCase()}
-                                </Badge>
-                                <h3 className="font-display font-bold text-xl tracking-tight leading-tight uppercase group-hover:text-brand-primary transition-colors">
-                                  {saved.userData.name}
-                                </h3>
-                              </div>
-                              <p className="text-[10px] text-gray-500 font-mono">
-                                {saved.timestamp?.toDate 
-                                  ? `${saved.timestamp.toDate().toLocaleDateString()} ${saved.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` 
-                                  : 'Recent'}
+                              <p className="text-red-300/80 leading-relaxed">
+                                No overlapping days are allowed between full transformation reports to prevent conflicting workout and meal plan information in Gym Hub. Please delete one of the conflicting reports below.
                               </p>
+                              <div className="text-xs text-red-200 space-y-1 font-mono pt-1">
+                                {reportConflicts.map((c, i) => (
+                                  <div key={i} className="flex items-center gap-2 flex-wrap">
+                                    <span>• <strong>{c.report1.userData?.name || 'Report 1'}</strong> ({c.range1.startISO} to {c.range1.endISO})</span>
+                                    <span className="text-red-400 font-bold">overlaps</span>
+                                    <span><strong>{c.report2.userData?.name || 'Report 2'}</strong> ({c.range2.startISO} to {c.range2.endISO})</span>
+                                    <span className="text-red-400 font-bold">({c.overlapDays} days)</span>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
-                            <p className="text-sm text-gray-400 line-clamp-2 font-light italic">
-                              "{saved.report.toplineSummary}"
-                            </p>
                           </div>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
+                        )}
+
+                        {selectedReportFolder === 'all' ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {[
+                              { id: 'assessment', name: 'Assessments', icon: Search, desc: 'Detailed physique analysis' },
+                              { id: 'workout', name: 'Workout Plans', icon: Dumbbell, desc: 'Custom training protocols' },
+                              { id: 'meal', name: 'Nutrition Plans', icon: Utensils, desc: 'Meal and macro strategies' },
+                              { id: 'progress', name: 'Progress History', icon: LineChart, desc: 'Transformation comparisons' },
+                              { id: 'full', name: 'Transformation Reports', icon: FileText, desc: 'Complete unified strategies' },
+                            ].map((folder) => {
+                              const count = savedReports.filter(r => r.path === folder.id).length;
+                              const folderHasConflict = folder.id === 'full' && reportConflicts.length > 0;
+                              return (
+                                <Card 
+                                  key={folder.id}
+                                  className={cn(
+                                    "group p-6 cursor-pointer bg-white/[0.02] border-white/5 hover:border-brand-primary/50 transition-all rounded-3xl relative overflow-hidden",
+                                    count === 0 && "opacity-40 grayscale pointer-events-none",
+                                    folderHasConflict && "border-red-500/50 bg-red-500/5 hover:border-red-500"
+                                  )}
+                                  onClick={() => count > 0 && setSelectedReportFolder(folder.id as Path)}
+                                >
+                                  <div className="absolute -right-4 -top-4 w-24 h-24 bg-brand-primary/5 rounded-full blur-2xl group-hover:bg-brand-primary/10 transition-colors" />
+                                  <div className="flex items-start gap-4 relative z-10">
+                                    <div className={cn(
+                                      "w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform duration-500",
+                                      folderHasConflict ? "bg-red-500/20 text-red-400" : "bg-brand-primary/10 text-brand-primary"
+                                    )}>
+                                      <folder.icon className="w-7 h-7" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center justify-between">
+                                        <h3 className="text-xl font-display font-bold uppercase tracking-tight group-hover:text-brand-primary transition-colors">
+                                          {folder.name}
+                                        </h3>
+                                        <div className="w-6 h-6 rounded-lg bg-white/5 flex items-center justify-center text-[10px] font-black font-mono text-gray-500">
+                                          {count}
+                                        </div>
+                                      </div>
+                                      <p className="text-xs text-gray-400 mt-1 line-clamp-1 font-light italic">"{folder.desc}"</p>
+                                      {folderHasConflict && (
+                                        <p className="text-[10px] text-red-400 font-bold mt-2 flex items-center gap-1">
+                                          <AlertTriangle className="w-3 h-3" /> Date Range Overlap Conflict
+                                        </p>
+                                      )}
+                                      <div className="mt-6 flex items-center justify-between border-t border-white/5 pt-4">
+                                        <span className="text-[10px] font-mono font-black text-brand-primary/60 uppercase tracking-widest flex items-center gap-1.5">
+                                          <Clock className="w-3 h-3" />
+                                          {count > 0 ? 'Managed' : 'Empty'}
+                                        </span>
+                                        {count > 0 && (
+                                          <div className="flex items-center gap-1 text-brand-primary text-[10px] font-black uppercase tracking-widest">
+                                            Open Folder
+                                            <ChevronRight className="w-3 h-3 transition-transform group-hover:translate-x-1" />
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </Card>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {savedReports.filter(r => r.path === selectedReportFolder).map((saved) => {
+                              const isConflicting = getReportConflicts(saved.id, reportConflicts).length > 0;
+                              const range = getReportDateRange(saved);
+                              return (
+                                <Card 
+                                  key={saved.id} 
+                                  className={cn(
+                                    "group cursor-pointer bg-white/[0.02] border-white/5 hover:border-brand-primary/50 transition-all overflow-hidden relative rounded-3xl",
+                                    isConflicting && "border-red-500/60 bg-red-500/5 hover:border-red-500"
+                                  )}
+                                  onClick={() => handleViewSavedReport(saved)}
+                                >
+                                  <div className="aspect-video relative overflow-hidden bg-brand-surface">
+                                    {saved.photos.front ? (
+                                      <img 
+                                        src={saved.photos.front} 
+                                        alt="Report thumbnail"
+                                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 blur-sm brightness-50"
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-brand-primary/5">
+                                        {saved.path === 'meal' ? (
+                                          <Utensils className="w-12 h-12 text-brand-primary/40" />
+                                        ) : saved.path === 'workout' ? (
+                                          <Dumbbell className="w-12 h-12 text-brand-primary/40" />
+                                        ) : (
+                                          <Activity className="w-12 h-12 text-brand-primary/40" />
+                                        )}
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-brand-primary/40">Report Data Only</span>
+                                      </div>
+                                    )}
+                                    <div className="absolute inset-0 bg-gradient-to-t from-brand-dark via-transparent to-transparent" />
+                                    <div className="absolute top-4 right-4 z-20 flex gap-2">
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="bg-red-500/20 hover:bg-red-500/40 text-red-400 rounded-full"
+                                        title="Delete report to resolve date overlap conflict"
+                                        onClick={(e) => handleDeleteReport(saved.id, e)}
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </Button>
+                                    </div>
+                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <Button className="bg-brand-primary text-brand-dark font-bold rounded-full gap-2">
+                                        View Report
+                                        <ArrowRight className="w-4 h-4" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                  <div className="p-6 space-y-4">
+                                    <div className="flex justify-between items-start">
+                                      <div>
+                                        <div className="flex items-center gap-2 flex-wrap mb-2">
+                                          <Badge className="bg-brand-primary/10 text-brand-primary border-none">
+                                            {saved.path.toUpperCase()}
+                                          </Badge>
+                                          {(!saved.report.recoverySchedule || saved.report.recoverySchedule.length === 0) ? (
+                                            <Badge className="bg-amber-400/10 text-amber-400 border border-amber-400/20 font-bold">
+                                              + RECOVERY READY
+                                            </Badge>
+                                          ) : (
+                                            <Badge className="bg-purple-500/10 text-purple-400 border border-purple-500/20 font-bold">
+                                              ✓ RECOVERY ACTIVE
+                                            </Badge>
+                                          )}
+                                          {isConflicting && (
+                                            <Badge className="bg-red-500/20 text-red-400 border border-red-500/30 font-bold">
+                                              ⚠️ OVERLAPPING DATES
+                                            </Badge>
+                                          )}
+                                        </div>
+                                        <h3 className="font-display font-bold text-xl tracking-tight leading-tight uppercase group-hover:text-brand-primary transition-colors">
+                                          {saved.userData.name}
+                                        </h3>
+                                        {saved.path === 'full' && (
+                                          <p className="text-[11px] font-mono text-gray-400 mt-1">
+                                            Plan Period: <span className="text-white font-bold">{range.startISO}</span> to <span className="text-white font-bold">{range.endISO}</span> ({range.weeks}w)
+                                          </p>
+                                        )}
+                                      </div>
+                                      <p className="text-[10px] text-gray-500 font-mono">
+                                        {saved.timestamp?.toDate 
+                                          ? `${saved.timestamp.toDate().toLocaleDateString()} ${saved.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` 
+                                          : 'Recent'}
+                                      </p>
+                                    </div>
+                                    <p className="text-sm text-gray-400 line-clamp-2 font-light italic">
+                                      "{saved.report.toplineSummary}"
+                                    </p>
+                                    <div className="pt-3 flex items-center justify-between border-t border-white/5">
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleRefreshReportRecovery(saved);
+                                        }}
+                                        disabled={isRefreshingRecovery}
+                                        className="text-brand-primary hover:text-brand-primary/80 text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                                        title="Refresh report to attach 7-day Recovery Protocol while preserving all workout and nutrition logs"
+                                      >
+                                        <Zap className="w-3.5 h-3.5" />
+                                        Refresh Recovery
+                                      </button>
+                                      <span className="text-[10px] text-gray-500 font-mono">
+                                        {saved.report.recoverySchedule?.length ? `${saved.report.recoverySchedule.length} Recovery Days` : 'No Recovery'}
+                                      </span>
+                                    </div>
+                                    {isConflicting && (
+                                      <p className="text-xs text-red-400 font-medium bg-red-500/10 p-2.5 rounded-xl border border-red-500/20">
+                                        ⚠️ Date range overlaps with another report. Please delete this or the conflicting report to prevent Gym Hub plan errors.
+                                      </p>
+                                    )}
+                                  </div>
+                                </Card>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               )}
             </motion.div>
@@ -4034,25 +4187,87 @@ export default function App() {
                   </div>
 
                   <div className="space-y-4">
-                    <h3 className="text-xl font-display font-bold text-gray-200">Suggested Recovery Schedule</h3>
-                    <div className="bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl overflow-x-auto max-w-full w-full">
-                      <table className="w-full text-xs sm:text-sm text-left border-collapse min-w-[260px]">
-                        <thead className="bg-brand-secondary/20 text-gray-400 uppercase text-[10px] tracking-wider">
-                          <tr>
-                            <th className="px-3 sm:px-6 py-3 font-semibold border-r border-gray-800 w-1/3 min-w-[80px]">Day</th>
-                            <th className="px-3 sm:px-6 py-3 font-semibold">Recovery Focus</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-800">
-                          {report.recoverySchedule?.map((row, i) => (
-                            <tr key={i}>
-                              <td className="px-3 sm:px-6 py-2.5 sm:py-3.5 bg-brand-secondary/20 font-bold text-gray-200 border-r border-gray-800 break-words text-xs sm:text-sm">{row.day}</td>
-                              <td className="px-3 sm:px-6 py-2.5 sm:py-3.5 text-gray-300 break-words text-xs sm:text-sm">{row.focus}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-xl font-display font-bold text-gray-200 flex items-center gap-2">
+                          <Zap className="w-5 h-5 text-brand-primary" />
+                          Suggested Recovery Protocol
+                        </h3>
+                        <p className="text-xs text-gray-400">Targeted recovery modalities tailored to your training split & recorded progress.</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleRefreshReportRecovery()}
+                        disabled={isRefreshingRecovery}
+                        className="border-brand-primary/40 text-brand-primary hover:bg-brand-primary/10 rounded-xl gap-2 self-start sm:self-auto shrink-0"
+                      >
+                        <RefreshCw className={cn("w-3.5 h-3.5", isRefreshingRecovery && "animate-spin")} />
+                        {isRefreshingRecovery ? "Updating Recovery..." : "Refresh Recovery Guidance"}
+                      </Button>
                     </div>
+
+                    {(!report.recoverySchedule || report.recoverySchedule.length === 0) ? (
+                      <div className="bg-brand-secondary/10 border border-brand-primary/30 p-5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <div className="space-y-1 text-center sm:text-left">
+                          <h4 className="text-sm font-bold text-gray-200">New Recovery Guidance Feature Available</h4>
+                          <p className="text-xs text-gray-400">
+                            This report was generated prior to the Recovery Feature release. Click refresh to automatically generate 7-day modalities while keeping all recorded workout and nutrition data intact!
+                          </p>
+                        </div>
+                        <Button
+                          onClick={() => handleRefreshReportRecovery()}
+                          disabled={isRefreshingRecovery}
+                          className="bg-brand-primary text-brand-dark font-bold text-xs rounded-xl shrink-0 gap-2"
+                        >
+                          <Zap className="w-4 h-4" />
+                          {isRefreshingRecovery ? "Generating..." : "Add Recovery Guidance"}
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl overflow-x-auto max-w-full w-full">
+                        <table className="w-full text-xs sm:text-sm text-left border-collapse min-w-[320px]">
+                          <thead className="bg-brand-secondary/20 text-gray-400 uppercase text-[10px] tracking-wider">
+                            <tr>
+                              <th className="px-3 sm:px-6 py-3 font-semibold border-r border-gray-800 w-1/4 min-w-[80px]">Day</th>
+                              <th className="px-3 sm:px-6 py-3 font-semibold border-r border-gray-800">Recovery Focus</th>
+                              <th className="px-3 sm:px-6 py-3 font-semibold">Recommended Modalities & Duration</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-800">
+                            {report.recoverySchedule?.map((row, i) => (
+                              <tr key={i} className="hover:bg-brand-secondary/5 transition-colors">
+                                <td className="px-3 sm:px-6 py-3 bg-brand-secondary/20 font-bold text-gray-200 border-r border-gray-800 break-words text-xs sm:text-sm align-top">
+                                  {row.day}
+                                </td>
+                                <td className="px-3 sm:px-6 py-3 text-gray-300 border-r border-gray-800 break-words text-xs sm:text-sm align-top font-semibold">
+                                  {row.focus}
+                                  {row.notes && <p className="text-[11px] text-gray-400 font-normal mt-1 italic">{row.notes}</p>}
+                                </td>
+                                <td className="px-3 sm:px-6 py-3 text-gray-300 break-words text-xs sm:text-sm align-top space-y-2">
+                                  {row.modalities && row.modalities.length > 0 ? (
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {row.modalities.map((m, idx) => (
+                                        <span key={idx} className="bg-brand-primary/10 text-brand-primary border border-brand-primary/20 text-[11px] font-medium px-2 py-0.5 rounded-lg inline-block">
+                                          {m}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <span>Active recovery & stretching</span>
+                                  )}
+                                  {row.duration && (
+                                    <p className="text-[11px] text-gray-400 font-mono">
+                                      ⏱️ Duration: <span className="text-gray-200 font-semibold">{row.duration}</span>
+                                    </p>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-4">
@@ -4098,15 +4313,25 @@ export default function App() {
                 </section>
               )}
 
-              <div className="mt-12 flex flex-col items-center gap-6 no-print pb-20">
+              <div className="mt-12 flex flex-col items-center gap-4 no-print pb-20">
                 <Button size="lg" onClick={() => setStep('landing')} className="rounded-2xl px-12">Start New Assessment</Button>
-                <button 
-                  onClick={() => processReport(true)}
-                  className="text-gray-500 hover:text-brand-primary text-xs font-bold uppercase tracking-widest transition-colors flex items-center gap-2"
-                >
-                  <RotateCcw className="w-3 h-3" />
-                  Resubmit Assessment (Fix Output Issues)
-                </button>
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <button 
+                    onClick={() => handleRefreshReportRecovery()}
+                    disabled={isRefreshingRecovery}
+                    className="text-brand-primary hover:text-brand-primary/80 text-xs font-bold uppercase tracking-widest transition-colors flex items-center gap-2 bg-brand-primary/10 border border-brand-primary/30 px-4 py-2.5 rounded-xl cursor-pointer disabled:opacity-50"
+                  >
+                    <Zap className={cn("w-4 h-4", isRefreshingRecovery && "animate-spin")} />
+                    {isRefreshingRecovery ? "Refreshing Recovery Guidance..." : "Refresh Report (Add Recovery Guidance)"}
+                  </button>
+                  <button 
+                    onClick={() => processReport(true)}
+                    className="text-gray-500 hover:text-brand-primary text-xs font-bold uppercase tracking-widest transition-colors flex items-center gap-2 px-4 py-2.5"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    Resubmit Full Assessment (Re-generate All)
+                  </button>
+                </div>
               </div>
             </motion.div>
           )}

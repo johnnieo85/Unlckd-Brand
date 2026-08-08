@@ -120,6 +120,9 @@ export interface AssessmentResult {
   recoverySchedule: {
     day: string;
     focus: string;
+    modalities?: string[];
+    duration?: string;
+    notes?: string;
   }[];
   waterSchedule: string[];
   stepGoals: string;
@@ -232,6 +235,18 @@ export interface UserProfile {
   };
 }
 
+export interface RecoverySession {
+  id: string;
+  modality: 'sauna' | 'steam_room' | 'massage' | 'normatec' | 'contrast' | 'cold_plunge' | 'percussive' | 'stretching' | 'other';
+  title: string;
+  durationMinutes: number;
+  temperatureOrLevel?: string;
+  notes?: string;
+  completed: boolean;
+  targetArea?: string;
+  timestamp?: string;
+}
+
 export interface DailyLog {
   id: string;
   date: string;
@@ -258,6 +273,7 @@ export interface DailyLog {
     [key: string]: boolean;
   };
   completedWorkouts: number;
+  recoverySessions?: RecoverySession[];
   workoutData?: Record<string, { weight?: string; sets?: string; reps?: string; notes?: string; time?: string; completed?: boolean; setRows?: Array<{ reps: string; weight: string; completed?: boolean }> }>;
   generalNotes?: string;
   lastUpdated?: any;

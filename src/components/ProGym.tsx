@@ -54,7 +54,9 @@ import {
   Shield,
   Download,
   ExternalLink,
-  RefreshCw
+  RefreshCw,
+  RotateCcw,
+  AlertTriangle
 } from 'lucide-react';
 import { Card, Badge } from './ui/Card';
 import { Button } from './ui/Button';
@@ -62,9 +64,11 @@ import { Input } from './ui/Input';
 import { UnitToggle } from './UnitToggle';
 import { ExerciseCard } from './ExerciseCard';
 import { ProgressReportModal } from './ProgressReportModal';
+import { checkReportOverlaps } from '../utils/reportOverlap';
 import { WhoopSyncModal } from './WhoopSyncModal';
+import { RecoveryScheduleView } from './RecoveryScheduleView';
 import { gymService } from '../services/gymService';
-import { DailyLog, SavedReport, Measurement, UserProfile, Badge as UserBadge } from '../types';
+import { DailyLog, SavedReport, Measurement, UserProfile, Badge as UserBadge, RecoverySession } from '../types';
 import { cn, downloadFile, getLocalDateString, parseLocalDate, safeStorage, getPlanDurationWeeks } from '../lib/utils';
 import { assessWorkoutFocus } from '../utils/focusAssessor';
 import { getWeeklyQuote } from '../constants/quotes';
@@ -109,9 +113,10 @@ const SortableTracker = ({ id, children }: { id: string; children: React.ReactNo
       <div 
         {...attributes} 
         {...listeners}
-        className="absolute top-4 right-4 p-2 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity z-10"
+        className="absolute top-3.5 right-3 p-1.5 cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-300 hover:bg-white/10 rounded-lg opacity-40 group-hover:opacity-100 transition-all z-10"
+        title="Drag to reorder card"
       >
-        <GripVertical className="w-4 h-4 text-gray-500" />
+        <GripVertical className="w-4 h-4" />
       </div>
       {children}
     </div>
@@ -320,12 +325,14 @@ const MONTHLY_GOALS: MonthlyGoal[] = [
 
 export const ProGym = ({ 
   latestReport, 
+  savedReports,
   userProfile, 
   onProfileUpdate,
   onReportSaved,
   onHomeClick 
 }: { 
   latestReport: SavedReport | null; 
+  savedReports?: SavedReport[];
   userProfile: UserProfile | null; 
   onProfileUpdate?: () => void;
   onReportSaved?: () => void;
@@ -374,6 +381,7 @@ export const ProGym = ({
   const [isSavingHydration, setIsSavingHydration] = useState(false);
   const [isSavingSteps, setIsSavingSteps] = useState(false);
   const [isSleepCollapsed, setIsSleepCollapsed] = useState(true);
+  const [isRecoveryCollapsed, setIsRecoveryCollapsed] = useState(true);
   const [isSavingSleep, setIsSavingSleep] = useState(false);
   const [isWhoopModalOpen, setIsWhoopModalOpen] = useState(false);
 
@@ -467,10 +475,51 @@ export const ProGym = ({
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<number>(0);
   const [calendarDates, setCalendarDates] = useState<string[]>([]);
-  const [activeView, setActiveView] = useState<'hub' | 'report'>('hub');
+  const [activeView, setActiveView] = useState<'hub' | 'report' | 'recovery'>('hub');
   const [isSyncing, setIsSyncing] = useState(false);
   const [isProgressReportOpen, setIsProgressReportOpen] = useState(false);
-  const [trackerOrder, setTrackerOrder] = useState<string[]>(['hydration', 'movement', 'sleep']);
+  const [trackerOrder, setTrackerOrder] = useState<string[]>(['hydration', 'movement', 'sleep', 'recovery']);
+
+  const handleUpdateRecoverySessions = async (sessions: RecoverySession[]) => {
+    if (!log) return;
+    const updated = { ...log, recoverySessions: sessions };
+    setLog(updated);
+    try {
+      await gymService.updateDailyLog(selectedDate, { recoverySessions: sessions });
+      setLastSaved(Date.now());
+    } catch (e) {
+      console.error("Save recovery sessions error:", e);
+    }
+  };
+
+  const handleToggleQuickRecovery = async (modality: string, title: string) => {
+    if (!log) return;
+    const current = log.recoverySessions || [];
+    const idx = current.findIndex(s => s.modality === modality || s.title === title);
+    let updated: RecoverySession[];
+
+    if (idx >= 0) {
+      updated = [...current];
+      const nextVal = !updated[idx].completed;
+      updated[idx] = { ...updated[idx], completed: nextVal };
+      if (nextVal) setTotalXP(prev => prev + 25);
+    } else {
+      updated = [
+        ...current,
+        {
+          id: `rec-${Date.now()}`,
+          modality: modality as any,
+          title,
+          durationMinutes: 20,
+          completed: true,
+          timestamp: new Date().toISOString()
+        }
+      ];
+      setTotalXP(prev => prev + 25);
+    }
+
+    await handleUpdateRecoverySessions(updated);
+  };
 
   const getLastPerformance = (exRaw: any) => {
     const parsed = parseExercise(exRaw);
@@ -575,32 +624,76 @@ export const ProGym = ({
   });
 
 
+  const ensureDateInCalendar = (dateStr: string) => {
+    if (!dateStr) return;
+    setCalendarDates(prev => {
+      if (prev.includes(dateStr)) return prev;
+      const combined = [...new Set([...prev, dateStr])].sort((a, b) => a.localeCompare(b));
+      return combined;
+    });
+  };
+
+  const handlePrevDay = async () => {
+    await flushChanges();
+    const current = parseLocalDate(selectedDate);
+    current.setDate(current.getDate() - 1);
+    const prevIso = getLocalDateString(current);
+    ensureDateInCalendar(prevIso);
+    setSelectedDate(prevIso);
+  };
+
+  const handleNextDay = async () => {
+    await flushChanges();
+    const current = parseLocalDate(selectedDate);
+    current.setDate(current.getDate() + 1);
+    const nextIso = getLocalDateString(current);
+    ensureDateInCalendar(nextIso);
+    setSelectedDate(nextIso);
+  };
+
+  const handleJumpToToday = async () => {
+    await flushChanges();
+    ensureDateInCalendar(today);
+    setSelectedDate(today);
+  };
+
   useEffect(() => {
-    // Determine how many days to show. Minimum 14 or enough to cover today + buffer.
-    // Use plan duration from report or default to 12 weeks.
-    const planDaysCount = numWeeks * 7;
+    // Generate dates covering past days (at least 60 days in the past) and future days (at least 30 days in the future)
+    const todayD = new Date();
+    todayD.setHours(0, 0, 0, 0);
+
     const baseStartDate = latestReport?.userData?.planStartDate 
       ? parseLocalDate(latestReport.userData.planStartDate)
-      : (latestReport?.timestamp?.toDate ? latestReport.timestamp.toDate() : (latestReport?.timestamp ? new Date(latestReport.timestamp) : new Date()));
-    
+      : todayD;
+
     const startD = new Date(baseStartDate);
     startD.setHours(0, 0, 0, 0);
 
-    const daysSinceStart = Math.ceil((new Date().getTime() - startD.getTime()) / (1000 * 60 * 60 * 24));
-    
-    // Always show at least 7 days before today and 7 days after today if no report.
-    // With report, show total plan days or more if program is longer.
-    const count = latestReport ? Math.max(planDaysCount, daysSinceStart + 14) : 21;
-    
-    if (calendarDates.length !== count) {
-      const initial = Array.from({ length: count }).map((_, i) => {
-        const d = new Date(startD);
+    // Earliest date: 60 days before startD or todayD (whichever is earlier)
+    const minTime = Math.min(startD.getTime(), todayD.getTime());
+    const minD = new Date(minTime);
+    minD.setDate(minD.getDate() - 60);
+
+    // Latest date: 30 days after plan end or todayD + 30 days
+    const planDaysCount = numWeeks * 7;
+    const maxTime = Math.max(startD.getTime() + (planDaysCount * 86400000), todayD.getTime() + (30 * 86400000));
+    const maxD = new Date(maxTime);
+
+    const totalDays = Math.ceil((maxD.getTime() - minD.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+    if (calendarDates.length < totalDays) {
+      const dates = Array.from({ length: totalDays }).map((_, i) => {
+        const d = new Date(minD);
         d.setDate(d.getDate() + i);
         return getLocalDateString(d);
       });
-      setCalendarDates(initial);
+      if (selectedDate && !dates.includes(selectedDate)) {
+        dates.push(selectedDate);
+        dates.sort((a, b) => a.localeCompare(b));
+      }
+      setCalendarDates(dates);
     }
-  }, [latestReport, calendarDates.length]);
+  }, [latestReport, numWeeks]);
 
   useEffect(() => {
     if (selectedDate && calendarDates.length > 0) {
@@ -793,6 +886,23 @@ export const ProGym = ({
     return planDays[dayOfPlan % planDays.length];
   };
 
+  const getRecoveryForSelectedDate = () => {
+    if (!latestReport?.report?.recoverySchedule || latestReport.report.recoverySchedule.length === 0) return null;
+    
+    const baseStartDate = latestReport?.userData?.planStartDate 
+      ? parseLocalDate(latestReport.userData.planStartDate)
+      : (latestReport?.timestamp?.toDate ? latestReport.timestamp.toDate() : new Date());
+    const startD = new Date(baseStartDate);
+    startD.setHours(0, 0, 0, 0);
+    const targetDate = parseLocalDate(selectedDate);
+    targetDate.setHours(0, 0, 0, 0);
+    const diffTime = targetDate.getTime() - startD.getTime();
+    const diffDaysTotal = Math.round(diffTime / (1000 * 60 * 60 * 24));
+    const dayOfPlan = ((diffDaysTotal % 7) + 7) % 7;
+
+    return latestReport.report.recoverySchedule[dayOfPlan % latestReport.report.recoverySchedule.length] || null;
+  };
+
   const importWorkoutFromPlan = async () => {
     if (!latestReport || !log) return;
     const workout = getWorkoutForSelectedDate() as any;
@@ -816,9 +926,42 @@ export const ProGym = ({
     await gymService.updateDailyLog(selectedDate, { manualWorkout: updatedManual, useManualWorkout: true });
   };
 
+  const handleImportAllReports = async () => {
+    const conflicts = checkReportOverlaps(savedReports || []);
+    if (conflicts.length > 0) {
+      const conflictLines = conflicts.map(c => 
+        `• "${c.report1.userData?.name || 'Report 1'}" (${c.range1.startISO} to ${c.range1.endISO}) overlaps with "${c.report2.userData?.name || 'Report 2'}" (${c.range2.startISO} to ${c.range2.endISO}) by ${c.overlapDays} days.`
+      ).join('\n');
+      alert(`⚠️ OVERLAPPING TRANSFORMATION REPORTS DETECTED\n\nNo overlapping days are allowed between full transformation reports to prevent conflicting information.\n\nConflicting Reports:\n${conflictLines}\n\nPlease delete one of the conflicting reports in your Saved Reports history before importing.`);
+      return;
+    }
+
+    setIsSyncing(true);
+    try {
+      const result = await gymService.importAllReportsToHub(savedReports);
+      await loadData(selectedDate);
+      alert(`Successfully imported all transformation reports into Gym Hub!\nUpdated ${result.logsUpdated} daily logs and ${result.measurementsAdded} body weight / measurement records.`);
+      if (onReportSaved) onReportSaved();
+    } catch (e: any) {
+      console.error("Import failed", e);
+      alert(e.message || "Failed to import report data. Please try again.");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const syncAllFutureDays = async () => {
     if (!latestReport || !latestReport.userData?.planStartDate) return;
     
+    const conflicts = checkReportOverlaps(savedReports || []);
+    if (conflicts.length > 0) {
+      const conflictLines = conflicts.map(c => 
+        `• "${c.report1.userData?.name || 'Report 1'}" (${c.range1.startISO} to ${c.range1.endISO}) overlaps with "${c.report2.userData?.name || 'Report 2'}" (${c.range2.startISO} to ${c.range2.endISO}) by ${c.overlapDays} days.`
+      ).join('\n');
+      alert(`⚠️ OVERLAPPING TRANSFORMATION REPORTS DETECTED\n\nNo overlapping days are allowed between full transformation reports to prevent conflicting information.\n\nConflicting Reports:\n${conflictLines}\n\nPlease delete one of the conflicting reports in your Saved Reports history before syncing.`);
+      return;
+    }
+
     const confirm = window.confirm("This will overwrite all training and meal logs from your plan start date onwards with the latest prescribed plan. Existing data from that date will be deleted. Continue?");
     if (!confirm) return;
 
@@ -829,9 +972,9 @@ export const ProGym = ({
       // Refresh current log
       await loadData(selectedDate);
       alert("Successfully synced Gym Hub with the latest plan starting from " + latestReport.userData.planStartDate);
-    } catch (e) {
+    } catch (e: any) {
       console.error("Sync failed", e);
-      alert("Sync failed. Some days may not have updated.");
+      alert(e.message || "Sync failed. Some days may not have updated.");
     } finally {
       setIsSyncing(false);
     }
@@ -1370,13 +1513,17 @@ export const ProGym = ({
 
   const loadData = async (date: string) => {
     setLoading(true);
-    const [logData, measurementData, dayMeasurement] = await Promise.all([
+    const [logData, measurementData, dayMeasurement, allLogs] = await Promise.all([
       gymService.getDailyLog(date),
       gymService.getLatestMeasurements(50),
-      gymService.getMeasurement(date)
+      gymService.getMeasurement(date),
+      gymService.getAllDailyLogs()
     ]);
 
     setMeasurements(measurementData);
+    if (allLogs && allLogs.length > 0) {
+      setReportLogs(allLogs);
+    }
     
     // Pre-fill measurement form for the selected date
     if (dayMeasurement) {
@@ -1927,6 +2074,39 @@ export const ProGym = ({
         xp={totalXP} 
       />
 
+      {/* Overlapping Reports Conflict Alert Banner */}
+      {(() => {
+        const conflicts = checkReportOverlaps(savedReports || []);
+        if (conflicts.length === 0) return null;
+        return (
+          <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-start gap-3 text-amber-200 text-xs mb-6">
+            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <div className="flex-1 space-y-1.5">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <p className="font-bold text-amber-300 text-sm">Overlapping Transformation Reports Detected</p>
+                <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/30 text-[10px]">Action Required: Delete 1 Report</Badge>
+              </div>
+              <p className="text-amber-200/80 leading-relaxed">
+                No overlapping days are allowed between full transformation reports to prevent conflicting workout and meal plans in Gym Hub.
+              </p>
+              <div className="space-y-1 font-mono text-[11px] text-amber-300 pt-1">
+                {conflicts.map((c, idx) => (
+                  <div key={idx} className="flex items-center gap-1.5 flex-wrap">
+                    <span>• <strong>{c.report1.userData?.name || 'Report 1'}</strong> ({c.range1.startISO} to {c.range1.endISO})</span>
+                    <span className="text-amber-400 font-bold">conflicts with</span>
+                    <span><strong>{c.report2.userData?.name || 'Report 2'}</strong> ({c.range2.startISO} to {c.range2.endISO})</span>
+                    <span className="text-amber-400 font-bold">({c.overlapDays} days)</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[11px] text-amber-400 font-semibold pt-1">
+                👉 Please go to Saved Reports in your main library and delete one of the conflicting reports to resolve plan conflicts.
+              </p>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Hero Header - Refined for mobile */}
       <div className="relative min-h-[140px] md:h-48 rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden group">
         <div className="absolute inset-0 bg-brand-primary opacity-10" />
@@ -1983,6 +2163,17 @@ export const ProGym = ({
               </button>
               <div className="w-1 h-1 rounded-full bg-gray-800" />
               <button 
+                onClick={() => setActiveView('recovery')}
+                className={cn(
+                  "text-[10px] md:text-[11px] font-black uppercase tracking-widest transition-all cursor-pointer flex items-center gap-1",
+                  activeView === 'recovery' ? "text-purple-400 font-bold" : "text-gray-500 hover:text-purple-300"
+                )}
+              >
+                <Sparkles className="w-3 h-3 text-purple-400" />
+                Recovery Hub
+              </button>
+              <div className="w-1 h-1 rounded-full bg-gray-800" />
+              <button 
                 onClick={() => setActiveView('report')}
                 className={cn(
                   "text-[10px] md:text-[11px] font-black uppercase tracking-widest transition-all cursor-pointer",
@@ -2007,122 +2198,192 @@ export const ProGym = ({
         <>
       {/* Daily Navigation */}
       <div className="flex flex-col gap-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-2">
-          <div className="relative group/header-date inline-flex items-center">
-            <input 
-              type="date"
-              className="absolute inset-0 opacity-0 cursor-pointer z-10 w-full"
-              value={selectedDate}
-              onChange={async (e) => {
-                await flushChanges();
-                setSelectedDate(e.target.value);
-                setUnlockedDates(prev => new Set([...prev, e.target.value]));
-              }}
-            />
-            <div className="flex items-center gap-2 cursor-pointer bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-1.5 rounded-xl transition-all shadow-sm">
-              <Calendar className="w-4 h-4 text-brand-primary group-hover/header-date:scale-110 transition-all shrink-0" />
-              <span className="text-xs font-black uppercase tracking-widest text-gray-300 group-hover/header-date:text-white transition-colors">
-                {latestReport ? `Report Schedule • Week ${currentWeekNumber}` : 'Weekly Activity'}
-              </span>
+        {/* Date Selector Header Bar */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-brand-surface/60 border border-white/5 p-3 rounded-2xl shadow-lg">
+          
+          {/* Left: Quick Date Nav controls */}
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handlePrevDay}
+              className="h-9 px-2.5 border-white/10 hover:bg-white/10 text-gray-300 gap-1 rounded-xl cursor-pointer"
+              title="Previous Day"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span className="hidden sm:inline text-xs font-semibold">Prev</span>
+            </Button>
+
+            {/* Date Picker Badge */}
+            <div className="relative group/header-date inline-flex items-center">
+              <input 
+                type="date"
+                className="absolute inset-0 opacity-0 cursor-pointer z-10 w-full h-full"
+                value={selectedDate}
+                onChange={async (e) => {
+                  if (!e.target.value) return;
+                  await flushChanges();
+                  ensureDateInCalendar(e.target.value);
+                  setSelectedDate(e.target.value);
+                }}
+              />
+              <div className="flex items-center gap-2 cursor-pointer bg-brand-primary/10 hover:bg-brand-primary/20 border border-brand-primary/30 px-3.5 py-1.5 rounded-xl transition-all shadow-sm">
+                <Calendar className="w-4 h-4 text-brand-primary group-hover/header-date:scale-110 transition-all shrink-0" />
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-brand-primary">
+                    {selectedDate === today ? 'Today' : 'Active Date'}
+                  </span>
+                  <span className="text-xs font-bold font-mono text-white">
+                    {parseLocalDate(selectedDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                  </span>
+                </div>
+              </div>
             </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleNextDay}
+              className="h-9 px-2.5 border-white/10 hover:bg-white/10 text-gray-300 gap-1 rounded-xl cursor-pointer"
+              title="Next Day"
+            >
+              <span className="hidden sm:inline text-xs font-semibold">Next</span>
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+
+            {/* Quick Jump to Today if on past/future date */}
+            {selectedDate !== today && (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleJumpToToday}
+                className="h-9 px-3 bg-brand-primary text-brand-dark font-bold hover:bg-brand-primary/90 text-xs gap-1.5 rounded-xl cursor-pointer shadow-md shadow-brand-primary/20"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Jump to Today
+              </Button>
+            )}
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleImportAllReports}
+              disabled={isSyncing}
+              className="h-9 px-3 border-brand-primary/30 bg-brand-primary/10 hover:bg-brand-primary/20 text-brand-primary font-bold text-xs gap-1.5 rounded-xl cursor-pointer"
+              title="Import all data from all previous Transformation Reports into Gym Hub"
+            >
+              <Download className="w-3.5 h-3.5" />
+              {isSyncing ? 'Importing...' : 'Import All Reports'}
+            </Button>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-3 py-1.5 rounded-xl text-xs font-mono font-bold text-gray-200 shadow-inner">
+
+          {/* Right: Info Pills */}
+          <div className="flex items-center gap-2 justify-between md:justify-end">
+            {latestReport && (
+              <div className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-xl text-xs font-mono font-bold text-gray-300">
+                <span className="text-brand-primary">Plan Week {currentWeekNumber}</span>
+              </div>
+            )}
+            <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-3 py-1.5 rounded-xl text-xs font-mono font-bold text-gray-200">
               <span className="w-2 h-2 rounded-full bg-brand-primary animate-pulse shrink-0" />
               <span className="text-gray-400 font-sans text-[10px] uppercase tracking-wider font-extrabold">Today:</span>
               <span className="text-brand-primary font-bold">
-                {parseLocalDate(today).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                {parseLocalDate(today).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
               </span>
             </div>
           </div>
+
         </div>
-        
+
+        {/* Previous Day Editing Alert Banner */}
+        {selectedDate !== today && (
+          <div className="bg-gradient-to-r from-brand-primary/15 via-brand-primary/10 to-transparent border border-brand-primary/30 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+            <div className="flex items-start sm:items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-brand-primary/20 text-brand-primary shrink-0 mt-0.5 sm:mt-0">
+                <Calendar className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-black uppercase tracking-wider text-brand-primary">
+                    Editing Previous Day Entry
+                  </span>
+                  <span className="text-xs bg-brand-primary/20 text-brand-primary px-2.5 py-0.5 rounded-full font-mono font-bold">
+                    {parseLocalDate(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-300 mt-1">
+                  You are viewing and editing logs for this date. All workout sets, meals, water, steps, sleep, habits, notes & measurements will save directly to this date's log.
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleJumpToToday}
+              className="gap-2 shrink-0 border-brand-primary/40 text-brand-primary hover:bg-brand-primary/20 font-bold rounded-xl cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Return to Today
+            </Button>
+          </div>
+        )}
+
+        {/* Scrollable Calendar Strip */}
         <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide px-1">
           {calendarDates.map((iso, i) => {
             const d = parseLocalDate(iso);
             const isSelected = selectedDate === iso;
-            const isUnlocked = unlockedDates.has(iso);
             const isToday = iso === today;
-            const weekNum = Math.floor(i / 7) + 1;
-            const isFirstDayOfWeek = i % 7 === 0;
 
             const hasMeasurement = measurements.some(m => m.date === iso && (chartMetric === 'weight' ? (m.weight && m.weight > 0) : (m.bodyFat && m.bodyFat > 0)));
 
             return (
-              <React.Fragment key={`${iso}-${i}`}>
-                {latestReport && isFirstDayOfWeek && i > 0 && (
-                  <div className="flex items-center px-4 self-stretch">
-                    <div className="h-full w-px bg-white/10" />
-                  </div>
+              <button
+                key={`${iso}-${i}`}
+                id={`date-btn-${iso}`}
+                onClick={async () => {
+                  await flushChanges();
+                  setSelectedDate(iso);
+                }}
+                className={cn(
+                  "flex flex-col items-center min-w-[72px] p-3.5 rounded-2xl border transition-all relative group shadow-sm cursor-pointer",
+                  isSelected 
+                    ? "bg-brand-primary border-brand-primary text-brand-dark scale-105 shadow-brand-primary/20" 
+                    : isToday 
+                    ? "bg-brand-primary/10 border-brand-primary/40 text-gray-200 hover:border-brand-primary" 
+                    : "bg-brand-surface border-white/5 text-gray-400 hover:border-white/20 hover:text-gray-200"
                 )}
-                <button
-                  id={`date-btn-${iso}`}
-                  onClick={async () => {
-                    await flushChanges();
-                    setSelectedDate(iso);
-                    setUnlockedDates(prev => new Set([...prev, iso]));
-                  }}
-                  className={cn(
-                    "flex flex-col items-center min-w-[70px] p-4 rounded-2xl border transition-all relative group shadow-sm",
-                    isSelected 
-                      ? "bg-brand-primary border-brand-primary text-brand-dark" 
-                      : "bg-brand-surface border-white/5 text-gray-500 hover:border-white/10"
+              >
+                <span className="text-[9px] font-black uppercase tracking-widest mb-1 opacity-80 flex items-center gap-1">
+                  {d.toLocaleDateString('en-US', { weekday: 'short' })}
+                  {isToday && (
+                    <span className={cn(
+                      "text-[7px] font-black px-1 py-0.2 rounded uppercase leading-tight",
+                      isSelected ? "bg-brand-dark/20 text-brand-dark" : "bg-brand-primary/30 text-brand-primary"
+                    )}>
+                      Today
+                    </span>
                   )}
-                >
-                  <span className="text-[9px] font-black uppercase tracking-widest mb-1 opacity-70 flex items-center gap-1">
-                    {d.toLocaleDateString('en-US', { weekday: 'short' })}
-                    {isToday && (
-                      <span className={cn(
-                        "text-[7px] font-black px-1 py-0.2 rounded uppercase leading-tight",
-                        isSelected ? "bg-brand-dark/20 text-brand-dark" : "bg-brand-primary/20 text-brand-primary"
-                      )}>
-                        Today
-                      </span>
-                    )}
-                  </span>
-                  <div className="relative">
-                    <span className="text-lg font-bold font-mono">{d.getDate()}</span>
-                    {hasMeasurement && (
-                      <div className={cn(
-                        "absolute -top-1 -right-2 w-1.5 h-1.5 rounded-full",
-                        isSelected ? "bg-brand-dark/50" : "bg-brand-primary"
-                      )} />
-                    )}
-                    <input 
-                      type="date"
-                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                      value={iso}
-                      onChange={(e) => {
-                        const newIso = e.target.value;
-                        const newDates = [...calendarDates];
-                        newDates[i] = newIso;
-                        setCalendarDates(newDates);
-                        setSelectedDate(newIso);
-                        setUnlockedDates(prev => new Set([...prev, newIso]));
-                      }}
-                      title="Change Date"
-                    />
-                  </div>
-                  
-                  <div className="mt-2">
-                    {isUnlocked || isSelected ? (
-                      <LockOpen className={cn("w-3 h-3", isSelected ? "text-brand-dark" : "text-brand-primary")} />
-                    ) : (
-                      <Lock className="w-3 h-3 text-gray-600" />
-                    )}
-                  </div>
-                  
-                  {isToday && !isSelected && (
-                    <div className="absolute -top-1 -right-1 w-2 h-2 bg-brand-primary rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                </span>
+                
+                <div className="relative flex items-center justify-center">
+                  <span className="text-lg font-bold font-mono">{d.getDate()}</span>
+                  {hasMeasurement && (
+                    <div className={cn(
+                      "absolute -top-1 -right-2 w-1.5 h-1.5 rounded-full",
+                      isSelected ? "bg-brand-dark/80" : "bg-brand-primary"
+                    )} />
                   )}
+                </div>
 
-                  {latestReport && isFirstDayOfWeek && (
-                    <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 whitespace-nowrap">
-                      <span className="text-[7px] font-black text-brand-primary uppercase tracking-tighter">W{weekNum}</span>
-                    </div>
-                  )}
-                </button>
-              </React.Fragment>
+                <span className="text-[9px] font-mono opacity-60 mt-1">
+                  {d.toLocaleDateString('en-US', { month: 'short' })}
+                </span>
+                
+                {isToday && !isSelected && (
+                  <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-brand-primary rounded-full shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
+                )}
+              </button>
             );
           })}
         </div>
@@ -2257,7 +2518,7 @@ export const ProGym = ({
           </Card>
 
           {/* Quick Logs */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             <DndContext 
               sensors={sensors}
               collisionDetection={closestCenter}
@@ -2271,7 +2532,7 @@ export const ProGym = ({
                   <SortableTracker key={id} id={id}>
                     {id === 'hydration' ? (
                       <Card className="p-4 sm:p-5 bg-brand-surface border-white/5 h-full overflow-hidden">
-                        <div className="flex items-center justify-between gap-2.5 min-w-0 w-full">
+                        <div className="flex items-center justify-between gap-2.5 min-w-0 w-full pr-8">
                           <div 
                             className="flex items-center gap-2.5 cursor-pointer group flex-1 min-w-0"
                             onClick={() => setIsWaterCollapsed(!isWaterCollapsed)}
@@ -2411,7 +2672,7 @@ export const ProGym = ({
                       </Card>
                     ) : id === 'movement' ? (
                       <Card className="p-4 sm:p-5 bg-brand-surface border-white/5 h-full overflow-hidden">
-                        <div className="flex items-center justify-between gap-2.5 min-w-0 w-full">
+                        <div className="flex items-center justify-between gap-2.5 min-w-0 w-full pr-8">
                           <div 
                             className="flex items-center gap-2.5 cursor-pointer group flex-1 min-w-0"
                             onClick={() => setIsStepsCollapsed(!isStepsCollapsed)}
@@ -2530,7 +2791,7 @@ export const ProGym = ({
                       </Card>
                     ) : id === 'sleep' ? (
                       <Card className="p-4 sm:p-5 bg-brand-surface border-white/5 h-full overflow-hidden">
-                        <div className="flex items-center justify-between gap-2.5 min-w-0 w-full">
+                        <div className="flex items-center justify-between gap-2.5 min-w-0 w-full pr-8">
                           <div 
                             className="flex items-center gap-2.5 cursor-pointer group flex-1 min-w-0"
                             onClick={() => setIsSleepCollapsed(!isSleepCollapsed)}
@@ -2692,6 +2953,140 @@ export const ProGym = ({
                                     {isSavingSleep ? "Sleep Log Saved!" : "Save Sleep Log"}
                                   </Button>
                                 </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </Card>
+                    ) : id === 'recovery' ? (
+                      <Card className="p-4 sm:p-5 bg-brand-surface border-white/5 h-full overflow-hidden">
+                        <div className="flex items-center justify-between gap-2.5 min-w-0 w-full pr-8">
+                          <div 
+                            className="flex items-center gap-2.5 cursor-pointer group flex-1 min-w-0"
+                            onClick={() => setIsRecoveryCollapsed(!isRecoveryCollapsed)}
+                          >
+                            <div className="p-2 bg-amber-500/10 rounded-lg group-hover:bg-amber-500/20 transition-colors shrink-0">
+                              <Sparkles className="w-5 h-5 text-amber-400" />
+                            </div>
+                            <div className="flex flex-col min-w-0 flex-1">
+                              <h3 className="font-bold text-gray-200 text-sm sm:text-base leading-tight truncate">Recovery Protocol</h3>
+                              <span className={cn("text-xs font-mono font-bold leading-tight truncate mt-0.5", isRecoveryCollapsed ? "text-amber-400" : "text-gray-500")}>
+                                {isRecoveryCollapsed 
+                                  ? `${(log.recoverySessions || []).filter(s => s.completed).length} Modalities Completed` 
+                                  : (() => {
+                                      const recItem = getRecoveryForSelectedDate();
+                                      return recItem ? `${recItem.day}: ${recItem.focus}` : "Sauna, Steam, Compression & Massage";
+                                    })()}
+                              </span>
+                            </div>
+                          </div>
+                          <div 
+                            className="p-1.5 text-gray-400 hover:text-white cursor-pointer rounded-lg hover:bg-white/5 transition-colors shrink-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsRecoveryCollapsed(!isRecoveryCollapsed);
+                            }}
+                          >
+                            {isRecoveryCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+                          </div>
+                        </div>
+
+                        <AnimatePresence>
+                          {!isRecoveryCollapsed && (
+                            <motion.div 
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              className="overflow-hidden"
+                            >
+                              <div className="space-y-3 pt-4">
+                                {(() => {
+                                  const recItem = getRecoveryForSelectedDate();
+                                  if (recItem) {
+                                    return (
+                                      <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl space-y-1">
+                                        <div className="flex items-center justify-between gap-2">
+                                          <span className="text-[11px] font-mono font-bold text-purple-300 uppercase truncate">{recItem.day} Prescribed Protocol</span>
+                                          {recItem.duration && (
+                                            <span className="text-[10px] font-mono bg-purple-500/20 text-purple-200 px-2 py-0.5 rounded-md shrink-0">
+                                              ⏱️ {recItem.duration}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <p className="text-xs font-bold text-white leading-snug">{recItem.focus}</p>
+                                        {recItem.notes && (
+                                          <p className="text-[11px] text-gray-300 italic font-light pt-1 leading-normal">💡 {recItem.notes}</p>
+                                        )}
+                                      </div>
+                                    );
+                                  }
+                                  return (
+                                    <div className="text-xs text-gray-300 font-light leading-relaxed">
+                                      Prescribed recovery modalities for today's workout split (Sauna, Steam Room, NormaTec & Massage).
+                                    </div>
+                                  );
+                                })()}
+
+                                <div className="space-y-2">
+                                  {(() => {
+                                    const recItem = getRecoveryForSelectedDate();
+                                    let modalList: Array<{ title: string; modality: string }> = [];
+
+                                    if (recItem && recItem.modalities && recItem.modalities.length > 0) {
+                                      modalList = recItem.modalities.map(m => {
+                                        const str = typeof m === 'string' ? m : String(m);
+                                        let modalityCat = 'sauna';
+                                        const lower = str.toLowerCase();
+                                        if (lower.includes('steam')) modalityCat = 'steam_room';
+                                        else if (lower.includes('compression') || lower.includes('normatec')) modalityCat = 'normatec';
+                                        else if (lower.includes('massage') || lower.includes('foam') || lower.includes('theragun')) modalityCat = 'percussive';
+                                        else if (lower.includes('plunge') || lower.includes('cold') || lower.includes('contrast')) modalityCat = 'contrast';
+                                        else if (lower.includes('stretch') || lower.includes('hang') || lower.includes('mobility')) modalityCat = 'stretching';
+
+                                        return {
+                                          title: str,
+                                          modality: modalityCat
+                                        };
+                                      });
+                                    } else {
+                                      modalList = [
+                                        { title: 'Infrared Sauna (20m @ 170°F)', modality: 'sauna' },
+                                        { title: 'NormaTec Air Compression (25m)', modality: 'normatec' },
+                                        { title: 'Moist Heat Steam Room (15m)', modality: 'steam_room' }
+                                      ];
+                                    }
+
+                                    return modalList.map((m, idx) => {
+                                      const isDone = (log.recoverySessions || []).some(s => s.completed && (s.modality === m.modality || s.title === m.title));
+                                      return (
+                                        <div key={idx} className="flex items-center justify-between p-2.5 bg-black/30 border border-white/5 rounded-xl text-xs gap-2 min-w-0">
+                                          <span className="font-semibold text-gray-200 truncate flex-1 leading-tight">{m.title}</span>
+                                          <Button
+                                            size="sm"
+                                            variant={isDone ? 'outline' : 'primary'}
+                                            className={cn(
+                                              "h-7 text-[11px] font-bold px-2.5 rounded-lg cursor-pointer shrink-0",
+                                              isDone ? "border-emerald-500/40 text-emerald-400 bg-emerald-500/10" : "bg-amber-500 text-black hover:bg-amber-400"
+                                            )}
+                                            onClick={() => handleToggleQuickRecovery(m.modality, m.title)}
+                                          >
+                                            {isDone ? '✓ Logged' : '+ Log (+25 XP)'}
+                                          </Button>
+                                        </div>
+                                      );
+                                    });
+                                  })()}
+                                </div>
+
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="w-full border-purple-500/30 text-purple-300 hover:bg-purple-500/10 font-bold text-xs py-2 rounded-xl gap-2 cursor-pointer mt-2"
+                                  onClick={() => setActiveView('recovery')}
+                                >
+                                  <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                                  Open Full 7-Day Recovery Master Hub
+                                </Button>
                               </div>
                             </motion.div>
                           )}
@@ -3832,6 +4227,14 @@ export const ProGym = ({
         </Card>
       </div>
       </>
+      ) : activeView === 'recovery' ? (
+        <RecoveryScheduleView 
+          log={log} 
+          selectedDate={selectedDate} 
+          report={latestReport} 
+          onUpdateRecoverySessions={handleUpdateRecoverySessions} 
+          onAddXP={(amount) => setTotalXP(prev => prev + amount)}
+        />
       ) : (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">

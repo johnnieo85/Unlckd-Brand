@@ -36,6 +36,10 @@ service cloud.firestore {
       allow create: if isSignedIn() && 
                       request.resource.data.userId == request.auth.uid &&
                       isValidReport(request.resource.data);
+      allow update: if isSignedIn() && 
+                      resource.data.userId == request.auth.uid &&
+                      request.resource.data.userId == request.auth.uid &&
+                      isValidReport(request.resource.data);
       allow get, list, delete: if isSignedIn() && 
                                  resource.data.userId == request.auth.uid;
     }

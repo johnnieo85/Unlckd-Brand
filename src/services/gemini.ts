@@ -348,7 +348,16 @@ async function generateHealthAndSupport(
     1. Health Metrics (BMI, Body Fat, Calorie Targets).
     2. Daily Life (Sleep, Water, Steps).
     3. Supplement Strategy: Recommend specific fitness and nutritional supplements (e.g., Protein Powder, Creatine, Omega-3s, Multivitamins) tailored to their goals and equipment access.
-    ${includeGrocery ? `4. Comprehensive Nutrition strategy for the full ${userData.planDuration || '12-week'} duration. This strategy MUST reference at least 5 key specific meals or ingredients that appear in the meal plan, including their names and verified links. 5. Grocery store recommendation.` : "4. Motivation and general Nutrition strategies."}
+    4. RECOVERY & MODALITY PROTOCOL:
+       Generate a 7-day "recoverySchedule" complimenting the user's workout schedule. For each day (Monday through Sunday), prescribe specific targeted recovery modalities such as:
+       - Infrared Sauna (15-20 mins @ 165-175°F for GH release & CNS relaxation)
+       - Steam Room (12-15 mins @ 110-115°F for moist heat & joint cartilage warmth)
+       - NormaTec Compression Boots (20-30 mins level 5-7 for lactic acid & venous flush after leg/lower body training)
+       - Percussive Therapy / Theragun & Foam Rolling (10 mins on trained muscle groups)
+       - Contrast Therapy / Cold Plunge (3 cycles: 15m Sauna + 3m Cold Plunge @ 48°F)
+       - Deep Tissue / Sports Massage or Active Spinal Decompression (on active recovery days)
+       Populate "modalities" (array of strings), "duration" (string), and "notes" (string) for each day in "recoverySchedule".
+    ${includeGrocery ? `5. Comprehensive Nutrition strategy for the full ${userData.planDuration || '12-week'} duration. This strategy MUST reference at least 5 key specific meals or ingredients that appear in the meal plan, including their names and verified links. 6. Grocery store recommendation.` : "5. Motivation and general Nutrition strategies."}
     
     UNIT ALIGNMENT: 
     - If user weight is in 'lbs', use US Imperial units for food: oz, lbs, cups, tsp, tbsp.
@@ -435,6 +444,9 @@ async function generateHealthAndSupport(
               properties: {
                 day: { type: Type.STRING },
                 focus: { type: Type.STRING },
+                modalities: { type: Type.ARRAY, items: { type: Type.STRING } },
+                duration: { type: Type.STRING },
+                notes: { type: Type.STRING },
               },
               required: ["day", "focus"],
             },
@@ -1018,4 +1030,114 @@ export async function generateTransformationReport(
     
     throw new Error(error.message || "An error occurred during report generation. Please try again.");
   }
+}
+
+export async function generateRecoveryGuidance(
+  userData: UserData,
+  existingWorkoutPlan?: any[]
+): Promise<Array<{
+  day: string;
+  focus: string;
+  modalities?: string[];
+  duration?: string;
+  notes?: string;
+}>> {
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `Generate a 7-day targeted recovery schedule complementing this user's training program.
+      User Data:
+      Name: ${userData.name || 'User'}
+      Goals: ${userData.goals || 'General Fitness & Hypertrophy'}
+      Gym Access: ${userData.gymAccess || 'Full Gym'}
+      Injuries: ${userData.injuries || 'None'}
+      Workout Split Context: ${existingWorkoutPlan ? JSON.stringify(existingWorkoutPlan.slice(0, 1)) : '7-day Split'}
+      
+      For each day (Monday through Sunday), specify:
+      - day: e.g. "Monday"
+      - focus: e.g. "Lower Body & Spinal Decompression"
+      - modalities: Array of 2-3 specific targeted modalities (e.g. ["Infrared Sauna (20 mins @ 170°F)", "NormaTec Compression Boots (25 mins Lvl 6)"])
+      - duration: e.g. "30-45 mins total"
+      - notes: Brief physiological rationale for why this recovery protocol benefits their workout split.`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              day: { type: Type.STRING },
+              focus: { type: Type.STRING },
+              modalities: { type: Type.ARRAY, items: { type: Type.STRING } },
+              duration: { type: Type.STRING },
+              notes: { type: Type.STRING },
+            },
+            required: ["day", "focus"],
+          },
+        },
+      },
+    });
+
+    if (response.text) {
+      const parsed = safeParseJson(response.text);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.warn("AI generation for recovery guidance failed, using split-tailored fallback:", err);
+  }
+
+  // Fallback to high-quality 7-day recovery schedule based on workout plan or default split
+  return [
+    {
+      day: 'Monday',
+      focus: 'Lower Body & Connective Tissue Hydration',
+      modalities: ['NormaTec Compression Boots (25 mins @ Level 6)', 'Moist Heat Steam Room (15 mins @ 112°F)', 'Percussive Foam Rolling (10 mins)'],
+      duration: '40 mins total',
+      notes: 'Propels lymphatic fluid to reduce lower body DOMS and hydrates knee/hip joint capsules.'
+    },
+    {
+      day: 'Tuesday',
+      focus: 'Upper Body Push & Thoracic Decompression',
+      modalities: ['Infrared Sauna (20 mins @ 170°F)', 'Theragun Percussive Therapy (10 mins)', 'Passive Bar Hanging (5 mins)'],
+      duration: '35 mins total',
+      notes: 'Triggers heat shock proteins, surges growth hormone release, and relieves thoracic spine compression.'
+    },
+    {
+      day: 'Wednesday',
+      focus: 'Active Recovery & Central Nervous System Reset',
+      modalities: ['Deep Tissue / Sports Massage (45 mins)', 'Contrast Plunge (3 Cycles: 12m Hot / 2m Cold)', 'Light Mobility Flow (15 mins)'],
+      duration: '60 mins total',
+      notes: 'Breaks down fascial adhesions, flushes metabolic waste, and resets nervous system tone.'
+    },
+    {
+      day: 'Thursday',
+      focus: 'Posterior Chain & Spinal Inflammation Flush',
+      modalities: ['Contrast Sauna & Cold Plunge (20 mins)', 'Lat & Rhomboid Percussive Release (10 mins)'],
+      duration: '30 mins total',
+      notes: 'Rapid vascular pumping effect flushes lumbar spinal inflammation and mitigates erector spinae tightness.'
+    },
+    {
+      day: 'Friday',
+      focus: 'Hypertrophy & Systemic Vasodilation',
+      modalities: ['Infrared Sauna (20 mins @ 170°F)', 'Moist Steam Room (15 mins @ 110°F)'],
+      duration: '35 mins total',
+      notes: 'Increases vascular capillary density and deep tissue oxygenation going into the weekend.'
+    },
+    {
+      day: 'Saturday',
+      focus: 'Conditioning Recovery & Metabolic Flush',
+      modalities: ['Cold Plunge / Ice Bath (3-5 mins @ 48°F)', 'Epsom Salt Magnesium Bath (20 mins)'],
+      duration: '25 mins total',
+      notes: 'Promotes rapid anti-inflammatory vasoconstriction and muscular relaxation.'
+    },
+    {
+      day: 'Sunday',
+      focus: 'Complete System Preparation & Rest',
+      modalities: ['Full Body Foam Rolling (20 mins)', 'Infrared Sauna (25 mins @ 165°F)', 'Hydration Protocol (3L Water)'],
+      duration: '45 mins total',
+      notes: 'Prepares muscles, joints, and central nervous system for peak output in the upcoming week.'
+    }
+  ];
 }

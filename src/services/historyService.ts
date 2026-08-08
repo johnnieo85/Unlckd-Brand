@@ -1,6 +1,7 @@
 import { 
   collection, 
   addDoc, 
+  updateDoc,
   query, 
   where, 
   orderBy, 
@@ -113,6 +114,16 @@ export const historyService = {
       await deleteDoc(doc(db, 'reports', reportId));
     } catch (error) {
       handleFirestoreError(error, 'delete', `reports/${reportId}`);
+    }
+  },
+
+  async updateReport(reportId: string, updatedReport: AssessmentResult): Promise<void> {
+    try {
+      await updateDoc(doc(db, 'reports', reportId), {
+        report: updatedReport
+      });
+    } catch (error) {
+      handleFirestoreError(error, 'update', `reports/${reportId}`);
     }
   },
 
