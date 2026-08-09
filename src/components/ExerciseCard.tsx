@@ -109,15 +109,8 @@ export function ExerciseCard({
                   className="bg-white/5 border border-white/10 rounded px-2.5 py-1 text-sm font-bold text-white outline-none focus:border-brand-primary w-full"
                   value={name}
                   onChange={(e) => onUpdateManualName?.(section, index, e.target.value)}
+                  placeholder="Exercise name"
                 />
-                <button 
-                  type="button"
-                  onClick={() => onRemoveManual?.(section, index)}
-                  className="text-red-400 hover:text-red-300 p-1 shrink-0"
-                  title="Remove exercise"
-                >
-                  <Minus className="w-4 h-4" />
-                </button>
               </div>
             ) : (
               <div className="flex items-center gap-2 flex-wrap">
@@ -155,16 +148,27 @@ export function ExerciseCard({
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
-          {!isManual && (
-            <a 
-              href={url || getSearchUrl(name, 'Workouts')} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-gray-500 hover:text-brand-primary p-1.5 rounded-lg hover:bg-white/5 transition-colors shrink-0"
-              title="Search or view exercise demonstration"
+          <a 
+            href={url || getSearchUrl(name, 'Workouts')} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-gray-500 hover:text-brand-primary p-1.5 rounded-lg hover:bg-white/5 transition-colors shrink-0"
+            title="Search or view exercise demonstration"
+          >
+            <ExternalLink className="w-4 h-4" />
+          </a>
+          {onRemoveManual && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemoveManual(section, index);
+              }}
+              className="text-gray-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-white/5 transition-colors cursor-pointer shrink-0"
+              title="Delete exercise or warm-up"
             >
-              <ExternalLink className="w-4 h-4" />
-            </a>
+              <Trash2 className="w-4 h-4" />
+            </button>
           )}
           <button
             type="button"

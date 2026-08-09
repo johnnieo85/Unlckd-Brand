@@ -29,6 +29,7 @@ import {
   Plus, 
   Minus, 
   TrendingUp, 
+  TrendingDown,
   Target, 
   Calendar,
   Utensils,
@@ -56,7 +57,12 @@ import {
   ExternalLink,
   RefreshCw,
   RotateCcw,
-  AlertTriangle
+  AlertTriangle,
+  Award,
+  Trophy,
+  Waves,
+  Flame,
+  X
 } from 'lucide-react';
 import { Card, Badge } from './ui/Card';
 import { Button } from './ui/Button';
@@ -323,6 +329,474 @@ const MONTHLY_GOALS: MonthlyGoal[] = [
   }
 ];
 
+export interface BadgeTier {
+  tier: 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
+  tierLevel: number;
+  targetValue: number;
+  targetLabel: string;
+  reqDescription: string;
+}
+
+export interface AccomplishmentBadgeDef {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  icon: React.ComponentType<any>;
+  unit: string;
+  tiers: BadgeTier[];
+  getProgressValue: (reportLogs: DailyLog[], currentLog: DailyLog | null, userProfile: UserProfile | null, measurements?: Measurement[]) => number;
+}
+
+export const ACCOMPLISHMENT_BADGES: AccomplishmentBadgeDef[] = [
+  {
+    id: 'big-foot',
+    name: 'Big Foot',
+    category: 'Step Master',
+    description: 'Walk like a giant! Reach massive single-day step records.',
+    icon: Footprints,
+    unit: 'steps',
+    tiers: [
+      { tier: 'Bronze', tierLevel: 1, targetValue: 10000, targetLabel: '10k Steps Day', reqDescription: 'Log 10,000 steps in a single day' },
+      { tier: 'Silver', tierLevel: 2, targetValue: 15000, targetLabel: '15k Steps Day', reqDescription: 'Log 15,000 steps in a single day' },
+      { tier: 'Gold', tierLevel: 3, targetValue: 20000, targetLabel: '20k Steps Day', reqDescription: 'Log 20,000 steps in a single day' },
+      { tier: 'Platinum', tierLevel: 4, targetValue: 25000, targetLabel: '25k Steps Day', reqDescription: 'Log 25,000 steps in a single day' }
+    ],
+    getProgressValue: (reportLogs, currentLog) => {
+      const logs = [...reportLogs];
+      if (currentLog) logs.push(currentLog);
+      return logs.reduce((max, l) => Math.max(max, Number(l.steps) || 0), 0);
+    }
+  },
+  {
+    id: 'triple-crown',
+    name: 'Triple Crown',
+    category: 'Gym Sessions',
+    description: 'Crush gym workouts with iron discipline and total consistency.',
+    icon: Trophy,
+    unit: 'sessions',
+    tiers: [
+      { tier: 'Bronze', tierLevel: 1, targetValue: 3, targetLabel: '3 Gym Sessions', reqDescription: 'Log 3 total gym workout sessions' },
+      { tier: 'Silver', tierLevel: 2, targetValue: 10, targetLabel: '10 Gym Sessions', reqDescription: 'Log 10 total gym workout sessions' },
+      { tier: 'Gold', tierLevel: 3, targetValue: 25, targetLabel: '25 Gym Sessions', reqDescription: 'Log 25 total gym workout sessions' },
+      { tier: 'Platinum', tierLevel: 4, targetValue: 50, targetLabel: '50 Gym Sessions', reqDescription: 'Log 50 total gym workout sessions' }
+    ],
+    getProgressValue: (reportLogs, currentLog) => {
+      const logs = [...reportLogs];
+      if (currentLog) logs.push(currentLog);
+      return logs.filter(l => (l.completedWorkouts || 0) > 0 || l.useManualWorkout || (l.workoutData && Object.keys(l.workoutData).length > 0)).length;
+    }
+  },
+  {
+    id: 'shape-shifter',
+    name: 'Shape Shifter',
+    category: 'Body Measurements',
+    description: 'Log updated body measurements showing net improvement vs. initial.',
+    icon: Ruler,
+    unit: 'check-ins',
+    tiers: [
+      { tier: 'Bronze', tierLevel: 1, targetValue: 1, targetLabel: '1 Check-in', reqDescription: '1 measurement check-in with improvement' },
+      { tier: 'Silver', tierLevel: 2, targetValue: 3, targetLabel: '3 Check-ins', reqDescription: '3 measurement check-ins with improvement' },
+      { tier: 'Gold', tierLevel: 3, targetValue: 6, targetLabel: '6 Check-ins', reqDescription: '6 measurement check-ins with improvement' },
+      { tier: 'Platinum', tierLevel: 4, targetValue: 12, targetLabel: '12 Check-ins', reqDescription: '12 measurement check-ins with improvement' }
+    ],
+    getProgressValue: (reportLogs, currentLog, userProfile, measurements) => {
+      const ms = measurements || [];
+      const mCount = ms.filter(m => Boolean(m.weight || m.bodyFat || m.chest || m.waist || m.arms || m.leftArm || m.rightArm || m.leftThigh || m.rightThigh || m.neck)).length;
+      const profileM = userProfile?.bodyMeasurements && Object.keys(userProfile.bodyMeasurements).length > 0 ? 1 : 0;
+      return Math.max(mCount, profileM);
+    }
+  },
+  {
+    id: 'scale-tipper',
+    name: 'Scale Tipper',
+    category: 'Weight Goal Progress',
+    description: 'Move net body weight toward your stated weight goal.',
+    icon: TrendingDown,
+    unit: 'lb toward goal',
+    tiers: [
+      { tier: 'Bronze', tierLevel: 1, targetValue: 2, targetLabel: '2 lb Progress', reqDescription: '2 lb net weight progress toward goal' },
+      { tier: 'Silver', tierLevel: 2, targetValue: 5, targetLabel: '5 lb Progress', reqDescription: '5 lb net weight progress toward goal' },
+      { tier: 'Gold', tierLevel: 3, targetValue: 10, targetLabel: '10 lb Progress', reqDescription: '10 lb net weight progress toward goal' },
+      { tier: 'Platinum', tierLevel: 4, targetValue: 15, targetLabel: 'Goal Reached', reqDescription: 'Goal weight reached or 15+ lb net progress' }
+    ],
+    getProgressValue: (reportLogs, currentLog, userProfile, measurements) => {
+      const ms = measurements || [];
+      const weights = ms.map(m => m.weight).filter((w): w is number => typeof w === 'number' && w > 0);
+      if (weights.length >= 2) {
+        const initial = weights[0];
+        const latest = weights[weights.length - 1];
+        return Math.max(0, Math.round(Math.abs(initial - latest) * 10) / 10);
+      }
+      if (weights.length === 1 && userProfile?.weight) {
+        return Math.max(0, Math.round(Math.abs(userProfile.weight - weights[0]) * 10) / 10);
+      }
+      return 0;
+    }
+  },
+  {
+    id: 'grind-mode',
+    name: 'Grind Mode',
+    category: 'XP Accumulation',
+    description: 'Earn total XP across all logged workouts, health activities, and habits.',
+    icon: ZapIcon,
+    unit: 'XP',
+    tiers: [
+      { tier: 'Bronze', tierLevel: 1, targetValue: 1000, targetLabel: '1,000 XP', reqDescription: 'Earn 1,000 total XP' },
+      { tier: 'Silver', tierLevel: 2, targetValue: 5000, targetLabel: '5,000 XP', reqDescription: 'Earn 5,000 total XP' },
+      { tier: 'Gold', tierLevel: 3, targetValue: 10000, targetLabel: '10,000 XP', reqDescription: 'Earn 10,000 total XP' },
+      { tier: 'Platinum', tierLevel: 4, targetValue: 25000, targetLabel: '25,000 XP', reqDescription: 'Earn 25,000 total XP' }
+    ],
+    getProgressValue: (reportLogs, currentLog, userProfile) => {
+      const logs = [...reportLogs];
+      if (currentLog) logs.push(currentLog);
+      const calculatedXp = logs.reduce((acc, l) => {
+        let xp = 0;
+        if ((l.completedWorkouts || 0) > 0 || l.useManualWorkout) xp += 100;
+        if (l.water >= 2000) xp += 25;
+        if ((l.sleepHours || 0) >= 7) xp += 50;
+        if (l.habits) xp += Object.values(l.habits).filter(Boolean).length * 10;
+        return acc + xp;
+      }, 0);
+      return Math.max(userProfile?.xp || 0, calculatedXp);
+    }
+  },
+  {
+    id: 'no-days-off',
+    name: 'No Days Off',
+    category: 'Perfect Week',
+    description: 'Hit every planned session, meal log, and step goal in a single week.',
+    icon: Calendar,
+    unit: 'perfect weeks',
+    tiers: [
+      { tier: 'Bronze', tierLevel: 1, targetValue: 1, targetLabel: '1 Perfect Week', reqDescription: 'Complete 1 perfect week of sessions, meals & steps' },
+      { tier: 'Silver', tierLevel: 2, targetValue: 4, targetLabel: '4 Perfect Weeks', reqDescription: 'Complete 4 perfect weeks of sessions, meals & steps' },
+      { tier: 'Gold', tierLevel: 3, targetValue: 12, targetLabel: '12 Perfect Weeks', reqDescription: 'Complete 12 perfect weeks of sessions, meals & steps' },
+      { tier: 'Platinum', tierLevel: 4, targetValue: 26, targetLabel: '26 Perfect Weeks', reqDescription: 'Complete 26 perfect weeks of sessions, meals & steps' }
+    ],
+    getProgressValue: (reportLogs, currentLog) => {
+      const logs = [...reportLogs];
+      if (currentLog) logs.push(currentLog);
+      const weeks: Record<string, DailyLog[]> = {};
+      logs.forEach(l => {
+        if (!l.date) return;
+        const d = parseLocalDate(l.date) || new Date(l.date);
+        const year = d.getFullYear();
+        const firstJan = new Date(year, 0, 1);
+        const weekNum = Math.ceil((((d.getTime() - firstJan.getTime()) / 86400000) + firstJan.getDay() + 1) / 7);
+        const key = `${year}-W${weekNum}`;
+        if (!weeks[key]) weeks[key] = [];
+        weeks[key].push(l);
+      });
+      let perfectWeeks = 0;
+      Object.values(weeks).forEach(weekLogs => {
+        const activeDays = weekLogs.filter(l => 
+          ((l.completedWorkouts || 0) > 0 || l.useManualWorkout) && 
+          Boolean(l.meals && l.meals.length > 0) && 
+          ((Number(l.steps) || 0) >= 5000 || (l.habits && Object.values(l.habits).some(Boolean)))
+        ).length;
+        if (activeDays >= 5) perfectWeeks++;
+      });
+      return perfectWeeks;
+    }
+  },
+  {
+    id: 'comeback-kid',
+    name: 'Comeback Kid',
+    category: 'Streak Recovery',
+    description: 'Rebuild an active streak of logged days after a break of 3+ missed days.',
+    icon: RotateCcw,
+    unit: 'days rebuilt',
+    tiers: [
+      { tier: 'Bronze', tierLevel: 1, targetValue: 3, targetLabel: '3-Day Comeback', reqDescription: 'Rebuild a 3-day active streak after a break' },
+      { tier: 'Silver', tierLevel: 2, targetValue: 7, targetLabel: '7-Day Comeback', reqDescription: 'Rebuild a 7-day active streak after a break' },
+      { tier: 'Gold', tierLevel: 3, targetValue: 14, targetLabel: '14-Day Comeback', reqDescription: 'Rebuild a 14-day active streak after a break' },
+      { tier: 'Platinum', tierLevel: 4, targetValue: 30, targetLabel: '30-Day Comeback', reqDescription: 'Rebuild a 30-day active streak after a break' }
+    ],
+    getProgressValue: (reportLogs, currentLog, userProfile) => {
+      const currentStreak = userProfile?.streak || 0;
+      const logs = [...reportLogs].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+      let maxComeback = 0;
+      let tempStreak = 0;
+      let gapFound = false;
+
+      for (let i = 1; i < logs.length; i++) {
+        const prev = parseLocalDate(logs[i - 1].date);
+        const curr = parseLocalDate(logs[i].date);
+        if (prev && curr) {
+          const diffDays = Math.round((curr.getTime() - prev.getTime()) / (1000 * 3600 * 24));
+          if (diffDays >= 4) {
+            gapFound = true;
+            tempStreak = 1;
+          } else if (diffDays === 1) {
+            tempStreak++;
+            if (gapFound) {
+              maxComeback = Math.max(maxComeback, tempStreak);
+            }
+          } else {
+            tempStreak = 1;
+          }
+        }
+      }
+      return Math.max(maxComeback, currentStreak);
+    }
+  },
+  {
+    id: 'monthly-collector',
+    name: 'Monthly Collector',
+    category: 'Monthly Challenges',
+    description: 'Consistently conquer monthly challenges and collect official monthly challenge badges.',
+    icon: Award,
+    unit: 'monthly badges',
+    tiers: [
+      { tier: 'Bronze', tierLevel: 1, targetValue: 1, targetLabel: '1 Monthly Badge', reqDescription: 'Earn 1 monthly challenge badge' },
+      { tier: 'Silver', tierLevel: 2, targetValue: 3, targetLabel: '3 Monthly Badges', reqDescription: 'Earn 3 monthly challenge badges' },
+      { tier: 'Gold', tierLevel: 3, targetValue: 6, targetLabel: '6 Monthly Badges', reqDescription: 'Earn 6 monthly challenge badges' },
+      { tier: 'Platinum', tierLevel: 4, targetValue: 12, targetLabel: '12 Monthly Badges', reqDescription: 'Earn 12 monthly challenge badges' }
+    ],
+    getProgressValue: (reportLogs, currentLog, userProfile) => {
+      const userBadges = userProfile?.badges || [];
+      return userBadges.filter(b => b.icon === 'monthly-badge' || b.id.includes('august') || b.id.includes('zen') || b.id.includes('challenge') || b.id.includes('reset')).length;
+    }
+  },
+  {
+    id: 'sleep-tracker',
+    name: 'Sleep Tracker',
+    category: 'Sleep Logging',
+    description: 'Consistently log nightly sleep hours and quality.',
+    icon: Moon,
+    unit: 'nights logged',
+    tiers: [
+      { tier: 'Bronze', tierLevel: 1, targetValue: 7, targetLabel: '7 Nights Logged', reqDescription: 'Log sleep for 7 total nights' },
+      { tier: 'Silver', tierLevel: 2, targetValue: 21, targetLabel: '21 Nights Logged', reqDescription: 'Log sleep for 21 total nights' },
+      { tier: 'Gold', tierLevel: 3, targetValue: 60, targetLabel: '60 Nights Logged', reqDescription: 'Log sleep for 60 total nights' },
+      { tier: 'Platinum', tierLevel: 4, targetValue: 100, targetLabel: '100 Nights Logged', reqDescription: 'Log sleep for 100 total nights' }
+    ],
+    getProgressValue: (reportLogs, currentLog) => {
+      const logs = [...reportLogs];
+      if (currentLog) logs.push(currentLog);
+      return logs.filter(l => (l.sleepHours || 0) > 0 || Boolean(l.sleepQuality)).length;
+    }
+  },
+  {
+    id: 'habit-master',
+    name: 'Habit Master',
+    category: 'Daily Habit Compliance',
+    description: 'Log daily habits and achieve compliance goals consistently.',
+    icon: CheckCircle2,
+    unit: 'habits completed',
+    tiers: [
+      { tier: 'Bronze', tierLevel: 1, targetValue: 10, targetLabel: '10 Completed Habits', reqDescription: 'Log 10 total completed daily habit checkmarks' },
+      { tier: 'Silver', tierLevel: 2, targetValue: 30, targetLabel: '30 Completed Habits', reqDescription: 'Log 30 total completed daily habit checkmarks' },
+      { tier: 'Gold', tierLevel: 3, targetValue: 100, targetLabel: '100 Completed Habits', reqDescription: 'Log 100 total completed daily habit checkmarks' },
+      { tier: 'Platinum', tierLevel: 4, targetValue: 250, targetLabel: '250 Completed Habits', reqDescription: 'Log 250 total completed daily habit checkmarks' }
+    ],
+    getProgressValue: (reportLogs, currentLog) => {
+      const logs = [...reportLogs];
+      if (currentLog) logs.push(currentLog);
+      return logs.reduce((acc, l) => {
+        if (!l.habits) return acc;
+        return acc + Object.values(l.habits).filter(Boolean).length;
+      }, 0);
+    }
+  },
+  {
+    id: 'aqua-man',
+    name: 'Aqua Man',
+    category: 'Hydration & Aquatic',
+    description: 'Log aquatic swimming sessions or achieve top daily water intake targets.',
+    icon: Waves,
+    unit: 'days/sessions',
+    tiers: [
+      { tier: 'Bronze', tierLevel: 1, targetValue: 1, targetLabel: '1 Swim / 2.5L Water', reqDescription: 'Log 1 swimming session or 2,500ml water day' },
+      { tier: 'Silver', tierLevel: 2, targetValue: 5, targetLabel: '5 Swims / 3.5L Water', reqDescription: 'Log 5 swimming sessions or 3,500ml water days' },
+      { tier: 'Gold', tierLevel: 3, targetValue: 15, targetLabel: '15 Swims / 4.5L Water', reqDescription: 'Log 15 swimming sessions or 4,500ml water days' },
+      { tier: 'Platinum', tierLevel: 4, targetValue: 30, targetLabel: '30 Swims / 5.0L Water', reqDescription: 'Log 30 swimming sessions or 5,000ml water days' }
+    ],
+    getProgressValue: (reportLogs, currentLog) => {
+      const logs = [...reportLogs];
+      if (currentLog) logs.push(currentLog);
+      return logs.filter(l => (l.water >= 2500) || (l.recoverySessions && l.recoverySessions.some(s => (s.title || s.modality || '').toLowerCase().includes('swim')))).length;
+    }
+  },
+  {
+    id: 'rubber-band-man',
+    name: 'Rubber Band Man',
+    category: 'Mobility & Recovery',
+    description: 'Decompress joints and keep mobility smooth with dedicated recovery flows.',
+    icon: ZapIcon,
+    unit: 'mobility flows',
+    tiers: [
+      { tier: 'Bronze', tierLevel: 1, targetValue: 3, targetLabel: '3 Mobility Flows', reqDescription: 'Log 3 mobility flows or recovery sessions' },
+      { tier: 'Silver', tierLevel: 2, targetValue: 10, targetLabel: '10 Mobility Flows', reqDescription: 'Log 10 mobility flows or recovery sessions' },
+      { tier: 'Gold', tierLevel: 3, targetValue: 25, targetLabel: '25 Mobility Flows', reqDescription: 'Log 25 mobility flows or recovery sessions' },
+      { tier: 'Platinum', tierLevel: 4, targetValue: 50, targetLabel: '50 Mobility Flows', reqDescription: 'Log 50 mobility flows or recovery sessions' }
+    ],
+    getProgressValue: (reportLogs, currentLog) => {
+      const logs = [...reportLogs];
+      if (currentLog) logs.push(currentLog);
+      return logs.reduce((acc, l) => acc + (l.recoverySessions ? l.recoverySessions.filter(s => s.completed).length : 0), 0);
+    }
+  },
+  {
+    id: 'early-bird',
+    name: 'Early Bird',
+    category: 'Schedule',
+    description: 'Rise and grind! Complete early morning workout sessions before 7:00 AM.',
+    icon: Sun,
+    unit: 'early workouts',
+    tiers: [
+      { tier: 'Bronze', tierLevel: 1, targetValue: 1, targetLabel: '1 Early Workout', reqDescription: 'Log 1 workout completed before 7:00 AM' },
+      { tier: 'Silver', tierLevel: 2, targetValue: 5, targetLabel: '5 Early Workouts', reqDescription: 'Log 5 workouts completed before 7:00 AM' },
+      { tier: 'Gold', tierLevel: 3, targetValue: 15, targetLabel: '15 Early Workouts', reqDescription: 'Log 15 workouts completed before 7:00 AM' },
+      { tier: 'Platinum', tierLevel: 4, targetValue: 30, targetLabel: '30 Early Workouts', reqDescription: 'Log 30 workouts completed before 7:00 AM' }
+    ],
+    getProgressValue: (reportLogs, currentLog) => {
+      const logs = [...reportLogs];
+      if (currentLog) logs.push(currentLog);
+      return logs.filter(l => (l.completedWorkouts || 0) > 0).length;
+    }
+  },
+  {
+    id: 'night-owl',
+    name: 'Night Owl',
+    category: 'Schedule',
+    description: 'Put in work late at night while the rest of the world is sleeping.',
+    icon: Moon,
+    unit: 'evening workouts',
+    tiers: [
+      { tier: 'Bronze', tierLevel: 1, targetValue: 1, targetLabel: '1 Evening Workout', reqDescription: 'Log 1 workout completed after 8:00 PM' },
+      { tier: 'Silver', tierLevel: 2, targetValue: 5, targetLabel: '5 Evening Workouts', reqDescription: 'Log 5 workouts completed after 8:00 PM' },
+      { tier: 'Gold', tierLevel: 3, targetValue: 15, targetLabel: '15 Evening Workouts', reqDescription: 'Log 15 workouts completed after 8:00 PM' },
+      { tier: 'Platinum', tierLevel: 4, targetValue: 30, targetLabel: '30 Evening Workouts', reqDescription: 'Log 30 workouts completed after 8:00 PM' }
+    ],
+    getProgressValue: (reportLogs, currentLog) => {
+      const logs = [...reportLogs];
+      if (currentLog) logs.push(currentLog);
+      return logs.filter(l => (l.completedWorkouts || 0) > 0).length;
+    }
+  },
+  {
+    id: 'iron-will',
+    name: 'Iron Will',
+    category: 'Consistency',
+    description: 'Maintain unbroken daily active training and logging streaks.',
+    icon: Flame,
+    unit: 'days streak',
+    tiers: [
+      { tier: 'Bronze', tierLevel: 1, targetValue: 3, targetLabel: '3-Day Streak', reqDescription: 'Maintain a 3-day workout & logging streak' },
+      { tier: 'Silver', tierLevel: 2, targetValue: 7, targetLabel: '7-Day Streak', reqDescription: 'Maintain a 7-day workout & logging streak' },
+      { tier: 'Gold', tierLevel: 3, targetValue: 14, targetLabel: '14-Day Streak', reqDescription: 'Maintain a 14-day workout & logging streak' },
+      { tier: 'Platinum', tierLevel: 4, targetValue: 30, targetLabel: '30-Day Streak', reqDescription: 'Maintain a 30-day workout & logging streak' }
+    ],
+    getProgressValue: (reportLogs, currentLog, userProfile) => {
+      return userProfile?.streak || 0;
+    }
+  },
+  {
+    id: 'rest-master',
+    name: 'Rest Master',
+    category: 'Sleep & Recovery',
+    description: 'Recharge your engine with optimal sleep hygiene and sleep duration.',
+    icon: Sparkles,
+    unit: 'days 8h sleep',
+    tiers: [
+      { tier: 'Bronze', tierLevel: 1, targetValue: 1, targetLabel: '1 Night 7.5h Sleep', reqDescription: 'Log 7.5+ hours of sleep in a single night' },
+      { tier: 'Silver', tierLevel: 2, targetValue: 5, targetLabel: '5 Nights 8.0h Sleep', reqDescription: 'Log 8.0+ hours of sleep for 5 nights' },
+      { tier: 'Gold', tierLevel: 3, targetValue: 15, targetLabel: '15 Nights 8.0h Sleep', reqDescription: 'Log 8.0+ hours of sleep for 15 nights' },
+      { tier: 'Platinum', tierLevel: 4, targetValue: 30, targetLabel: '30 Nights 8.0h Sleep', reqDescription: 'Log 8.0+ hours of sleep for 30 nights' }
+    ],
+    getProgressValue: (reportLogs, currentLog) => {
+      const logs = [...reportLogs];
+      if (currentLog) logs.push(currentLog);
+      return logs.filter(l => (l.sleepHours || 0) >= 7.5).length;
+    }
+  },
+  {
+    id: 'hydration-hero',
+    name: 'Hydration Hero',
+    category: 'Health',
+    description: 'Drink clean water consistently to maximize cell performance and recovery.',
+    icon: Droplets,
+    unit: 'ml water/day',
+    tiers: [
+      { tier: 'Bronze', tierLevel: 1, targetValue: 2000, targetLabel: '2,000ml Day', reqDescription: 'Log 2,000ml of water in a single day' },
+      { tier: 'Silver', tierLevel: 2, targetValue: 3000, targetLabel: '3,000ml Day', reqDescription: 'Log 3,000ml of water in a single day' },
+      { tier: 'Gold', tierLevel: 3, targetValue: 4000, targetLabel: '4,000ml Day', reqDescription: 'Log 4,000ml of water in a single day' },
+      { tier: 'Platinum', tierLevel: 4, targetValue: 5000, targetLabel: '5,000ml Day', reqDescription: 'Log 5,000ml of water in a single day' }
+    ],
+    getProgressValue: (reportLogs, currentLog) => {
+      const logs = [...reportLogs];
+      if (currentLog) logs.push(currentLog);
+      return logs.reduce((max, l) => Math.max(max, Number(l.water) || 0), 0);
+    }
+  },
+  {
+    id: 'macro-chef',
+    name: 'Macro Chef',
+    category: 'Nutrition',
+    description: 'Fuel your body accurately by consistently logging meals and macros.',
+    icon: Utensils,
+    unit: 'days logged',
+    tiers: [
+      { tier: 'Bronze', tierLevel: 1, targetValue: 3, targetLabel: '3 Days Logged', reqDescription: 'Log all meals for 3 days' },
+      { tier: 'Silver', tierLevel: 2, targetValue: 7, targetLabel: '7 Days Logged', reqDescription: 'Log all meals for 7 days' },
+      { tier: 'Gold', tierLevel: 3, targetValue: 20, targetLabel: '20 Days Logged', reqDescription: 'Log all meals for 20 days' },
+      { tier: 'Platinum', tierLevel: 4, targetValue: 50, targetLabel: '50 Days Logged', reqDescription: 'Log all meals for 50 days' }
+    ],
+    getProgressValue: (reportLogs, currentLog) => {
+      const logs = [...reportLogs];
+      if (currentLog) logs.push(currentLog);
+      return logs.filter(l => Boolean(l.meals && l.meals.length > 0)).length;
+    }
+  }
+];
+
+export const getTierStyle = (tierName: 'Bronze' | 'Silver' | 'Gold' | 'Platinum' | null) => {
+  switch (tierName) {
+    case 'Bronze':
+      return {
+        bg: 'bg-amber-950/20 hover:bg-amber-950/30',
+        border: 'border-amber-700/40 hover:border-amber-600/60',
+        iconBg: 'bg-amber-700/20 border border-amber-600/40',
+        iconColor: 'text-amber-400',
+        tag: 'bg-amber-900/40 text-amber-300 border-amber-700/40'
+      };
+    case 'Silver':
+      return {
+        bg: 'bg-slate-900/30 hover:bg-slate-900/40',
+        border: 'border-slate-400/40 hover:border-slate-300/60',
+        iconBg: 'bg-slate-400/20 border border-slate-300/40',
+        iconColor: 'text-slate-200',
+        tag: 'bg-slate-800/60 text-slate-200 border-slate-500/40'
+      };
+    case 'Gold':
+      return {
+        bg: 'bg-yellow-950/20 hover:bg-yellow-950/30',
+        border: 'border-yellow-500/40 hover:border-yellow-400/60',
+        iconBg: 'bg-yellow-500/20 border border-yellow-400/40 shadow-[0_0_12px_rgba(234,179,8,0.2)]',
+        iconColor: 'text-yellow-400',
+        tag: 'bg-yellow-900/40 text-yellow-300 border-yellow-500/40'
+      };
+    case 'Platinum':
+      return {
+        bg: 'bg-cyan-950/20 hover:bg-cyan-950/30',
+        border: 'border-cyan-400/40 hover:border-cyan-300/60',
+        iconBg: 'bg-cyan-400/20 border border-cyan-300/40 shadow-[0_0_15px_rgba(34,211,238,0.25)]',
+        iconColor: 'text-cyan-300',
+        tag: 'bg-cyan-900/40 text-cyan-200 border-cyan-400/40'
+      };
+    default:
+      return {
+        bg: 'bg-white/[0.02] hover:bg-white/[0.04]',
+        border: 'border-white/5 hover:border-white/10 opacity-70',
+        iconBg: 'bg-white/5 border border-white/10',
+        iconColor: 'text-gray-500',
+        tag: 'bg-white/5 text-gray-400 border-white/10'
+      };
+  }
+};
+
 export const ProGym = ({ 
   latestReport, 
   savedReports,
@@ -384,6 +858,78 @@ export const ProGym = ({
   const [isRecoveryCollapsed, setIsRecoveryCollapsed] = useState(true);
   const [isSavingSleep, setIsSavingSleep] = useState(false);
   const [isWhoopModalOpen, setIsWhoopModalOpen] = useState(false);
+  const [isMonthlyBadgeModalOpen, setIsMonthlyBadgeModalOpen] = useState(false);
+  const [isAccomplishmentBadgesCollapsed, setIsAccomplishmentBadgesCollapsed] = useState(true);
+  const [showAllAccomplishmentBadges, setShowAllAccomplishmentBadges] = useState(false);
+  const activeMonthIdx = (parseLocalDate(selectedDate) || new Date()).getMonth();
+  const [selectedModalMonthIdx, setSelectedModalMonthIdx] = useState<number>(activeMonthIdx);
+  const [selectedAccomplishmentBadge, setSelectedAccomplishmentBadge] = useState<AccomplishmentBadgeDef | null>(null);
+  const [badgeSyncToast, setBadgeSyncToast] = useState<string | null>(null);
+
+  const handleSyncAccomplishmentBadge = async (badgeDef: AccomplishmentBadgeDef) => {
+    if (!userProfile) return;
+    const val = badgeDef.getProgressValue(reportLogs, log, userProfile, measurements);
+    const unlockedTiers = badgeDef.tiers.filter(t => val >= t.targetValue);
+    
+    if (unlockedTiers.length === 0) {
+      setBadgeSyncToast(`Keep pushing! Progress: ${val.toLocaleString()} / ${badgeDef.tiers[0].targetValue.toLocaleString()} ${badgeDef.unit}`);
+      setTimeout(() => setBadgeSyncToast(null), 3500);
+      return;
+    }
+
+    const existingBadges = userProfile.badges || [];
+    const newBadges: UserBadge[] = [...existingBadges];
+    let newlyUnlockedCount = 0;
+
+    unlockedTiers.forEach(t => {
+      const badgeId = `${badgeDef.id}-${t.tier.toLowerCase()}`;
+      if (!newBadges.some(b => b.id === badgeId)) {
+        newBadges.push({
+          id: badgeId,
+          name: `${badgeDef.name} (${t.tier})`,
+          icon: badgeDef.id,
+          description: t.reqDescription,
+          unlockedAt: new Date().toISOString()
+        });
+        newlyUnlockedCount++;
+      }
+    });
+
+    if (newlyUnlockedCount > 0) {
+      await updateUserProfile(userProfile.userId, { badges: newBadges });
+      if (onProfileUpdate) onProfileUpdate();
+      setBadgeSyncToast(`🎉 Victory! Unlocked ${newlyUnlockedCount} new badge tier(s) for ${badgeDef.name}!`);
+    } else {
+      setBadgeSyncToast(`Badge tiers synced! Highest unlocked: ${unlockedTiers[unlockedTiers.length - 1].tier}`);
+    }
+    setTimeout(() => setBadgeSyncToast(null), 3500);
+  };
+
+  const handleSyncMonthlyBadge = async (targetGoalToSync: MonthlyGoal = MONTHLY_GOALS[selectedModalMonthIdx] || currentGoal) => {
+    if (!userProfile) return;
+    const existingBadges = userProfile.badges || [];
+    if (existingBadges.some(b => b.id === targetGoalToSync.badgeId)) {
+      setBadgeSyncToast(`Monthly Badge "${targetGoalToSync.badgeName}" is already in your profile!`);
+      setTimeout(() => setBadgeSyncToast(null), 3000);
+      return;
+    }
+
+    const newBadges: UserBadge[] = [
+      ...existingBadges,
+      {
+        id: targetGoalToSync.badgeId,
+        name: targetGoalToSync.badgeName,
+        icon: 'monthly-badge',
+        description: targetGoalToSync.rewardDetail,
+        unlockedAt: new Date().toISOString()
+      }
+    ];
+
+    await updateUserProfile(userProfile.userId, { badges: newBadges });
+    if (onProfileUpdate) onProfileUpdate();
+    setBadgeSyncToast(`🏆 Outstanding! The "${targetGoalToSync.badgeName}" Monthly Badge has been added to your profile!`);
+    setTimeout(() => setBadgeSyncToast(null), 3500);
+  };
 
   const handleApplyWhoopData = async (data: {
     sleepHours?: number;
@@ -998,36 +1544,93 @@ export const ProGym = ({
     await gymService.updateDailyLog(selectedDate, updatedLog);
   };
 
+  const getSectionExerciseList = (section: 'warmUp' | 'mainWork'): string[] => {
+    if (log?.manualWorkout && log.manualWorkout[section] !== undefined) {
+      const raw = log.manualWorkout[section] || '';
+      return raw ? raw.split('\n') : [];
+    }
+    const rawSec = workoutDay?.[section];
+    if (Array.isArray(rawSec)) {
+      return rawSec.map((item: any) => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item === 'object') {
+          const name = item.name || 'Exercise';
+          const sets = item.sets ? `${item.sets} sets x ` : '';
+          const reps = item.reps ? `${item.reps} reps` : '';
+          return `${name} ${sets}${reps}`.trim();
+        }
+        return String(item);
+      });
+    }
+    if (typeof rawSec === 'string') {
+      return rawSec.split('\n').map(s => s.trim()).filter(Boolean);
+    }
+    return [];
+  };
+
   const updateManualWorkout = (field: 'warmUp' | 'mainWork' | 'focus', value: string) => {
-    if (!log) return;
+    const currentWarmUpList = getSectionExerciseList('warmUp');
+    const currentMainWorkList = getSectionExerciseList('mainWork');
+
+    const defaultLog: DailyLog = {
+      id: selectedDate,
+      date: selectedDate,
+      steps: 0,
+      stepGoal: 10000,
+      water: 0,
+      waterGoal: 2500,
+      waterUnit: 'ml',
+      sleepHours: 0,
+      sleepGoal: 8,
+      completedWorkouts: 0,
+      useManualWorkout: true,
+      manualWorkout: {
+        warmUp: currentWarmUpList.join('\n'),
+        mainWork: currentMainWorkList.join('\n'),
+        focus: workoutDay?.focus || 'Custom Session'
+      }
+    };
+
+    const activeLog = log || defaultLog;
+
     const updatedManual = {
-      ...(log.manualWorkout || { warmUp: '', mainWork: '', focus: '' }),
+      warmUp: currentWarmUpList.join('\n'),
+      mainWork: currentMainWorkList.join('\n'),
+      focus: workoutDay?.focus || 'Custom Session',
+      ...(activeLog.manualWorkout || {}),
       [field]: value
     };
-    const updatedLog = { ...log, manualWorkout: updatedManual };
+
+    const updatedLog: DailyLog = {
+      ...activeLog,
+      useManualWorkout: true,
+      manualWorkout: updatedManual
+    };
+
     setLog(updatedLog);
     gymService.updateDailyLog(selectedDate, updatedLog);
   };
 
   const addManualExercise = (section: 'warmUp' | 'mainWork') => {
-    if (!log) return;
-    const current = log.manualWorkout?.[section] || '';
-    const updatedValue = current ? `${current}\nNew Exercise` : 'New Exercise';
-    updateManualWorkout(section, updatedValue);
+    const list = getSectionExerciseList(section);
+    list.push('New Exercise');
+    updateManualWorkout(section, list.join('\n'));
   };
 
   const updateManualExerciseName = (section: 'warmUp' | 'mainWork', index: number, newName: string) => {
-    if (!log) return;
-    const lines = (log.manualWorkout?.[section] || '').split('\n');
-    lines[index] = newName;
-    updateManualWorkout(section, lines.join('\n'));
+    const list = getSectionExerciseList(section);
+    if (index >= 0 && index < list.length) {
+      list[index] = newName;
+      updateManualWorkout(section, list.join('\n'));
+    }
   };
 
   const removeManualExercise = (section: 'warmUp' | 'mainWork', index: number) => {
-    if (!log) return;
-    const lines = (log.manualWorkout?.[section] || '').split('\n');
-    lines.splice(index, 1);
-    updateManualWorkout(section, lines.join('\n'));
+    const list = getSectionExerciseList(section);
+    if (index >= 0 && index < list.length) {
+      list.splice(index, 1);
+      updateManualWorkout(section, list.join('\n'));
+    }
   };
 
   const updateMealMacro = (index: number, field: 'calories' | 'protein' | 'fat' | 'carbs' | 'name', value: string) => {
@@ -2546,9 +3149,10 @@ export const ProGym = ({
                                     </Button>
                                     <input 
                                       type="number"
-                                      value={log.water}
+                                      value={log.water ? log.water : ''}
                                       onChange={(e) => {
-                                        const val = parseInt(e.target.value) || 0;
+                                        const raw = e.target.value;
+                                        const val = raw === '' ? 0 : (parseInt(raw, 10) || 0);
                                         setLog({ ...log, water: val });
                                       }}
                                       className="w-12 sm:w-14 bg-white/5 border border-white/10 rounded-lg px-1 py-1 text-center font-mono text-xs sm:text-sm font-bold text-gray-100 focus:border-blue-500 outline-none transition-colors"
@@ -2686,9 +3290,10 @@ export const ProGym = ({
                                     </Button>
                                     <input 
                                       type="number"
-                                      value={log.steps}
+                                      value={log.steps ? log.steps : ''}
                                       onChange={(e) => {
-                                        const val = parseInt(e.target.value) || 0;
+                                        const raw = e.target.value;
+                                        const val = raw === '' ? 0 : (parseInt(raw, 10) || 0);
                                         setLog({ ...log, steps: val });
                                       }}
                                       className="w-14 sm:w-16 bg-white/5 border border-white/10 rounded-lg px-1 py-1 text-center font-mono text-xs sm:text-sm font-bold text-gray-100 focus:border-emerald-500 outline-none transition-colors"
@@ -2807,15 +3412,16 @@ export const ProGym = ({
                                     </Button>
                                     <input 
                                       type="number"
-                                      step="0.5"
+                                      step="0.1"
                                       min="0"
                                       max="24"
-                                      value={log.sleepHours || 0}
+                                      value={log.sleepHours ? log.sleepHours : ''}
                                       onChange={(e) => {
-                                        const val = parseFloat(e.target.value) || 0;
+                                        const raw = e.target.value;
+                                        const val = raw === '' ? 0 : (parseFloat(raw) || 0);
                                         setLog({ ...log, sleepHours: val });
                                       }}
-                                      className="w-12 sm:w-14 bg-white/5 border border-white/10 rounded-lg px-1 py-1 text-center font-mono text-xs sm:text-sm font-bold text-gray-100 focus:border-purple-500 outline-none transition-colors"
+                                      className="w-14 sm:w-16 bg-white/5 border border-white/10 rounded-lg px-1 py-1 text-center font-mono text-xs sm:text-sm font-bold text-gray-100 focus:border-purple-500 outline-none transition-colors"
                                     />
                                     <Button 
                                       variant="outline" 
@@ -3261,16 +3867,14 @@ export const ProGym = ({
                         {isWarmUpCollapsed ? <ChevronDown className="w-4 h-4 text-brand-primary" /> : <ChevronUp className="w-4 h-4 text-brand-primary" />}
                         <span>WARM-UP SEQUENCE</span>
                       </button>
-                      {(log?.useManualWorkout || !latestReport) && (
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => addManualExercise('warmUp')}
-                          className="h-7 px-2.5 text-xs font-bold bg-brand-primary/10 text-brand-primary border border-brand-primary/20 hover:bg-brand-primary/20"
-                        >
-                          <Plus className="w-3.5 h-3.5 mr-1" /> Add Warm-Up
-                        </Button>
-                      )}
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => addManualExercise('warmUp')}
+                        className="h-7 px-2.5 text-xs font-bold bg-brand-primary/10 text-brand-primary border border-brand-primary/20 hover:bg-brand-primary/20 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5 mr-1" /> Add Warm-Up
+                      </Button>
                     </div>
 
                     {!isWarmUpCollapsed && (
@@ -3314,16 +3918,14 @@ export const ProGym = ({
                       {isMainWorkCollapsed ? <ChevronDown className="w-4 h-4 text-brand-primary" /> : <ChevronUp className="w-4 h-4 text-brand-primary" />}
                       <span>{evaluatedFocus ? `${evaluatedFocus.toUpperCase()} (MAIN WORK)` : 'MAIN WORKOUT'}</span>
                     </button>
-                    {(log?.useManualWorkout || !latestReport) && (
                       <Button 
                         variant="ghost" 
                         size="sm" 
                         onClick={() => addManualExercise('mainWork')}
-                        className="h-7 px-2.5 text-xs font-bold bg-brand-primary/10 text-brand-primary border border-brand-primary/20 hover:bg-brand-primary/20"
+                        className="h-7 px-2.5 text-xs font-bold bg-brand-primary/10 text-brand-primary border border-brand-primary/20 hover:bg-brand-primary/20 cursor-pointer"
                       >
                         <Plus className="w-3.5 h-3.5 mr-1" /> Add Exercise
                       </Button>
-                    )}
                   </div>
                   {!isMainWorkCollapsed && (
                     <div className="space-y-3">
@@ -4078,119 +4680,234 @@ export const ProGym = ({
 
       {/* Monthly Goal & Badges Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <Card className="p-8 bg-brand-surface border-white/5 relative overflow-hidden flex flex-col justify-between">
-          <div className="absolute top-0 right-0 p-8 opacity-5">
+        {/* Monthly Badge Card */}
+        <Card 
+          className="p-6 md:p-8 bg-brand-surface border-white/5 relative overflow-hidden flex flex-col justify-between cursor-pointer group hover:border-brand-primary/30 transition-all shadow-lg hover:shadow-brand-primary/5"
+          onClick={() => {
+            setSelectedModalMonthIdx(activeMonthIdx);
+            setIsMonthlyBadgeModalOpen(true);
+          }}
+        >
+          <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity pointer-events-none">
             <Target className="w-40 h-40 text-brand-primary" />
           </div>
-          <div className="relative z-10 space-y-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-brand-primary/10 rounded-lg">
-                <Calendar className="w-5 h-5 text-brand-primary" />
-              </div>
-              <h3 className="font-bold text-gray-100 uppercase tracking-widest text-sm">{currentGoal.monthName} Badge Goal</h3>
-            </div>
-            
-            <div className="space-y-4">
-              <div>
-                <h4 className="text-2xl font-display font-black text-white">{currentGoal.missionName}</h4>
-                <p className="text-gray-400 mt-2 text-sm leading-relaxed">{currentGoal.description}</p>
-              </div>
-              
-              <div className="flex items-center justify-between pt-4 border-t border-white/5">
-                <div className="space-y-1">
-                  <span className="text-[10px] text-gray-500 uppercase font-black tracking-widest">Deadline</span>
-                  <p className="text-gray-200 text-sm font-mono">{currentGoalDeadline}</p>
-                </div>
-                <Badge className={cn(
-                  "px-4 py-2 rounded-xl border-none font-black uppercase tracking-tighter",
-                  userProfile?.badges?.find(b => b.id === currentGoal.badgeId) ? "bg-brand-primary text-brand-dark" : "bg-white/5 text-gray-500"
-                )}>
-                  {userProfile?.badges?.find(b => b.id === currentGoal.badgeId) ? "Mission Complete" : "In Progress"}
-                </Badge>
-              </div>
-            </div>
-          </div>
           
-          <div className="mt-8 p-6 bg-brand-primary/5 border border-brand-primary/10 rounded-2xl flex items-center gap-4">
-             <div className="w-16 h-16 rounded-full bg-brand-primary/20 flex items-center justify-center border border-brand-primary/30 shadow-[0_0_20px_rgba(16,185,129,0.2)]">
-                <currentGoal.icon className="w-8 h-8 text-brand-primary" />
-             </div>
-             <div>
-                <p className="text-[10px] text-brand-primary font-black uppercase tracking-widest">{currentGoal.monthName} Victory Reward</p>
-                <h5 className="text-lg font-display font-bold text-white tracking-tight">The "{currentGoal.badgeName}" Badge</h5>
-                <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mt-1">{currentGoal.rewardDetail}</p>
-             </div>
+          <div className="relative z-10 space-y-5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-brand-primary/10 rounded-xl border border-brand-primary/20 shrink-0">
+                  <Calendar className="w-5 h-5 text-brand-primary" />
+                </div>
+                <h3 className="font-extrabold text-white text-base tracking-wide">Monthly Badge</h3>
+              </div>
+              <Badge className={cn(
+                "px-3 py-1 rounded-xl border-none font-bold uppercase text-[10px] tracking-wider shrink-0",
+                userProfile?.badges?.find(b => b.id === currentGoal.badgeId) ? "bg-brand-primary text-brand-dark shadow-[0_0_12px_rgba(16,185,129,0.3)]" : "bg-white/10 text-gray-300"
+              )}>
+                {userProfile?.badges?.find(b => b.id === currentGoal.badgeId) ? "Mission Complete" : "In Progress"}
+              </Badge>
+            </div>
+
+            <div className="space-y-4 pt-1">
+              <div className="flex items-start gap-3.5">
+                <div 
+                  className="w-12 h-12 rounded-2xl bg-brand-primary/15 border border-brand-primary/30 flex items-center justify-center shrink-0 cursor-pointer hover:scale-105 transition-transform shadow-[0_0_12px_rgba(16,185,129,0.15)] mt-0.5"
+                  title="Click to view requirements and details"
+                >
+                  <currentGoal.icon className="w-6 h-6 text-brand-primary" />
+                </div>
+                <div className="space-y-1 min-w-0 flex-1">
+                  <h4 
+                    className="text-lg font-display font-black text-white hover:text-brand-primary transition-colors cursor-pointer flex items-center gap-1.5 group/title"
+                    title="Click to view requirements and details"
+                  >
+                    <span>{currentGoal.missionName}</span>
+                    <ChevronRight className="w-4 h-4 text-brand-primary opacity-80 group-hover/title:translate-x-1 transition-transform shrink-0" />
+                  </h4>
+                  <p className="text-gray-400 text-xs leading-relaxed line-clamp-2">{currentGoal.description}</p>
+                </div>
+              </div>
+
+              {/* Requirement & Progress summary */}
+              <div className="p-4 bg-white/[0.03] border border-white/10 rounded-2xl space-y-3">
+                <div className="space-y-1">
+                  <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider block">Requirement:</span>
+                  <p className="text-brand-primary font-bold text-xs leading-snug">{currentGoal.rewardDetail}</p>
+                </div>
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex justify-between items-center text-[10px] text-gray-400 font-mono font-bold">
+                    <span>Progress: {reportLogs.filter(l => (l.sleepHours || 0) >= 8).length} / 20 Nights</span>
+                    <span>{Math.min(100, Math.round((reportLogs.filter(l => (l.sleepHours || 0) >= 8).length / 20) * 100))}%</span>
+                  </div>
+                  <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden">
+                    <div 
+                      className="bg-gradient-to-r from-brand-primary/80 to-brand-primary h-full rounded-full transition-all duration-500" 
+                      style={{ width: `${Math.min(100, Math.round((reportLogs.filter(l => (l.sleepHours || 0) >= 8).length / 20) * 100))}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-xs text-gray-400 pt-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Deadline:</span>
+                  <span className="font-mono text-gray-200 font-semibold">{currentGoalDeadline}</span>
+                </div>
+
+                {/* Upcoming Month Preview Quick Link */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedModalMonthIdx((activeMonthIdx + 1) % 12);
+                    setIsMonthlyBadgeModalOpen(true);
+                  }}
+                  className="text-[11px] font-bold text-brand-primary hover:underline flex items-center gap-1 transition-all"
+                >
+                  <span>Next Up ({MONTHLY_GOALS[(activeMonthIdx + 1) % 12].monthName})</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
           </div>
         </Card>
 
-        <Card className={`p-8 bg-brand-surface border-white/5 ${isBadgesCollapsed ? 'space-y-0' : 'space-y-8'}`}>
-           <div 
-             className="flex items-center justify-between cursor-pointer group select-none"
-             onClick={() => setIsBadgesCollapsed(!isBadgesCollapsed)}
-           >
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-brand-primary/10 rounded-lg shrink-0">
-                  <Sparkles className="w-5 h-5 text-brand-primary" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-gray-100 uppercase tracking-widest text-sm group-hover:text-brand-primary transition-colors">Accomplishment Badges</h3>
-                  <span className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">{userProfile?.badges?.length || 0} Unlocked</span>
-                </div>
-              </div>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="text-gray-400 hover:text-white p-1.5 h-8 w-8"
-              >
-                {isBadgesCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-              </Button>
-           </div>
+        {/* Accomplishment Badges Card */}
+        {(() => {
+          const earnedAccomplishmentBadges = ACCOMPLISHMENT_BADGES.filter((badgeDef) => {
+            const val = badgeDef.getProgressValue(reportLogs, log, userProfile, measurements);
+            return badgeDef.tiers.some(t => val >= t.targetValue);
+          });
+          const displayedAccomplishmentBadges = showAllAccomplishmentBadges 
+            ? ACCOMPLISHMENT_BADGES 
+            : earnedAccomplishmentBadges;
 
-           {!isBadgesCollapsed && (
-             <div className="space-y-8">
-               <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
-                  {/* Dynamic Current Month's Badge */}
-                  <div className={cn(
-                    "flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all cursor-help group",
-                    userProfile?.badges?.find(b => b.id === currentGoal.badgeId) 
-                      ? "bg-brand-primary/10 border-brand-primary/40" 
-                      : "bg-white/5 border-white/5 opacity-40 grayscale"
-                  )} title={currentGoal.rewardDetail}>
-                     <div className="w-12 h-12 rounded-full bg-brand-primary/20 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
-                        <currentGoal.icon className="w-6 h-6 text-brand-primary" />
-                     </div>
-                     <span className="text-[9px] font-black uppercase tracking-tighter text-center leading-none">{currentGoal.badgeName}</span>
+          return (
+            <Card className="p-6 md:p-8 bg-brand-surface border-white/5 space-y-4 md:space-y-6">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-brand-primary/10 rounded-xl border border-brand-primary/20 shrink-0">
+                    <Award className="w-5 h-5 text-brand-primary" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isAccomplishmentBadgesCollapsed) {
+                            setIsAccomplishmentBadgesCollapsed(false);
+                            setShowAllAccomplishmentBadges(true);
+                          } else {
+                            setShowAllAccomplishmentBadges(prev => !prev);
+                          }
+                        }}
+                        className="font-extrabold text-gray-100 uppercase tracking-widest text-sm hover:text-brand-primary transition-colors text-left flex items-center gap-2"
+                        title="Click title to view all or earned badges"
+                      >
+                        <span>Accomplishment Badges</span>
+                      </button>
+                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-brand-primary/10 text-brand-primary border border-brand-primary/30">
+                        {earnedAccomplishmentBadges.length} / {ACCOMPLISHMENT_BADGES.length} Earned
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-mono text-gray-400 uppercase tracking-widest block pt-0.5">
+                      {isAccomplishmentBadgesCollapsed
+                        ? "Collapsed • Click title or arrow to view"
+                        : showAllAccomplishmentBadges
+                        ? "Showing All Badges (Click title for earned only)"
+                        : "Showing Earned Only (Click title for all badges)"}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsAccomplishmentBadgesCollapsed(prev => !prev)}
+                  className="p-2 text-gray-400 hover:text-white rounded-xl bg-white/5 hover:bg-white/10 transition-colors shrink-0"
+                  title={isAccomplishmentBadgesCollapsed ? "Expand section" : "Collapse section"}
+                >
+                  <ChevronDown className={cn("w-5 h-5 transition-transform duration-300", !isAccomplishmentBadgesCollapsed && "rotate-180")} />
+                </button>
+              </div>
+
+              {!isAccomplishmentBadgesCollapsed && (
+                <div className="space-y-4 border-t border-white/5 pt-4">
+                  <div className="flex items-center justify-between text-xs text-gray-400">
+                    <span className="text-[10px] sm:text-xs font-mono text-gray-400">
+                      Tap any badge to view tiers & requirements
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowAllAccomplishmentBadges(prev => !prev)}
+                      className="text-[11px] font-bold text-brand-primary hover:underline flex items-center gap-1 shrink-0 ml-2"
+                    >
+                      {showAllAccomplishmentBadges ? (
+                        <span>Show Earned Only ({earnedAccomplishmentBadges.length})</span>
+                      ) : (
+                        <span>Show All Badges ({ACCOMPLISHMENT_BADGES.length})</span>
+                      )}
+                    </button>
                   </div>
 
-                  {/* Placeholder Badges */}
-                  {[
-                    { id: 'early-bird', name: 'Early Bird', icon: Moon, desc: 'Complete a workout before 6:00 AM' },
-                    { id: 'iron-will', name: 'Iron Will', icon: Dumbbell, desc: 'Maintain a 7-day workout streak' },
-                    { id: 'aqua-king', name: 'Aqua King', icon: Droplets, desc: 'Achieve hydration targets for 30 consecutive days' }
-                  ].map(badge => {
-                    const isUnlocked = userProfile?.badges?.find(b => b.id === badge.id);
-                    return (
-                      <div key={badge.id} className={cn(
-                        "flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all cursor-help group",
-                        isUnlocked 
-                          ? "bg-brand-primary/10 border-brand-primary/40" 
-                          : "bg-white/5 border-white/5 opacity-40 grayscale"
-                      )} title={badge.desc}>
-                        <div className="w-12 h-12 rounded-full bg-brand-primary/20 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
-                            <badge.icon className="w-6 h-6 text-brand-primary" />
-                        </div>
-                        <span className="text-[9px] font-black uppercase tracking-tighter text-center leading-none">{badge.name}</span>
-                      </div>
-                    );
-                  })}
-               </div>
+                  {displayedAccomplishmentBadges.length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                      {displayedAccomplishmentBadges.map((badgeDef) => {
+                        const val = badgeDef.getProgressValue(reportLogs, log, userProfile, measurements);
+                        const unlockedTiers = badgeDef.tiers.filter(t => val >= t.targetValue);
+                        const highestUnlockedTier = unlockedTiers.length > 0 ? unlockedTiers[unlockedTiers.length - 1] : null;
+                        const tierStyle = getTierStyle(highestUnlockedTier ? highestUnlockedTier.tier : null);
 
-               <div className="p-4 bg-white/[0.02] rounded-xl border border-white/5 text-center">
-                  <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest italic">Every accomplishment starts with the decision to try.</p>
-               </div>
-             </div>
-           )}
-        </Card>
+                        return (
+                          <div 
+                            key={badgeDef.id}
+                            onClick={() => setSelectedAccomplishmentBadge(badgeDef)}
+                            className={cn(
+                              "flex flex-col items-center text-center p-3.5 rounded-2xl border transition-all cursor-pointer group hover:scale-[1.03] relative overflow-hidden",
+                              tierStyle.bg,
+                              tierStyle.border
+                            )}
+                          >
+                            <div className={cn("w-11 h-11 rounded-full flex items-center justify-center mb-2 transition-transform group-hover:scale-110 shadow-md", tierStyle.iconBg)}>
+                              <badgeDef.icon className={cn("w-5 h-5", tierStyle.iconColor)} />
+                            </div>
+                            <span className="text-xs font-black text-gray-100 tracking-tight leading-tight line-clamp-1">{badgeDef.name}</span>
+                            <span className={cn("text-[9px] font-bold uppercase tracking-wider mt-1 px-2 py-0.5 rounded-full border", tierStyle.tag)}>
+                              {highestUnlockedTier ? highestUnlockedTier.tier : 'Locked'}
+                            </span>
+                            <span className="text-[9px] font-mono text-gray-400 mt-1 line-clamp-1">
+                              {val.toLocaleString()} {badgeDef.unit}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="p-6 bg-white/[0.02] border border-white/5 rounded-2xl text-center space-y-2">
+                      <Award className="w-8 h-8 text-gray-600 mx-auto" />
+                      <p className="text-xs font-bold text-gray-300">No Badges Earned Yet</p>
+                      <p className="text-[11px] text-gray-500 max-w-sm mx-auto">
+                        Keep logging workouts, step milestones, sleep, and recovery to unlock your first badge!
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setShowAllAccomplishmentBadges(true)}
+                        className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-brand-primary hover:underline"
+                      >
+                        View All {ACCOMPLISHMENT_BADGES.length} Available Badges
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="p-3 bg-white/[0.02] rounded-xl border border-white/5 text-center">
+                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest italic">
+                      Workouts, step milestones, mobility flows & sleep hygiene automatically unlock badge tiers.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </Card>
+          );
+        })()}
       </div>
       </>
       ) : activeView === 'recovery' ? (
@@ -4567,6 +5284,342 @@ export const ProGym = ({
         currentLog={log}
         onApplyWhoopData={handleApplyWhoopData}
       />
+
+      {/* Toast Notification Alert */}
+      <AnimatePresence>
+        {badgeSyncToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            className="fixed bottom-6 right-6 z-50 bg-brand-surface border border-brand-primary/40 text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 backdrop-blur-xl"
+          >
+            <div className="p-2 bg-brand-primary/20 rounded-xl">
+              <Award className="w-5 h-5 text-brand-primary" />
+            </div>
+            <p className="text-xs font-bold font-mono tracking-tight">{badgeSyncToast}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Monthly Badge Requirements & Details Modal */}
+      <AnimatePresence>
+        {isMonthlyBadgeModalOpen && (() => {
+          const viewGoal = MONTHLY_GOALS[selectedModalMonthIdx] || currentGoal;
+          const isSelectedActive = selectedModalMonthIdx === activeMonthIdx;
+          const isSelectedUpcoming = selectedModalMonthIdx > activeMonthIdx;
+          const isSelectedUnlocked = userProfile?.badges?.some(b => b.id === viewGoal.badgeId);
+
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="bg-brand-surface border border-white/10 rounded-2xl md:rounded-3xl max-w-xl w-full p-4 sm:p-6 md:p-8 space-y-5 relative shadow-2xl max-h-[85vh] sm:max-h-[88vh] overflow-y-auto custom-scrollbar min-h-0"
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 bg-brand-primary/10 rounded-xl border border-brand-primary/30">
+                      <Calendar className="w-5 h-5 text-brand-primary" />
+                    </div>
+                    <div>
+                      <h3 className="text-base sm:text-lg font-display font-black text-white">Monthly Challenges</h3>
+                      <p className="text-[10px] text-brand-primary font-mono uppercase font-bold tracking-widest">
+                        {viewGoal.monthName} Challenge {isSelectedActive ? '(Active)' : isSelectedUpcoming ? '(Upcoming)' : '(Past)'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsMonthlyBadgeModalOpen(false)}
+                    className="p-2 text-gray-400 hover:text-white rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Month Navigation & Preview Selector */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px] font-mono font-bold text-gray-400">
+                    <span>Browse Challenges:</span>
+                    <span className="text-brand-primary font-bold">
+                      {isSelectedActive ? '★ Current Active Month' : isSelectedUpcoming ? '🔒 Upcoming Preview' : '✓ Past Challenge'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-2 pt-0.5 no-scrollbar scroll-smooth">
+                    {MONTHLY_GOALS.map((goal, idx) => {
+                      const isSelected = idx === selectedModalMonthIdx;
+                      const isActiveCurrent = idx === activeMonthIdx;
+                      const isUpcoming = idx > activeMonthIdx;
+                      const isUnlockedBadge = userProfile?.badges?.some(b => b.id === goal.badgeId);
+
+                      return (
+                        <button
+                          key={goal.monthName}
+                          type="button"
+                          onClick={() => setSelectedModalMonthIdx(idx)}
+                          className={cn(
+                            "px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border shrink-0 flex items-center gap-1.5",
+                            isSelected 
+                              ? "bg-brand-primary text-brand-dark border-brand-primary font-black shadow-[0_0_12px_rgba(16,185,129,0.3)]" 
+                              : isActiveCurrent
+                              ? "bg-brand-primary/10 text-brand-primary border-brand-primary/40 hover:bg-brand-primary/20"
+                              : isUpcoming
+                              ? "bg-white/5 text-gray-300 border-white/10 hover:bg-white/10"
+                              : "bg-white/[0.02] text-gray-500 border-white/5 hover:bg-white/5"
+                          )}
+                        >
+                          <span>{goal.monthName}</span>
+                          {isUnlockedBadge && <CheckCircle2 className={cn("w-3 h-3", isSelected ? "text-brand-dark" : "text-brand-primary")} />}
+                          {isActiveCurrent && !isUnlockedBadge && <span className={cn("w-1.5 h-1.5 rounded-full", isSelected ? "bg-brand-dark" : "bg-brand-primary")} />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Hero Banner */}
+                <div className="p-4 sm:p-5 bg-gradient-to-br from-brand-primary/15 via-brand-primary/5 to-transparent border border-brand-primary/20 rounded-2xl flex items-center gap-4">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-brand-primary/20 border border-brand-primary/40 flex items-center justify-center shrink-0 shadow-[0_0_20px_rgba(16,185,129,0.2)]">
+                    <viewGoal.icon className="w-7 h-7 sm:w-8 sm:h-8 text-brand-primary" />
+                  </div>
+                  <div className="space-y-0.5 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[10px] text-brand-primary font-mono uppercase font-bold tracking-widest">
+                        {viewGoal.monthName} Challenge
+                      </span>
+                      {isSelectedUpcoming && (
+                        <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/30 text-[9px] px-2 py-0.5 font-bold uppercase">
+                          Upcoming Preview
+                        </Badge>
+                      )}
+                    </div>
+                    <h4 className="text-base sm:text-lg font-display font-black text-white tracking-tight leading-tight">{viewGoal.missionName}</h4>
+                    <p className="text-xs text-gray-300 font-semibold">Badge Title: <span className="text-white font-extrabold">{viewGoal.badgeName}</span></p>
+                  </div>
+                </div>
+
+                {/* Requirements & Description */}
+                <div className="space-y-3">
+                  <h5 className="text-xs font-bold uppercase tracking-wider text-gray-400">Mission Overview</h5>
+                  <p className="text-xs text-gray-300 leading-relaxed bg-white/[0.02] p-3.5 rounded-xl border border-white/5">
+                    {viewGoal.description}
+                  </p>
+
+                  <h5 className="text-xs font-bold uppercase tracking-wider text-gray-400 pt-1">Requirements Checklist</h5>
+                  <div className="space-y-2">
+                    <div className="flex items-start gap-3 p-3 bg-white/5 rounded-xl border border-white/5 text-xs text-gray-200">
+                      <CheckCircle2 className="w-4 h-4 text-brand-primary shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold text-white">Target Goal: </span>
+                        <span>{viewGoal.rewardDetail}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 p-3 bg-white/5 rounded-xl border border-white/5 text-xs text-gray-200">
+                      <CheckCircle2 className="w-4 h-4 text-brand-primary shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold text-white">Timeframe: </span>
+                        <span>
+                          {isSelectedActive ? (
+                            <>Complete before <span className="font-mono text-brand-primary font-bold">{currentGoalDeadline}</span></>
+                          ) : isSelectedUpcoming ? (
+                            <>Active during the full month of <span className="font-mono text-brand-primary font-bold">{viewGoal.monthName}</span></>
+                          ) : (
+                            <>Past Challenge (<span className="font-mono text-gray-400 font-bold">{viewGoal.monthName}</span>)</>
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 p-3 bg-white/5 rounded-xl border border-white/5 text-xs text-gray-200">
+                      <CheckCircle2 className="w-4 h-4 text-brand-primary shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-bold text-white">Logging Method: </span>
+                        <span>Log workouts, sleep, hydration or recovery sessions daily in Pro Gym</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Progress Evaluation */}
+                {isSelectedActive ? (
+                  <div className="p-3.5 bg-brand-primary/10 border border-brand-primary/20 rounded-2xl space-y-2">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-bold text-gray-200">Current Log Progress:</span>
+                      <span className="font-mono text-brand-primary font-black">
+                        {reportLogs.filter(l => (l.sleepHours || 0) >= 8).length} / 20 Nights Logged
+                      </span>
+                    </div>
+                    <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden">
+                      <div 
+                        className="bg-brand-primary h-full rounded-full transition-all duration-500"
+                        style={{ width: `${Math.min(100, Math.round((reportLogs.filter(l => (l.sleepHours || 0) >= 8).length / 20) * 100))}%` }}
+                      />
+                    </div>
+                  </div>
+                ) : isSelectedUpcoming ? (
+                  <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center gap-3">
+                    <Calendar className="w-5 h-5 text-amber-400 shrink-0" />
+                    <p className="text-xs text-amber-200/90 leading-normal">
+                      <span className="font-bold text-amber-300">Upcoming Challenge: </span>
+                      This mission unlocks on the 1st of {viewGoal.monthName}. Review the requirements above to prepare your training routine!
+                    </p>
+                  </div>
+                ) : (
+                  <div className="p-3.5 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-between text-xs">
+                    <span className="text-gray-400">Past Month Challenge ({viewGoal.monthName})</span>
+                    {isSelectedUnlocked ? (
+                      <span className="text-brand-primary font-bold flex items-center gap-1">
+                        <CheckCircle2 className="w-4 h-4" /> Badge Unlocked
+                      </span>
+                    ) : (
+                      <span className="text-gray-500 italic">Not unlocked</span>
+                    )}
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-3 pt-1">
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsMonthlyBadgeModalOpen(false)}
+                    className="flex-1 text-xs font-bold py-2.5 border-white/10 text-gray-300 hover:bg-white/5"
+                  >
+                    Close
+                  </Button>
+                  <Button
+                    onClick={() => handleSyncMonthlyBadge(viewGoal)}
+                    className="flex-1 text-xs font-extrabold py-2.5 bg-brand-primary text-brand-dark hover:bg-brand-primary/90 shadow-lg shadow-brand-primary/20"
+                  >
+                    <Award className="w-4 h-4 mr-1.5" /> 
+                    {isSelectedActive 
+                      ? 'Sync / Claim Badge' 
+                      : isSelectedUnlocked 
+                      ? 'Badge Unlocked' 
+                      : 'Claim Badge'}
+                  </Button>
+                </div>
+              </motion.div>
+            </div>
+          );
+        })()}
+      </AnimatePresence>
+
+      {/* Accomplishment Badge Tiers & Breakdown Modal */}
+      <AnimatePresence>
+        {selectedAccomplishmentBadge && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-brand-surface border border-white/10 rounded-2xl md:rounded-3xl max-w-xl w-full p-4 sm:p-6 md:p-8 space-y-5 relative shadow-2xl max-h-[85vh] sm:max-h-[88vh] overflow-y-auto custom-scrollbar min-h-0"
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-brand-primary/10 rounded-xl border border-brand-primary/30">
+                    <Award className="w-5 h-5 text-brand-primary" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-display font-black text-white">{selectedAccomplishmentBadge.name} Badge</h3>
+                    <p className="text-[10px] text-brand-primary font-mono uppercase font-bold tracking-widest">{selectedAccomplishmentBadge.category}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedAccomplishmentBadge(null)}
+                  className="p-2 text-gray-400 hover:text-white rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Hero Overview */}
+              <div className="p-5 bg-gradient-to-br from-white/5 to-transparent border border-white/10 rounded-2xl flex items-center gap-4">
+                <div className="w-16 h-16 rounded-2xl bg-brand-primary/20 border border-brand-primary/30 flex items-center justify-center shrink-0 shadow-lg">
+                  <selectedAccomplishmentBadge.icon className="w-8 h-8 text-brand-primary" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-base font-bold text-white">{selectedAccomplishmentBadge.name}</h4>
+                  <p className="text-xs text-gray-300 leading-relaxed">{selectedAccomplishmentBadge.description}</p>
+                  <div className="pt-1 text-xs font-mono text-brand-primary font-bold">
+                    Your Record: {selectedAccomplishmentBadge.getProgressValue(reportLogs, log, userProfile, measurements).toLocaleString()} {selectedAccomplishmentBadge.unit}
+                  </div>
+                </div>
+              </div>
+
+              {/* Tiers List */}
+              <div className="space-y-3">
+                <h5 className="text-xs font-bold uppercase tracking-wider text-gray-400">Achievement Tiers</h5>
+                <div className="space-y-3">
+                  {selectedAccomplishmentBadge.tiers.map((t) => {
+                    const userVal = selectedAccomplishmentBadge.getProgressValue(reportLogs, log, userProfile, measurements);
+                    const isUnlocked = userVal >= t.targetValue;
+                    const tierStyle = getTierStyle(t.tier);
+                    const progressPercent = Math.min(100, Math.round((userVal / t.targetValue) * 100));
+
+                    return (
+                      <div 
+                        key={t.tier} 
+                        className={cn(
+                          "p-4 rounded-2xl border transition-all space-y-2.5",
+                          tierStyle.bg,
+                          tierStyle.border
+                        )}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={cn("w-8 h-8 rounded-full flex items-center justify-center font-black text-xs", tierStyle.iconBg)}>
+                              {t.tierLevel}
+                            </div>
+                            <div>
+                              <h6 className="text-xs font-extrabold text-white">{t.tier} Tier — {t.targetLabel}</h6>
+                              <p className="text-[11px] text-gray-300">{t.reqDescription}</p>
+                            </div>
+                          </div>
+                          <Badge className={cn("px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider border", tierStyle.tag)}>
+                            {isUnlocked ? 'UNLOCKED' : `${progressPercent}%`}
+                          </Badge>
+                        </div>
+
+                        {/* Progress bar */}
+                        <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
+                          <div 
+                            className={cn(
+                              "h-full rounded-full transition-all duration-500",
+                              isUnlocked ? "bg-brand-primary" : "bg-white/40"
+                            )}
+                            style={{ width: `${progressPercent}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Footer Actions */}
+              <div className="flex items-center gap-3 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setSelectedAccomplishmentBadge(null)}
+                  className="flex-1 text-xs font-bold py-3 border-white/10 text-gray-300 hover:bg-white/5"
+                >
+                  Close
+                </Button>
+                <Button
+                  onClick={() => handleSyncAccomplishmentBadge(selectedAccomplishmentBadge)}
+                  className="flex-1 text-xs font-extrabold py-3 bg-brand-primary text-brand-dark hover:bg-brand-primary/90 shadow-lg shadow-brand-primary/20"
+                >
+                  <Award className="w-4 h-4 mr-2" /> Sync / Claim Earned Tiers
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
