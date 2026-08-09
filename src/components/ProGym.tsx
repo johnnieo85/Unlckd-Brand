@@ -658,51 +658,43 @@ export const ProGym = ({
   };
 
   useEffect(() => {
-    // Generate dates covering past days (at least 60 days in the past) and future days (at least 30 days in the future)
     const todayD = new Date();
     todayD.setHours(0, 0, 0, 0);
 
-    const baseStartDate = latestReport?.userData?.planStartDate 
-      ? parseLocalDate(latestReport.userData.planStartDate)
-      : todayD;
-
-    const startD = new Date(baseStartDate);
-    startD.setHours(0, 0, 0, 0);
-
-    // Earliest date: 60 days before startD or todayD (whichever is earlier)
-    const minTime = Math.min(startD.getTime(), todayD.getTime());
-    const minD = new Date(minTime);
-    minD.setDate(minD.getDate() - 60);
-
-    // Latest date: 30 days after plan end or todayD + 30 days
-    const planDaysCount = numWeeks * 7;
-    const maxTime = Math.max(startD.getTime() + (planDaysCount * 86400000), todayD.getTime() + (30 * 86400000));
-    const maxD = new Date(maxTime);
-
-    const totalDays = Math.ceil((maxD.getTime() - minD.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-
-    if (calendarDates.length < totalDays) {
-      const dates = Array.from({ length: totalDays }).map((_, i) => {
-        const d = new Date(minD);
-        d.setDate(d.getDate() + i);
-        return getLocalDateString(d);
-      });
-      if (selectedDate && !dates.includes(selectedDate)) {
-        dates.push(selectedDate);
-        dates.sort((a, b) => a.localeCompare(b));
+    // Date bar starts on current date (or selectedDate if selectedDate is earlier)
+    let minD = new Date(todayD);
+    if (selectedDate) {
+      const selD = parseLocalDate(selectedDate);
+      selD.setHours(0, 0, 0, 0);
+      if (selD < minD) {
+        minD = selD;
       }
-      setCalendarDates(dates);
     }
-  }, [latestReport, numWeeks]);
+
+    // Generate 90 days of calendar dates starting from minD (today or selected date)
+    const totalDays = 90;
+    const dates = Array.from({ length: totalDays }).map((_, i) => {
+      const d = new Date(minD);
+      d.setDate(d.getDate() + i);
+      return getLocalDateString(d);
+    });
+
+    if (selectedDate && !dates.includes(selectedDate)) {
+      dates.push(selectedDate);
+      dates.sort((a, b) => a.localeCompare(b));
+    }
+
+    setCalendarDates(dates);
+  }, [selectedDate]);
 
   useEffect(() => {
     if (selectedDate && calendarDates.length > 0) {
       const timer = setTimeout(() => {
         const element = document.getElementById(`date-btn-${selectedDate}`);
         if (element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+          element.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
         }
-      }, 100);
+      }, 50);
       return () => clearTimeout(timer);
     }
   }, [selectedDate, calendarDates]);
@@ -2199,15 +2191,15 @@ export const ProGym = ({
       {/* Daily Navigation */}
       <div className="flex flex-col gap-4">
         {/* Date Selector Header Bar */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-brand-surface/60 border border-white/5 p-3 rounded-2xl shadow-lg">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-brand-surface/80 border border-white/10 p-3 rounded-2xl shadow-lg">
           
           {/* Left: Quick Date Nav controls */}
-          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+          <div className="flex items-center gap-2 shrink-0">
             <Button
               variant="outline"
               size="sm"
               onClick={handlePrevDay}
-              className="h-9 px-2.5 border-white/10 hover:bg-white/10 text-gray-300 gap-1 rounded-xl cursor-pointer"
+              className="h-10 px-3 border-white/10 hover:bg-white/10 text-gray-300 gap-1 rounded-xl cursor-pointer"
               title="Previous Day"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -2215,7 +2207,7 @@ export const ProGym = ({
             </Button>
 
             {/* Date Picker Badge */}
-            <div className="relative group/header-date inline-flex items-center">
+            <div className="relative group/header-date inline-flex items-center flex-1 sm:flex-initial">
               <input 
                 type="date"
                 className="absolute inset-0 opacity-0 cursor-pointer z-10 w-full h-full"
@@ -2227,13 +2219,13 @@ export const ProGym = ({
                   setSelectedDate(e.target.value);
                 }}
               />
-              <div className="flex items-center gap-2 cursor-pointer bg-brand-primary/10 hover:bg-brand-primary/20 border border-brand-primary/30 px-3.5 py-1.5 rounded-xl transition-all shadow-sm">
+              <div className="flex items-center justify-center gap-2 cursor-pointer bg-brand-primary/10 hover:bg-brand-primary/20 border border-brand-primary/30 px-3.5 h-10 rounded-xl transition-all shadow-sm w-full">
                 <Calendar className="w-4 h-4 text-brand-primary group-hover/header-date:scale-110 transition-all shrink-0" />
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-brand-primary">
+                <div className="flex flex-col leading-none justify-center">
+                  <span className="text-[9px] font-black uppercase tracking-wider text-brand-primary mb-0.5">
                     {selectedDate === today ? 'Today' : 'Active Date'}
                   </span>
-                  <span className="text-xs font-bold font-mono text-white">
+                  <span className="text-xs font-bold font-mono text-white whitespace-nowrap">
                     {parseLocalDate(selectedDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
                   </span>
                 </div>
@@ -2244,54 +2236,28 @@ export const ProGym = ({
               variant="outline"
               size="sm"
               onClick={handleNextDay}
-              className="h-9 px-2.5 border-white/10 hover:bg-white/10 text-gray-300 gap-1 rounded-xl cursor-pointer"
+              className="h-10 px-3 border-white/10 hover:bg-white/10 text-gray-300 gap-1 rounded-xl cursor-pointer"
               title="Next Day"
             >
               <span className="hidden sm:inline text-xs font-semibold">Next</span>
               <ChevronRight className="w-4 h-4" />
             </Button>
+          </div>
 
-            {/* Quick Jump to Today if on past/future date */}
-            {selectedDate !== today && (
+          {/* Right: Actions */}
+          {selectedDate !== today && (
+            <div className="flex items-center gap-2 justify-end shrink-0">
               <Button
                 variant="primary"
                 size="sm"
                 onClick={handleJumpToToday}
-                className="h-9 px-3 bg-brand-primary text-brand-dark font-bold hover:bg-brand-primary/90 text-xs gap-1.5 rounded-xl cursor-pointer shadow-md shadow-brand-primary/20"
+                className="h-10 px-3 bg-brand-primary text-brand-dark font-bold hover:bg-brand-primary/90 text-xs gap-1.5 rounded-xl cursor-pointer shadow-md shadow-brand-primary/20"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 Jump to Today
               </Button>
-            )}
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleImportAllReports}
-              disabled={isSyncing}
-              className="h-9 px-3 border-brand-primary/30 bg-brand-primary/10 hover:bg-brand-primary/20 text-brand-primary font-bold text-xs gap-1.5 rounded-xl cursor-pointer"
-              title="Import all data from all previous Transformation Reports into Gym Hub"
-            >
-              <Download className="w-3.5 h-3.5" />
-              {isSyncing ? 'Importing...' : 'Import All Reports'}
-            </Button>
-          </div>
-
-          {/* Right: Info Pills */}
-          <div className="flex items-center gap-2 justify-between md:justify-end">
-            {latestReport && (
-              <div className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-xl text-xs font-mono font-bold text-gray-300">
-                <span className="text-brand-primary">Plan Week {currentWeekNumber}</span>
-              </div>
-            )}
-            <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-3 py-1.5 rounded-xl text-xs font-mono font-bold text-gray-200">
-              <span className="w-2 h-2 rounded-full bg-brand-primary animate-pulse shrink-0" />
-              <span className="text-gray-400 font-sans text-[10px] uppercase tracking-wider font-extrabold">Today:</span>
-              <span className="text-brand-primary font-bold">
-                {parseLocalDate(today).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-              </span>
             </div>
-          </div>
+          )}
 
         </div>
 
