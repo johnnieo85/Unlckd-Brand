@@ -54,10 +54,35 @@
     animation: gold-glow 4s ease-in-out infinite;
   }
 
+  /* Mobile Scrollbar & Utility classes */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* Custom sleek scrollbar for dark theme modals */
+  .progress-report-modal-wrapper::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .progress-report-modal-wrapper::-webkit-scrollbar-track {
+    background: #070b14;
+  }
+  .progress-report-modal-wrapper::-webkit-scrollbar-thumb {
+    background: rgba(16, 185, 129, 0.3);
+    border-radius: 9999px;
+  }
+  .progress-report-modal-wrapper::-webkit-scrollbar-thumb:hover {
+    background: rgba(16, 185, 129, 0.6);
+  }
+
   @media print {
     @page {
       size: letter portrait;
-      margin: 2mm;
+      margin: 4mm;
     }
 
     .no-print {
@@ -94,21 +119,28 @@
       padding: 0 !important;
       margin: 0 !important;
       width: 100% !important;
-      font-size: 75% !important;
-      zoom: 0.60 !important; /* Condenses report layout to guarantee 1-page fit */
-      -webkit-transform: scale(0.60) !important;
+      font-size: 85% !important;
+      zoom: 0.80 !important; /* Perfect scaling for 1-page output */
+      -webkit-transform: scale(0.80) !important;
       -webkit-transform-origin: top left !important;
-      transform: scale(0.60) !important;
+      transform: scale(0.80) !important;
       transform-origin: top left !important;
+    }
+
+    /* Force 2-column grid side-by-side layout in print */
+    .progress-report-grid {
+      display: grid !important;
+      grid-template-columns: 5fr 7fr !important;
+      gap: 0.5rem !important;
     }
 
     /* Compact spacing for single page print fit */
     .progress-report-container > * + * {
-      margin-top: 0.2rem !important;
+      margin-top: 0.3rem !important;
     }
 
     .progress-report-container .space-y-6 > * + * {
-      margin-top: 0.2rem !important;
+      margin-top: 0.3rem !important;
     }
 
     .progress-report-card {
@@ -117,54 +149,54 @@
       background-color: #0d1424 !important;
       border: 1px solid rgba(255, 255, 255, 0.15) !important;
       box-shadow: none !important;
-      padding: 0.25rem 0.4rem !important;
-      border-radius: 0.375rem !important;
+      padding: 0.4rem 0.5rem !important;
+      border-radius: 0.5rem !important;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
 
     .progress-report-card > * + * {
-      margin-top: 0.15rem !important;
+      margin-top: 0.2rem !important;
     }
 
     .progress-report-card .space-y-4 > * + * {
-      margin-top: 0.15rem !important;
+      margin-top: 0.2rem !important;
     }
 
     .progress-report-card .space-y-6 > * + * {
-      margin-top: 0.15rem !important;
+      margin-top: 0.2rem !important;
     }
 
     .progress-report-card .space-y-3 > * + * {
-      margin-top: 0.1rem !important;
+      margin-top: 0.15rem !important;
     }
 
     /* Force tables and set grids to be compact when printing */
     .progress-report-card table th,
     .progress-report-card table td {
-      padding: 0.12rem 0.25rem !important;
-      font-size: 8.5px !important;
-      line-height: 1.1 !important;
+      padding: 0.2rem 0.35rem !important;
+      font-size: 9.5px !important;
+      line-height: 1.15 !important;
     }
 
     .progress-report-card h1 {
-      font-size: 1rem !important;
+      font-size: 1.1rem !important;
       line-height: 1.1 !important;
     }
 
     .progress-report-card h2,
     .progress-report-card h3 {
-      font-size: 0.75rem !important;
-      line-height: 1.1 !important;
-    }
-
-    .progress-report-card p {
-      font-size: 8.5px !important;
+      font-size: 0.85rem !important;
       line-height: 1.15 !important;
     }
 
+    .progress-report-card p {
+      font-size: 9.5px !important;
+      line-height: 1.2 !important;
+    }
+
     .progress-report-card .grid {
-      gap: 0.2rem !important;
+      gap: 0.3rem !important;
     }
 
     .progress-report-card .p-3,
@@ -172,13 +204,13 @@
     .progress-report-card .p-4,
     .progress-report-card .p-5,
     .progress-report-card .p-6 {
-      padding: 0.2rem 0.35rem !important;
+      padding: 0.3rem 0.45rem !important;
     }
 
     /* Scale down images and icons in print */
     .progress-report-container img {
-      max-height: 28px !important;
-      max-width: 28px !important;
+      max-height: 32px !important;
+      max-width: 32px !important;
     }
 
     .print-break-inside-avoid, tr, section {

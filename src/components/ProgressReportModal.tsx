@@ -74,6 +74,15 @@ export function ProgressReportModal({
   }, [unitSystem]);
 
   useEffect(() => {
+    if (!isOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
     if (isOpen) {
       if (selectedDate) {
         setReportDate(selectedDate);
@@ -808,11 +817,11 @@ export function ProgressReportModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#070b14] overflow-y-auto font-sans text-gray-100 flex flex-col progress-report-modal-wrapper">
+    <div className="fixed inset-0 z-50 bg-[#070b14] overflow-y-auto font-sans text-gray-100 flex flex-col progress-report-modal-wrapper max-w-full overflow-x-hidden touch-pan-y">
       {/* Top Banner for Trainer Client View */}
       {isClientReport && (
-        <div className="bg-[#0b1320] border-b border-emerald-500/20 px-6 py-3 flex items-center justify-between no-print shrink-0">
-          <div className="flex items-center gap-2 text-emerald-400 font-mono text-xs font-bold">
+        <div className="bg-[#0b1320] border-b border-emerald-500/20 px-4 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between no-print shrink-0">
+          <div className="flex items-center gap-2 text-emerald-400 font-mono text-[11px] sm:text-xs font-bold">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             <span>Viewing client report — trainer view</span>
           </div>
@@ -829,14 +838,15 @@ export function ProgressReportModal({
       )}
 
       {/* Main Report Container */}
-      <div className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-8 space-y-6 progress-report-container">
+      <div className="flex-1 max-w-5xl w-full mx-auto p-3 sm:p-6 md:p-8 space-y-4 sm:space-y-6 progress-report-container overflow-x-hidden">
         
         {/* Close Button (No Print) */}
         {!isClientReport && (
-          <div className="flex justify-end no-print">
+          <div className="flex justify-end no-print -mb-1 sm:mb-0">
             <button
               onClick={onClose}
-              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
+              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 active:scale-95 text-gray-400 hover:text-white transition-all cursor-pointer touch-manipulation"
+              aria-label="Close report"
             >
               <X className="w-5 h-5" />
             </button>
@@ -844,47 +854,47 @@ export function ProgressReportModal({
         )}
 
         {/* 1. HEADER SECTION */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-white/10">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 sm:pb-6 border-b border-white/10">
+          <div className="flex items-center gap-3 sm:gap-4">
             {photoUrl ? (
               <img 
                 src={photoUrl} 
                 alt={subjectName} 
-                className="w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover border-2 border-brand-primary/40 shrink-0" 
+                className="w-12 h-12 sm:w-16 sm:h-16 rounded-full object-cover border-2 border-brand-primary/40 shrink-0" 
               />
             ) : (
-              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white/10 border border-white/20 flex items-center justify-center font-display font-black text-lg text-emerald-400 shrink-0">
+              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-white/10 border border-white/20 flex items-center justify-center font-display font-black text-base sm:text-lg text-emerald-400 shrink-0">
                 {avatarInitials}
               </div>
             )}
 
             <div>
-              <div className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-emerald-400 font-mono">
+              <div className="text-[9px] sm:text-xs font-black uppercase tracking-widest text-emerald-400 font-mono">
                 TRANSFORMATION PROGRESS REPORT
               </div>
-              <h1 className="text-2xl sm:text-4xl font-display font-black text-white tracking-tight mt-0.5">
+              <h1 className="text-xl sm:text-3xl font-display font-black text-white tracking-tight mt-0.5">
                 {subjectName}
               </h1>
-              <p className="text-xs sm:text-sm text-gray-400 font-medium mt-1">
+              <p className="text-[11px] sm:text-sm text-gray-400 font-medium mt-0.5 sm:mt-1">
                 Generated {formattedTodayDate} · {timeframeLabels[timeframe]} view
               </p>
             </div>
           </div>
 
-          <div className="no-print flex items-center gap-3">
+          <div className="no-print flex items-center gap-2 self-start sm:self-auto">
             <Button
               onClick={handlePrintReport}
-              className="bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-gray-200 px-4 py-2.5 rounded-xl flex items-center gap-2 cursor-pointer transition-all"
+              className="bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-gray-200 px-3.5 py-2 rounded-xl flex items-center gap-2 cursor-pointer transition-all active:scale-95"
             >
               <Printer className="w-4 h-4 text-emerald-400" />
-              Print / Export
+              <span>Print / Export</span>
             </Button>
           </div>
         </div>
 
         {/* TIMEFRAME & UNIT SELECTOR */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 no-print">
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 no-print">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none no-scrollbar max-w-full">
             {(['daily', 'weekly', '4-week', '8-week', '12-week', 'full'] as ReportTimeframe[]).map((tf) => {
               const isActive = timeframe === tf;
               return (
@@ -892,7 +902,7 @@ export function ProgressReportModal({
                   key={tf}
                   onClick={() => setTimeframe(tf)}
                   className={cn(
-                    "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer border",
+                    "px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all whitespace-nowrap cursor-pointer border shrink-0",
                     isActive
                       ? "bg-emerald-500 text-black border-emerald-400 shadow-md font-black"
                       : "bg-[#0d1424] hover:bg-white/10 border-white/10 text-gray-400 hover:text-white"
@@ -905,11 +915,11 @@ export function ProgressReportModal({
           </div>
 
           {/* UNIT SYSTEM TOGGLE */}
-          <div className="flex items-center gap-1 bg-[#0d1424] border border-white/10 p-1 rounded-xl shrink-0 self-start sm:self-auto">
+          <div className="flex items-center justify-center gap-1 bg-[#0d1424] border border-white/10 p-1 rounded-xl shrink-0 w-full sm:w-auto">
             <button
               onClick={() => setUnitSystem('imperial')}
               className={cn(
-                "px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5",
+                "flex-1 sm:flex-none px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5",
                 unitSystem === 'imperial'
                   ? "bg-emerald-500 text-black font-black shadow-sm"
                   : "text-gray-400 hover:text-white"
@@ -921,7 +931,7 @@ export function ProgressReportModal({
             <button
               onClick={() => setUnitSystem('metric')}
               className={cn(
-                "px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5",
+                "flex-1 sm:flex-none px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5",
                 unitSystem === 'metric'
                   ? "bg-emerald-500 text-black font-black shadow-sm"
                   : "text-gray-400 hover:text-white"
@@ -935,18 +945,18 @@ export function ProgressReportModal({
 
         {timeframe === 'daily' ? (
           /* SINGLE DAY PROGRESS REPORT VIEW */
-          <div className="space-y-6">
+          <div className="space-y-4">
             {/* Date Selector Banner */}
-            <div className="no-print bg-[#0d1424] border border-emerald-500/30 p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg">
+            <div className="no-print bg-[#0d1424] border border-emerald-500/30 p-3.5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-emerald-500/20 text-emerald-400 rounded-xl">
-                  <Calendar className="w-5 h-5" />
+                <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-xl">
+                  <Calendar className="w-4 h-4" />
                 </div>
                 <div>
                   <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-400">
                     Selected Progress Report Date
                   </span>
-                  <div className="text-base font-black font-mono text-white">
+                  <div className="text-sm font-black font-mono text-white">
                     {formattedReportDate}
                   </div>
                 </div>
@@ -957,9 +967,9 @@ export function ProgressReportModal({
                   <button
                     onClick={handlePrevDay}
                     title="Previous Day"
-                    className="p-1.5 hover:bg-white/10 text-gray-300 hover:text-white rounded-lg transition-colors cursor-pointer"
+                    className="p-1 hover:bg-white/10 text-gray-300 hover:text-white rounded-lg transition-colors cursor-pointer"
                   >
-                    <ChevronLeft className="w-4 h-4" />
+                    <ChevronLeft className="w-3.5 h-3.5" />
                   </button>
 
                   <div className="relative flex items-center px-1">
@@ -969,683 +979,532 @@ export function ProgressReportModal({
                       onChange={(e) => {
                         if (e.target.value) setReportDate(e.target.value);
                       }}
-                      className="bg-transparent text-white text-xs font-mono font-bold px-2 py-1 focus:outline-none cursor-pointer [color-scheme:dark]"
+                      className="bg-transparent text-white text-xs font-mono font-bold px-1.5 py-0.5 focus:outline-none cursor-pointer [color-scheme:dark]"
                     />
                   </div>
 
                   <button
                     onClick={handleNextDay}
                     title="Next Day"
-                    className="p-1.5 hover:bg-white/10 text-gray-300 hover:text-white rounded-lg transition-colors cursor-pointer"
+                    className="p-1 hover:bg-white/10 text-gray-300 hover:text-white rounded-lg transition-colors cursor-pointer"
                   >
-                    <ChevronRight className="w-4 h-4" />
+                    <ChevronRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
 
                 <Button
                   size="sm"
                   onClick={() => setReportDate(todayStr)}
-                  className="bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 text-xs font-bold rounded-xl cursor-pointer"
+                  className="bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 text-xs font-bold rounded-xl cursor-pointer py-1 px-3"
                 >
                   Today
                 </Button>
               </div>
             </div>
 
-            {/* 1. Day Overview & Weight Card */}
-            <Card className="p-6 bg-[#0d1424] border border-white/10 rounded-2xl space-y-6 progress-report-card">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] font-mono font-bold uppercase text-emerald-400 tracking-wider">
-                    Daily Physical Snapshot
-                  </span>
-                  <h2 className="text-xl font-display font-black text-white mt-0.5">
-                    {formattedReportDate}
-                  </h2>
-                </div>
-                <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-lg border border-emerald-500/20">
-                  DAILY SYNC
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                <div className="bg-black/30 p-3.5 rounded-xl border border-white/5">
-                  <span className="text-[10px] font-black uppercase text-gray-400 block mb-1">HEIGHT</span>
-                  <span className="text-lg font-display font-black text-white">{heightDisplay}</span>
-                </div>
-                <div className="bg-black/30 p-3.5 rounded-xl border border-white/5">
-                  <span className="text-[10px] font-black uppercase text-gray-400 block mb-1">AGE</span>
-                  <span className="text-lg font-display font-black text-white">{ageDisplay}</span>
-                </div>
-                <div className="bg-black/30 p-3.5 rounded-xl border border-white/5">
-                  <span className="text-[10px] font-black uppercase text-gray-400 block mb-1">PREVIOUS WEIGHT</span>
-                  <span className="text-lg font-display font-black text-gray-300">
-                    {previousWeightEntry ? fmtWeight(previousWeightEntry.weight) : (userProfile?.weight ? fmtWeight(userProfile.weight) : '—')}
-                  </span>
-                  {previousWeightEntry && (
-                    <span className="text-[10px] font-mono text-gray-500 block truncate mt-0.5">{previousWeightEntry.date}</span>
-                  )}
-                </div>
-                <div className="bg-black/30 p-3.5 rounded-xl border border-white/5">
-                  <span className="text-[10px] font-black uppercase text-gray-400 block mb-1">RECORDED WEIGHT</span>
-                  <span className="text-lg font-display font-black text-emerald-400">
-                    {fmtWeight(targetDayLog?.weight || latestDayWeight || null)}
-                  </span>
-                  {weightDeltaText && (
-                    <span className={cn(
-                      "text-[10px] font-mono font-bold block mt-0.5",
-                      (weightDeltaFromPrevious || 0) <= 0 ? "text-emerald-400" : "text-amber-400"
-                    )}>
-                      {weightDeltaText}
+            {/* HIGH-DENSITY 2-COLUMN SINGLE PAGE GRID */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 progress-report-grid">
+              
+              {/* LEFT COLUMN: Physical Snapshot, Habits, Badges */}
+              <div className="md:col-span-5 space-y-3">
+                {/* 1. Day Overview & Weight Card */}
+                <Card className="p-4 bg-[#0d1424] border border-white/10 rounded-2xl space-y-3 progress-report-card">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                    <div>
+                      <span className="text-[9px] font-mono font-bold uppercase text-emerald-400 tracking-wider block">
+                        Daily Physical Snapshot
+                      </span>
+                      <h2 className="text-base font-display font-black text-white">
+                        {formattedReportDate}
+                      </h2>
+                    </div>
+                    <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20">
+                      DAILY SYNC
                     </span>
-                  )}
-                </div>
-                <div className="bg-black/30 p-3.5 rounded-xl border border-white/5">
-                  <span className="text-[10px] font-black uppercase text-gray-400 block mb-1">GOAL WEIGHT</span>
-                  <span className="text-lg font-display font-black text-white">{goalWeightDisplay}</span>
-                </div>
-              </div>
-            </Card>
-
-            {/* 2. XP Level & Earned Badges Banner */}
-            <Card className="p-6 bg-[#0d1424] border border-white/10 rounded-2xl space-y-4 progress-report-card">
-              <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                    <Award className="w-5 h-5" />
                   </div>
-                  <div>
-                    <h3 className="text-base font-display font-black text-white">XP Level & Earned Badges</h3>
-                    <p className="text-xs text-gray-400">Level status and achievements unlocked</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className="text-xs font-bold text-emerald-400 block">Lvl {levelInfo.level} · {levelInfo.title}</span>
-                  <span className="text-[10px] font-mono text-gray-400">{userProfile?.xp || 0} Total XP</span>
-                </div>
-              </div>
 
-              {/* Badges List */}
-              <div className="space-y-2">
-                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-gray-400 block">
-                  EARNED ACCOMPLISHMENT BADGES
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {earnedBadgesList.length > 0 ? (
-                    earnedBadgesList.map((badge, idx) => (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-black/30 p-2.5 rounded-xl border border-white/5">
+                      <span className="text-[9px] font-black uppercase text-gray-400 block mb-0.5">HEIGHT</span>
+                      <span className="text-sm font-display font-black text-white">{heightDisplay}</span>
+                    </div>
+                    <div className="bg-black/30 p-2.5 rounded-xl border border-white/5">
+                      <span className="text-[9px] font-black uppercase text-gray-400 block mb-0.5">AGE</span>
+                      <span className="text-sm font-display font-black text-white">{ageDisplay}</span>
+                    </div>
+                    <div className="bg-black/30 p-2.5 rounded-xl border border-white/5 col-span-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-[9px] font-black uppercase text-gray-400 block">RECORDED WEIGHT</span>
+                          <span className="text-base font-display font-black text-emerald-400">
+                            {fmtWeight(targetDayLog?.weight || latestDayWeight || null)}
+                          </span>
+                        </div>
+                        {weightDeltaText && (
+                          <span className={cn(
+                            "text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border",
+                            (weightDeltaFromPrevious || 0) <= 0 
+                              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
+                              : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                          )}>
+                            {weightDeltaText}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="bg-black/30 p-2 rounded-xl border border-white/5">
+                      <span className="text-[9px] font-black uppercase text-gray-400 block mb-0.5">PREVIOUS W</span>
+                      <span className="text-xs font-display font-bold text-gray-300">
+                        {previousWeightEntry ? fmtWeight(previousWeightEntry.weight) : (userProfile?.weight ? fmtWeight(userProfile.weight) : '—')}
+                      </span>
+                    </div>
+                    <div className="bg-black/30 p-2 rounded-xl border border-white/5">
+                      <span className="text-[9px] font-black uppercase text-gray-400 block mb-0.5">GOAL WEIGHT</span>
+                      <span className="text-xs font-display font-bold text-white">{goalWeightDisplay}</span>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* 2. Habit & Compliance Dashboard */}
+                <Card className="p-4 bg-[#0d1424] border border-white/10 rounded-2xl space-y-3 progress-report-card">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      <h3 className="text-sm font-display font-black text-white">Habit & Compliance</h3>
+                    </div>
+                    <span className="text-xs font-display font-black text-emerald-400">{dayHabitsCompliancePct}%</span>
+                  </div>
+
+                  {/* Habit Progress */}
+                  <div className="p-2.5 bg-black/40 border border-emerald-500/20 rounded-xl space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-emerald-400">
+                        HABIT SCORE
+                      </span>
+                      <span className="font-mono font-bold text-white text-xs">
+                        {completedHabitsCount} / {dayHabitItems.length}
+                      </span>
+                    </div>
+                    <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden">
                       <div 
-                        key={idx}
-                        className="p-3 bg-black/40 border border-emerald-500/30 rounded-xl flex items-center gap-3"
-                      >
-                        <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-lg shrink-0">
-                          <Award className="w-4 h-4" />
+                        className="bg-emerald-400 h-full rounded-full transition-all" 
+                        style={{ width: `${dayHabitsCompliancePct}%` }} 
+                      />
+                    </div>
+                  </div>
+
+                  {/* 4 Compliance Metrics */}
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Hydration */}
+                    <div className="p-2 bg-black/30 border border-white/5 rounded-lg space-y-1">
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="font-black text-gray-400 flex items-center gap-1">
+                          <Droplets className="w-3 h-3 text-cyan-400" /> Water
+                        </span>
+                        <span className="font-mono font-bold text-cyan-400">
+                          {targetDayLog?.water || 0} ml
+                        </span>
+                      </div>
+                      <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
+                        <div 
+                          className="bg-cyan-400 h-full rounded-full" 
+                          style={{ width: `${Math.min(100, Math.round(((targetDayLog?.water || 0) / (targetDayLog?.waterGoal || 3000)) * 100))}%` }} 
+                        />
+                      </div>
+                    </div>
+
+                    {/* Steps */}
+                    <div className="p-2 bg-black/30 border border-white/5 rounded-lg space-y-1">
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="font-black text-gray-400 flex items-center gap-1">
+                          <Footprints className="w-3 h-3 text-emerald-400" /> Steps
+                        </span>
+                        <span className="font-mono font-bold text-emerald-400">
+                          {(targetDayLog?.steps || 0).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
+                        <div 
+                          className="bg-emerald-400 h-full rounded-full" 
+                          style={{ width: `${Math.min(100, Math.round(((targetDayLog?.steps || 0) / (targetDayLog?.stepGoal || 10000)) * 100))}%` }} 
+                        />
+                      </div>
+                    </div>
+
+                    {/* Sleep */}
+                    <div className="p-2 bg-black/30 border border-white/5 rounded-lg space-y-1">
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="font-black text-gray-400 flex items-center gap-1">
+                          <Moon className="w-3 h-3 text-purple-400" /> Sleep
+                        </span>
+                        <span className="font-mono font-bold text-purple-400">
+                          {targetDayLog?.sleepHours || 0} hrs
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Meals */}
+                    <div className="p-2 bg-black/30 border border-white/5 rounded-lg space-y-1">
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="font-black text-gray-400 flex items-center gap-1">
+                          <Utensils className="w-3 h-3 text-amber-400" /> Meals
+                        </span>
+                        <span className="font-mono font-bold text-amber-400">
+                          {(targetDayLog?.meals || []).filter(m => m.completed).length}/{(targetDayLog?.meals || []).length || 4}
+                        </span>
+                      </div>
+                      <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
+                        <div 
+                          className="bg-amber-400 h-full rounded-full" 
+                          style={{ width: `${Math.min(100, Math.round((((targetDayLog?.meals || []).filter(m => m.completed).length) / Math.max(1, (targetDayLog?.meals || []).length || 4)) * 100))}%` }} 
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* 3. XP Level & Earned Badges */}
+                <Card className="p-4 bg-[#0d1424] border border-white/10 rounded-2xl space-y-2.5 progress-report-card">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                    <div className="flex items-center gap-2">
+                      <Award className="w-4 h-4 text-amber-400" />
+                      <h3 className="text-sm font-display font-black text-white">Level & Badges</h3>
+                    </div>
+                    <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                      Lvl {levelInfo.level} · {levelInfo.title}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5">
+                    {earnedBadgesList.length > 0 ? (
+                      earnedBadgesList.map((badge, idx) => (
+                        <div 
+                          key={idx}
+                          className="px-2.5 py-1 bg-black/40 border border-emerald-500/30 rounded-lg flex items-center gap-1.5 text-xs"
+                        >
+                          <Award className="w-3 h-3 text-emerald-400 shrink-0" />
+                          <span className="font-bold text-white text-[11px]">{badge.title}</span>
+                          <span className="text-[9px] font-mono text-emerald-400 uppercase font-bold">{badge.tier}</span>
                         </div>
-                        <div className="min-w-0">
-                          <span className="text-xs font-bold text-white block truncate">{badge.title}</span>
-                          <span className="text-[10px] font-mono text-emerald-400 font-bold block">{badge.tier} Tier</span>
+                      ))
+                    ) : (
+                      <p className="text-[10px] text-gray-400 font-mono italic py-1">
+                        No badges unlocked on record for this date yet.
+                      </p>
+                    )}
+                  </div>
+                </Card>
+              </div>
+
+              {/* RIGHT COLUMN: Exercises Performed */}
+              <div className="md:col-span-7 space-y-3">
+                <Card className="p-4 bg-[#0d1424] border border-white/10 rounded-2xl space-y-3 progress-report-card">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-2 flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <Dumbbell className="w-4 h-4 text-cyan-400" />
+                      <div>
+                        <h3 className="text-sm font-display font-black text-white">Exercises Performed</h3>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {/* Weight Unit Toggle */}
+                      <div className="flex items-center gap-1 bg-black/40 border border-white/10 p-0.5 rounded-lg no-print">
+                        <button
+                          type="button"
+                          onClick={() => setExerciseWeightUnit('lbs')}
+                          className={cn(
+                            "px-2 py-0.5 rounded text-[9px] font-black uppercase transition-all cursor-pointer",
+                            exerciseWeightUnit === 'lbs' ? "bg-emerald-500 text-black font-bold" : "text-gray-400"
+                          )}
+                        >
+                          lbs
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setExerciseWeightUnit('kg')}
+                          className={cn(
+                            "px-2 py-0.5 rounded text-[9px] font-black uppercase transition-all cursor-pointer",
+                            exerciseWeightUnit === 'kg' ? "bg-emerald-500 text-black font-bold" : "text-gray-400"
+                          )}
+                        >
+                          kg
+                        </button>
+                      </div>
+
+                      {totalDayExercises > 0 && (
+                        <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
+                          <span className="text-[10px] font-mono font-bold text-emerald-400">
+                            {completedDayExercises}/{totalDayExercises} Done
+                          </span>
+                          <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 font-display font-black text-xs rounded">
+                            {dayExerciseCompletionPct}%
+                          </span>
                         </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {dayExercisesList.length > 0 ? (
+                    <div className="space-y-2">
+                      {dayExercisesList.map((ex, idx) => (
+                        <div key={idx} className="p-2.5 bg-black/40 border border-white/5 rounded-xl space-y-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                              <Dumbbell className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                              {ex.name}
+                            </span>
+                            <span className={cn(
+                              "text-[9px] font-mono font-bold px-2 py-0.5 rounded-full border shrink-0",
+                              ex.completed 
+                                ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" 
+                                : "bg-amber-500/20 text-amber-400 border-amber-500/30"
+                            )}>
+                              {ex.completed ? 'Completed ✓' : 'In Progress'}
+                            </span>
+                          </div>
+
+                          {ex.setRows && ex.setRows.length > 0 ? (
+                            <div className="flex flex-wrap gap-1.5">
+                              {ex.setRows.map((sr, sIdx) => {
+                                const showWeight = hasValidWeight(sr.weight, ex.name);
+                                return (
+                                  <div key={sIdx} className="bg-white/5 px-2 py-1 rounded-md border border-white/5 text-[10px] font-mono">
+                                    <span className="text-gray-400">Set {sIdx + 1}: </span>
+                                    <span className="text-white font-bold">
+                                      {formatRepsLabel(sr.reps)}
+                                      {showWeight ? ` @ ${formatExerciseWeight(sr.weight, exerciseWeightUnit)}` : ''}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <p className="text-[10px] text-gray-300 font-mono">
+                              {ex.sets || '3'} sets × {ex.reps || '10'} reps
+                              {hasValidWeight(ex.weight, ex.name) ? ` · ${formatExerciseWeight(ex.weight, exerciseWeightUnit)}` : ''}
+                            </p>
+                          )}
+
+                          {ex.notes && (
+                            <p className="text-[10px] text-gray-400 italic bg-white/5 px-2 py-1 rounded border border-white/5">
+                              "{ex.notes}"
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-black/20 border border-white/5 rounded-xl text-center space-y-1">
+                      <p className="text-xs font-bold text-gray-300">Rest / Recovery Day</p>
+                      <p className="text-[10px] text-gray-500 font-mono">No exercises recorded or scheduled for this date.</p>
+                    </div>
+                  )}
+                </Card>
+              </div>
+
+            </div>
+          </div>
+        ) : (
+          /* MULTI-DAY / FULL TIMEFRAME HIGH-DENSITY 2-COLUMN VIEW */
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-3 progress-report-grid">
+            
+            {/* LEFT COLUMN: Physical Profile, Measurements, Habits, Badges */}
+            <div className="md:col-span-5 space-y-3">
+              
+              {/* Physical Profile & Net Weight */}
+              <Card className="p-4 bg-[#0d1424] border border-white/10 rounded-2xl space-y-3 progress-report-card">
+                <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                  <h2 className="text-sm font-display font-black text-white">Physical Profile & Weight</h2>
+                  <span className="text-[9px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                    WEIGH LOG SYNCED
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-2 bg-black/30 rounded-xl border border-white/5">
+                    <span className="text-[9px] font-black uppercase text-gray-400 block mb-0.5">HEIGHT</span>
+                    <span className="text-sm font-display font-black text-white">{heightDisplay}</span>
+                  </div>
+                  <div className="p-2 bg-black/30 rounded-xl border border-white/5">
+                    <span className="text-[9px] font-black uppercase text-gray-400 block mb-0.5">AGE</span>
+                    <span className="text-sm font-display font-black text-white">{ageDisplay}</span>
+                  </div>
+                  <div className="p-2 bg-black/30 rounded-xl border border-white/5">
+                    <span className="text-[9px] font-black uppercase text-gray-400 block mb-0.5">START WEIGHT</span>
+                    <span className="text-xs font-display font-black text-gray-300">{startWeightDisplay}</span>
+                  </div>
+                  <div className="p-2 bg-black/30 rounded-xl border border-white/5">
+                    <span className="text-[9px] font-black uppercase text-gray-400 block mb-0.5">CURRENT WEIGHT</span>
+                    <span className="text-xs font-display font-black text-white">{currentWeightDisplay}</span>
+                  </div>
+                </div>
+
+                {/* Net Change Bar */}
+                <div className="p-2.5 bg-black/40 border border-white/5 rounded-xl flex items-center justify-between">
+                  <span className="text-[9px] font-black uppercase tracking-wider text-gray-400">NET CHANGE</span>
+                  <div className="flex items-center gap-2">
+                    <span className={cn(
+                      "text-sm font-display font-black",
+                      netWeightChangeDisplay === '—' ? "text-gray-400" : isWeightDeltaPositive ? "text-emerald-400" : "text-red-400"
+                    )}>
+                      {netWeightChangeDisplay}
+                    </span>
+                    <span className="text-[10px] text-gray-400 italic">{weightTrendNote}</span>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Body Measurements */}
+              <Card className="p-4 bg-[#0d1424] border border-white/10 rounded-2xl space-y-2 progress-report-card">
+                <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                  <h2 className="text-sm font-display font-black text-white">Body Measurements</h2>
+                  <span className="text-[9px] font-mono text-gray-400">({unitSystem === 'metric' ? 'cm' : 'in'})</span>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {measurementSites.map(site => (
+                    <div key={site.key} className="p-1.5 bg-black/30 border border-white/5 rounded-lg text-center">
+                      <span className="text-[8px] font-black uppercase text-gray-400 block">{site.label}</span>
+                      <span className="text-xs font-bold text-white block mt-0.5">{getMeasurementVal(site.key)}</span>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+
+              {/* Habit & Compliance Summary */}
+              <Card className="p-4 bg-[#0d1424] border border-white/10 rounded-2xl space-y-2 progress-report-card">
+                <h2 className="text-sm font-display font-black text-white border-b border-white/10 pb-2">Compliance Summary</h2>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-2 bg-black/30 border border-white/5 rounded-xl space-y-1">
+                    <span className="text-[9px] font-black uppercase text-gray-400 block">WORKOUTS</span>
+                    <span className="text-xs font-display font-black text-white block">{workoutSetsDisplay}</span>
+                    <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
+                      <div className="bg-amber-400 h-full rounded-full" style={{ width: `${Math.min(100, workoutCompletionPct)}%` }} />
+                    </div>
+                  </div>
+                  <div className="p-2 bg-black/30 border border-white/5 rounded-xl space-y-1">
+                    <span className="text-[9px] font-black uppercase text-gray-400 block">HABITS</span>
+                    <span className="text-xs font-display font-black text-white block">{habitCompliancePct}%</span>
+                    <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
+                      <div className="bg-emerald-400 h-full rounded-full" style={{ width: `${Math.min(100, habitCompliancePct)}%` }} />
+                    </div>
+                  </div>
+                  <div className="p-2 bg-black/30 border border-white/5 rounded-xl space-y-1 col-span-2">
+                    <span className="text-[9px] font-black uppercase text-gray-400 block">DAILY AVERAGES</span>
+                    <span className="text-xs font-bold text-white block">{avgStepsDisplay} · {avgWaterDisplay}</span>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Badges Display */}
+              <Card className="p-4 bg-[#0d1424] border border-white/10 rounded-2xl space-y-2 progress-report-card">
+                <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                  <h2 className="text-sm font-display font-black text-white">Badges & XP</h2>
+                  <span className="text-[10px] font-bold text-emerald-400 font-mono">Lvl {levelInfo.level}</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {badgesList.length > 0 ? (
+                    badgesList.map((badge, idx) => (
+                      <div key={idx} className="px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold flex items-center gap-1">
+                        <Award className="w-3 h-3" />
+                        <span>{badge}</span>
                       </div>
                     ))
                   ) : (
-                    <p className="text-xs text-gray-400 font-mono italic col-span-full py-2">
-                      No badges unlocked on record for this date yet. Keep logging sessions to unlock tiers!
-                    </p>
+                    <p className="text-[10px] text-gray-500 font-mono">No badges logged yet.</p>
                   )}
                 </div>
-              </div>
-            </Card>
+              </Card>
 
-            {/* 3. Exercises Performed Card */}
-            <Card className="p-6 bg-[#0d1424] border border-white/10 rounded-2xl space-y-4 progress-report-card">
-              <div className="flex items-center justify-between border-b border-white/10 pb-4 flex-wrap gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
-                    <Dumbbell className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-display font-black text-white">Exercises Performed</h3>
-                    <p className="text-xs text-gray-400">Detailed workout log for {formattedReportDate}</p>
-                  </div>
+            </div>
+
+            {/* RIGHT COLUMN: Progression Tables */}
+            <div className="md:col-span-7 space-y-3">
+              
+              {/* Main Exercise Progression */}
+              <Card className="p-4 bg-[#0d1424] border border-white/10 rounded-2xl space-y-3 progress-report-card">
+                <div>
+                  <h2 className="text-sm font-display font-black text-white">Main Exercise Progression</h2>
+                  <p className="text-[10px] text-gray-400">Initial vs. latest logged weight for top main lifts.</p>
                 </div>
 
-                <div className="flex items-center gap-3 flex-wrap">
-                  {/* Weight Unit Toggle for Exercises */}
-                  <div className="flex items-center gap-1 bg-black/40 border border-white/10 p-1 rounded-xl no-print">
-                    <button
-                      type="button"
-                      onClick={() => setExerciseWeightUnit('lbs')}
-                      className={cn(
-                        "px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer",
-                        exerciseWeightUnit === 'lbs'
-                          ? "bg-emerald-500 text-black shadow-sm font-bold"
-                          : "text-gray-400 hover:text-white"
-                      )}
-                    >
-                      lbs
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setExerciseWeightUnit('kg')}
-                      className={cn(
-                        "px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer",
-                        exerciseWeightUnit === 'kg'
-                          ? "bg-emerald-500 text-black shadow-sm font-bold"
-                          : "text-gray-400 hover:text-white"
-                      )}
-                    >
-                      kgs
-                    </button>
+                {exerciseRows.length > 0 ? (
+                  <div className="overflow-x-auto rounded-xl border border-white/5">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="bg-[#131d30] text-gray-400 font-black uppercase text-[9px] tracking-wider border-b border-white/10">
+                          <th className="py-2 px-3">EXERCISE</th>
+                          <th className="py-2 px-3">START</th>
+                          <th className="py-2 px-3">LATEST</th>
+                          <th className="py-2 px-3">DIFF</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {exerciseRows.map((row, idx) => (
+                          <tr key={idx} className="hover:bg-white/[0.02]">
+                            <td className="py-2 px-3 font-bold text-white text-[11px]">{row.exercise}</td>
+                            <td className="py-2 px-3 text-gray-300 font-mono text-[11px]">{row.start}</td>
+                            <td className="py-2 px-3 text-gray-300 font-mono text-[11px]">{row.latest}</td>
+                            <td className={cn(
+                              "py-2 px-3 font-bold font-mono text-[11px]",
+                              row.isGain ? "text-emerald-400" : "text-red-400"
+                            )}>
+                              {row.diffFormatted}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-
-                  {totalDayExercises > 0 && (
-                    <div className="flex items-center gap-3 bg-black/40 border border-emerald-500/20 px-3.5 py-1.5 rounded-xl">
-                      <div className="text-right">
-                        <span className="text-xs font-mono font-bold text-emerald-400 block">
-                          {completedDayExercises} / {totalDayExercises} Completed
-                        </span>
-                        <span className="text-[10px] font-mono text-gray-400 block">
-                          Workout Score
-                        </span>
-                      </div>
-                      <div className="px-2.5 py-1 bg-emerald-500/20 text-emerald-400 font-display font-black text-lg rounded-lg border border-emerald-500/30">
-                        {dayExerciseCompletionPct}%
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {totalDayExercises > 0 && (
-                <div className="space-y-1">
-                  <div className="w-full bg-white/10 h-2.5 rounded-full overflow-hidden">
-                    <div 
-                      className="bg-emerald-400 h-full rounded-full transition-all duration-300" 
-                      style={{ width: `${dayExerciseCompletionPct}%` }} 
-                    />
-                  </div>
-                </div>
-              )}
-
-              {dayExercisesList.length > 0 ? (
-                <div className="space-y-3 pt-1">
-                  {dayExercisesList.map((ex, idx) => (
-                    <div key={idx} className="p-4 bg-black/40 border border-white/5 rounded-xl space-y-2">
-                      <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <span className="text-sm font-bold text-white flex items-center gap-2">
-                          <Dumbbell className="w-4 h-4 text-emerald-400" />
-                          {ex.name}
-                        </span>
-                        <span className={cn(
-                          "text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full border",
-                          ex.completed 
-                            ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" 
-                            : "bg-amber-500/20 text-amber-400 border-amber-500/30"
-                        )}>
-                          {ex.completed ? 'Completed ✓' : 'In Progress'}
-                        </span>
-                      </div>
-
-                      {ex.setRows && ex.setRows.length > 0 ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-                          {ex.setRows.map((sr, sIdx) => {
-                            const showWeight = hasValidWeight(sr.weight, ex.name);
-                            return (
-                              <div key={sIdx} className="bg-white/5 px-2.5 py-1.5 rounded-lg border border-white/5 text-xs font-mono">
-                                <span className="text-gray-400 text-[10px] block">Set {sIdx + 1}</span>
-                                <span className="text-white font-bold">
-                                  {formatRepsLabel(sr.reps)}
-                                  {showWeight ? ` @ ${formatExerciseWeight(sr.weight, exerciseWeightUnit)}` : ''}
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <p className="text-xs text-gray-300 font-mono">
-                          {ex.sets || '3'} prescribed sets x {ex.reps || '10'} reps
-                          {hasValidWeight(ex.weight, ex.name) ? ` · ${formatExerciseWeight(ex.weight, exerciseWeightUnit)}` : ''}
-                        </p>
-                      )}
-
-                      {ex.notes && (
-                        <p className="text-xs text-gray-400 italic bg-white/5 p-2 rounded-lg border border-white/5">
-                          "{ex.notes}"
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="p-6 bg-black/20 border border-white/5 rounded-xl text-center space-y-1">
-                  <p className="text-sm font-bold text-gray-300">Rest / Recovery Day</p>
-                  <p className="text-xs text-gray-500 font-mono">No exercises recorded or scheduled for this date.</p>
-                </div>
-              )}
-            </Card>
-
-            {/* 4. Habit & Compliance Dashboard */}
-            <Card className="p-6 bg-[#0d1424] border border-white/10 rounded-2xl space-y-6 progress-report-card">
-              <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                    <CheckCircle2 className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-display font-black text-white">Habit & Compliance Dashboard</h3>
-                    <p className="text-xs text-gray-400">Daily checklist and compliance metric breakdown</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className="text-lg font-display font-black text-emerald-400">{dayHabitsCompliancePct}%</span>
-                  <span className="text-[10px] font-mono text-gray-400 block">Day Compliance</span>
-                </div>
-              </div>
-
-              {/* Habit Score Card */}
-              <div className="p-5 bg-black/40 border border-emerald-500/20 rounded-2xl space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-400 block">
-                      DAILY HABIT SCORE
-                    </span>
-                    <span className="text-2xl font-display font-black text-white">
-                      {completedHabitsCount} / {dayHabitItems.length} <span className="text-sm font-bold text-gray-400">Complete</span>
-                    </span>
-                  </div>
-                  <div className="px-3.5 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-center">
-                    <span className="text-xl font-display font-black text-emerald-400">{dayHabitsCompliancePct}%</span>
-                    <span className="text-[10px] font-mono text-gray-400 block">Score</span>
-                  </div>
-                </div>
-
-                <div className="w-full bg-white/10 h-3 rounded-full overflow-hidden">
-                  <div 
-                    className="bg-emerald-400 h-full rounded-full transition-all duration-300" 
-                    style={{ width: `${dayHabitsCompliancePct}%` }} 
-                  />
-                </div>
-              </div>
-
-              {/* Compliance Metrics Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
-                {/* Hydration */}
-                <div className="p-4 bg-black/40 border border-white/5 rounded-xl space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase text-gray-400 flex items-center gap-1">
-                      <Droplets className="w-3.5 h-3.5 text-cyan-400" /> Hydration
-                    </span>
-                    <span className="text-xs font-mono font-bold text-cyan-400">
-                      {targetDayLog?.water || 0} / {targetDayLog?.waterGoal || 3000} ml
-                    </span>
-                  </div>
-                  <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden">
-                    <div 
-                      className="bg-cyan-400 h-full rounded-full" 
-                      style={{ width: `${Math.min(100, Math.round(((targetDayLog?.water || 0) / (targetDayLog?.waterGoal || 3000)) * 100))}%` }} 
-                    />
-                  </div>
-                </div>
-
-                {/* Steps */}
-                <div className="p-4 bg-black/40 border border-white/5 rounded-xl space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase text-gray-400 flex items-center gap-1">
-                      <Footprints className="w-3.5 h-3.5 text-emerald-400" /> Steps
-                    </span>
-                    <span className="text-xs font-mono font-bold text-emerald-400">
-                      {(targetDayLog?.steps || 0).toLocaleString()} / {(targetDayLog?.stepGoal || 10000).toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden">
-                    <div 
-                      className="bg-emerald-400 h-full rounded-full" 
-                      style={{ width: `${Math.min(100, Math.round(((targetDayLog?.steps || 0) / (targetDayLog?.stepGoal || 10000)) * 100))}%` }} 
-                    />
-                  </div>
-                </div>
-
-                {/* Sleep */}
-                <div className="p-4 bg-black/40 border border-white/5 rounded-xl space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase text-gray-400 flex items-center gap-1">
-                      <Moon className="w-3.5 h-3.5 text-purple-400" /> Sleep
-                    </span>
-                    <span className="text-xs font-mono font-bold text-purple-400">
-                      {targetDayLog?.sleepHours || 0} hrs
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-gray-400 font-mono truncate">
-                    Quality: {targetDayLog?.sleepQuality ? `${targetDayLog.sleepQuality}/5` : 'Not rated'}
-                  </p>
-                </div>
-
-                {/* Meals */}
-                <div className="p-4 bg-black/40 border border-white/5 rounded-xl space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase text-gray-400 flex items-center gap-1">
-                      <Utensils className="w-3.5 h-3.5 text-amber-400" /> Meals
-                    </span>
-                    <span className="text-xs font-mono font-bold text-amber-400">
-                      {(targetDayLog?.meals || []).filter(m => m.completed).length} / {(targetDayLog?.meals || []).length || 4} Logged
-                    </span>
-                  </div>
-                  <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden">
-                    <div 
-                      className="bg-amber-400 h-full rounded-full" 
-                      style={{ width: `${Math.min(100, Math.round((((targetDayLog?.meals || []).filter(m => m.completed).length) / Math.max(1, (targetDayLog?.meals || []).length || 4)) * 100))}%` }} 
-                    />
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </div>
-        ) : (
-          <>
-
-        {/* 2. SECTION A: PHYSICAL PROFILE & WEIGHT OVERVIEW */}
-        <Card className="p-6 bg-[#0d1424] border border-white/10 rounded-2xl space-y-6 progress-report-card">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-display font-black text-white">Physical Profile & Weight Overview</h2>
-            <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
-              WEIGH LOG SYNCED
-            </span>
-          </div>
-
-          {/* 5 Stats in a row */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 pb-6 border-b border-white/5">
-            <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">HEIGHT</span>
-              <span className="text-xl sm:text-2xl font-display font-black text-white">{heightDisplay}</span>
-            </div>
-            <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">AGE</span>
-              <span className="text-xl sm:text-2xl font-display font-black text-white">{ageDisplay}</span>
-            </div>
-            <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">START WEIGHT</span>
-              <span className="text-xl sm:text-2xl font-display font-black text-gray-300">{startWeightDisplay}</span>
-            </div>
-            <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">CURRENT WEIGHT</span>
-              <span className="text-xl sm:text-2xl font-display font-black text-white">{currentWeightDisplay}</span>
-            </div>
-            <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block mb-1">GOAL WEIGHT</span>
-              <span className="text-xl sm:text-2xl font-display font-black text-white">{goalWeightDisplay}</span>
-            </div>
-          </div>
-
-          {/* Net Weight Change */}
-          <div className="space-y-1">
-            <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block">NET WEIGHT CHANGE</span>
-            <div className="flex items-baseline gap-3">
-              <span className={cn(
-                "text-2xl sm:text-3xl font-display font-black",
-                netWeightChangeDisplay === '—' 
-                  ? "text-gray-400" 
-                  : isWeightDeltaPositive 
-                    ? "text-emerald-400" 
-                    : "text-red-400"
-              )}>
-                {netWeightChangeDisplay}
-              </span>
-              <span className="text-xs text-gray-400 font-medium">{weightTrendNote}</span>
-            </div>
-          </div>
-
-          {/* Weigh Log Progression Table if entries exist */}
-          {sortedWeighLogsList.length > 0 && (
-            <div className="pt-4 border-t border-white/5 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-black uppercase tracking-wider text-gray-300">Weigh-In Log History Comparison</span>
-                <span className="text-[10px] font-mono text-gray-400">{sortedWeighLogsList.length} weigh-ins recorded</span>
-              </div>
-
-              <div className="overflow-x-auto rounded-xl border border-white/5">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="bg-[#131d30] text-gray-400 font-black uppercase text-[10px] tracking-wider border-b border-white/10">
-                      <th className="py-2.5 px-3">DATE</th>
-                      <th className="py-2.5 px-3">WEIGHT LOGGED</th>
-                      <th className="py-2.5 px-3">VS START WEIGHT</th>
-                      <th className="py-2.5 px-3">SOURCE</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {sortedWeighLogsList.slice(0, 10).map((entry, idx) => (
-                      <tr key={idx} className="hover:bg-white/[0.02]">
-                        <td className="py-2.5 px-3 font-mono font-bold text-gray-200">{entry.date}</td>
-                        <td className="py-2.5 px-3 font-mono font-bold text-white">{fmtWeight(entry.weight)}</td>
-                        <td className={cn(
-                          "py-2.5 px-3 font-mono font-bold",
-                          entry.delta < 0 ? "text-emerald-400" : entry.delta > 0 ? "text-amber-400" : "text-gray-400"
-                        )}>
-                          {fmtWeightDelta(entry.delta)}
-                        </td>
-                        <td className="py-2.5 px-3 text-[10px] font-mono text-gray-400">{entry.source}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </Card>
-
-        {/* 3. SECTION B: BODY MEASUREMENTS */}
-        <Card className="p-6 bg-[#0d1424] border border-white/10 rounded-2xl space-y-4 progress-report-card">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div>
-              <h2 className="text-lg font-display font-black text-white">Body Measurements</h2>
-              <p className="text-xs text-gray-400">Latest recorded values ({unitSystem === 'metric' ? 'cm' : 'in'}).</p>
-            </div>
-            <div className="flex items-center gap-1 bg-black/40 border border-white/10 p-1 rounded-xl no-print">
-              <button
-                onClick={() => setUnitSystem('imperial')}
-                className={cn(
-                  "px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer",
-                  unitSystem === 'imperial'
-                    ? "bg-emerald-500 text-black shadow-sm"
-                    : "text-gray-400 hover:text-white"
-                )}
-              >
-                ft / in
-              </button>
-              <button
-                onClick={() => setUnitSystem('metric')}
-                className={cn(
-                  "px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer",
-                  unitSystem === 'metric'
-                    ? "bg-emerald-500 text-black shadow-sm"
-                    : "text-gray-400 hover:text-white"
-                )}
-              >
-                cm
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
-            {measurementSites.map(site => (
-              <div key={site.key} className="p-3.5 bg-black/30 border border-white/5 rounded-xl space-y-1">
-                <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block">{site.label}</span>
-                <span className="text-base sm:text-lg font-bold text-white block">{getMeasurementVal(site.key)}</span>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        {/* 4. SECTION C: MAIN EXERCISE PROGRESSION */}
-        <Card className="p-6 bg-[#0d1424] border border-white/10 rounded-2xl space-y-4 progress-report-card">
-          <div>
-            <h2 className="text-lg font-display font-black text-white">Main Exercise Progression</h2>
-            <p className="text-xs text-gray-400">Initial vs. latest logged weight for your most-trained main lifts. Warm-ups excluded.</p>
-          </div>
-
-          {exerciseRows.length > 0 ? (
-            <div className="overflow-x-auto rounded-xl border border-white/5">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="bg-[#131d30] text-gray-400 font-black uppercase text-[10px] tracking-wider border-b border-white/10">
-                    <th className="py-3 px-4">EXERCISE</th>
-                    <th className="py-3 px-4">START</th>
-                    <th className="py-3 px-4">LATEST</th>
-                    <th className="py-3 px-4">DIFFERENCE</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {exerciseRows.map((row, idx) => (
-                    <tr key={idx} className="hover:bg-white/[0.02]">
-                      <td className="py-3.5 px-4 font-bold text-white">{row.exercise}</td>
-                      <td className="py-3.5 px-4 text-gray-300 font-mono">{row.start}</td>
-                      <td className="py-3.5 px-4 text-gray-300 font-mono">{row.latest}</td>
-                      <td className={cn(
-                        "py-3.5 px-4 font-bold font-mono",
-                        row.isGain ? "text-emerald-400" : "text-red-400"
-                      )}>
-                        {row.diffFormatted}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p className="text-xs text-gray-400 py-4 font-medium italic">
-              Not enough logged sets yet for this range — log weights on your main lifts to populate this table.
-            </p>
-          )}
-        </Card>
-
-        {/* 5. SECTION D: HABIT & COMPLIANCE DASHBOARD */}
-        <Card className="p-6 bg-[#0d1424] border border-white/10 rounded-2xl space-y-4 progress-report-card">
-          <h2 className="text-lg font-display font-black text-white">Habit & Compliance Dashboard</h2>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Workout Completion */}
-            <div className="p-4 bg-black/30 border border-white/5 rounded-xl space-y-3">
-              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block">WORKOUT COMPLETION</span>
-              <span className="text-xl font-display font-black text-white block">{workoutSetsDisplay}</span>
-              <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden">
-                <div 
-                  className="bg-amber-400 h-full rounded-full transition-all duration-500" 
-                  style={{ width: `${Math.min(100, workoutCompletionPct)}%` }} 
-                />
-              </div>
-            </div>
-
-            {/* Habit Compliance */}
-            <div className="p-4 bg-black/30 border border-white/5 rounded-xl space-y-3">
-              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block">HABIT COMPLIANCE</span>
-              <span className="text-xl font-display font-black text-white block">{habitCompliancePct}%</span>
-              <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden">
-                <div 
-                  className="bg-emerald-400 h-full rounded-full transition-all duration-500" 
-                  style={{ width: `${Math.min(100, habitCompliancePct)}%` }} 
-                />
-              </div>
-            </div>
-
-            {/* Meal Plan Compliance */}
-            <div className="p-4 bg-black/30 border border-white/5 rounded-xl space-y-3">
-              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block">MEAL PLAN COMPLIANCE</span>
-              <span className="text-xl font-display font-black text-white block">{mealCompliancePct}%</span>
-              <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden">
-                <div 
-                  className="bg-cyan-400 h-full rounded-full transition-all duration-500" 
-                  style={{ width: `${Math.min(100, mealCompliancePct)}%` }} 
-                />
-              </div>
-            </div>
-
-            {/* Daily Averages */}
-            <div className="p-4 bg-black/30 border border-white/5 rounded-xl space-y-2">
-              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block">DAILY AVERAGES</span>
-              <div className="space-y-0.5">
-                <span className="text-base font-bold text-white block">{avgStepsDisplay}</span>
-                <span className="text-xs text-gray-300 block font-mono">{avgWaterDisplay} · {avgSleepDisplay}</span>
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        {/* 6. SECTION E: ADDITIONAL GYM HUB DATA */}
-        <Card className="p-6 bg-[#0d1424] border border-white/10 rounded-2xl space-y-4 progress-report-card">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-display font-black text-white">Additional Gym Hub Data</h2>
-
-            <div className="no-print flex items-center gap-2">
-              <button
-                onClick={() => setShowBadges(!showBadges)}
-                className={cn(
-                  "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border cursor-pointer",
-                  showBadges 
-                    ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40" 
-                    : "bg-white/5 text-gray-500 border-white/5"
-                )}
-              >
-                Badges
-              </button>
-
-              {!isClientReport && (
-                <button
-                  onClick={() => setShowXpAndLevel(!showXpAndLevel)}
-                  className={cn(
-                    "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border cursor-pointer",
-                    showXpAndLevel 
-                      ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40" 
-                      : "bg-white/5 text-gray-500 border-white/5"
-                  )}
-                >
-                  XP & Level
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            {/* Badges Display */}
-            {showBadges && (
-              <div className="flex flex-wrap gap-2.5">
-                {badgesList.length > 0 ? (
-                  badgesList.map((badge, idx) => (
-                    <div 
-                      key={idx}
-                      className="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold flex items-center gap-2"
-                    >
-                      <Award className="w-3.5 h-3.5" />
-                      <span>{badge}</span>
-                    </div>
-                  ))
                 ) : (
-                  <p className="text-xs text-gray-500 font-mono">No badges earned in this range yet.</p>
+                  <p className="text-[10px] text-gray-400 py-2 font-medium italic">
+                    Log weight on your main lifts to populate progress.
+                  </p>
                 )}
-              </div>
-            )}
+              </Card>
 
-            {/* XP & Level Display (Hidden for Client view) */}
-            {showXpAndLevel && !isClientReport && (
-              <div className="p-4 bg-black/30 border border-white/5 rounded-xl flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center font-display font-black text-emerald-400 text-sm">
-                    Lvl {levelInfo.level}
+              {/* Weigh-In History Table */}
+              {sortedWeighLogsList.length > 0 && (
+                <Card className="p-4 bg-[#0d1424] border border-white/10 rounded-2xl space-y-3 progress-report-card">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                    <span className="text-xs font-black uppercase tracking-wider text-gray-200">Weigh-In History Log</span>
+                    <span className="text-[10px] font-mono text-gray-400">{sortedWeighLogsList.length} recorded</span>
                   </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-white">{levelInfo.title}</h4>
-                    <p className="text-xs text-gray-400">{userProfile?.xp || 0} Total XP</p>
-                  </div>
-                </div>
 
-                <div className="text-right">
-                  <span className="text-xs text-emerald-400 font-bold block">{levelInfo.xpToNext} XP to Level {levelInfo.level + 1}</span>
-                  <span className="text-[10px] text-gray-500">Keep logging to level up!</span>
-                </div>
-              </div>
-            )}
+                  <div className="overflow-x-auto rounded-xl border border-white/5">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="bg-[#131d30] text-gray-400 font-black uppercase text-[9px] tracking-wider border-b border-white/10">
+                          <th className="py-2 px-3">DATE</th>
+                          <th className="py-2 px-3">WEIGHT</th>
+                          <th className="py-2 px-3">VS START</th>
+                          <th className="py-2 px-3">SOURCE</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {sortedWeighLogsList.slice(0, 8).map((entry, idx) => (
+                          <tr key={idx} className="hover:bg-white/[0.02]">
+                            <td className="py-2 px-3 font-mono font-bold text-gray-200 text-[11px]">{entry.date}</td>
+                            <td className="py-2 px-3 font-mono font-bold text-white text-[11px]">{fmtWeight(entry.weight)}</td>
+                            <td className={cn(
+                              "py-2 px-3 font-mono font-bold text-[11px]",
+                              entry.delta < 0 ? "text-emerald-400" : entry.delta > 0 ? "text-amber-400" : "text-gray-400"
+                            )}>
+                              {fmtWeightDelta(entry.delta)}
+                            </td>
+                            <td className="py-2 px-3 text-[9px] font-mono text-gray-400">{entry.source}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              )}
+
+            </div>
+
           </div>
-        </Card>
-      </>
-    )}
+        )}
 
       </div>
     </div>
