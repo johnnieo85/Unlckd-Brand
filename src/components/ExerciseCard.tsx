@@ -56,18 +56,28 @@ export function ExerciseCard({
   const allSetRowsCompleted = setRows.length > 0 && setRows.every(sr => !!sr.completed);
   const isCompleted = exerciseData?.completed || allSetRowsCompleted;
 
+  const isUnweighted = (() => {
+    const n = name.toLowerCase();
+    return section === 'warmUp' || /stretch|mobility|foam roll|warmup|warm-up|plank|push up|pushup|pull up|pullup|chin up|chinup|bodyweight|yoga|dog|cat cow|jumping|lunges|jumping jack|air squat|crunch|sit up|situp|hanging leg|dip|hollow|walk|run|cardio/i.test(n);
+  })();
+
   // Format last performance string if available
   const lastPerfText = (() => {
     if (!lastPerformance) return null;
     if (typeof lastPerformance === 'string') return lastPerformance;
     if (lastPerformance.setRows && lastPerformance.setRows.length > 0) {
       const lastSet = lastPerformance.setRows[lastPerformance.setRows.length - 1];
-      if (lastSet.weight || lastSet.reps) {
-        return `${lastSet.weight ? lastSet.weight + ' ' + measurementUnits.weight : ''} ${lastSet.reps ? '× ' + lastSet.reps + ' reps' : ''}`.trim();
+      const hasW = lastSet.weight !== undefined && lastSet.weight !== null && lastSet.weight !== '' && parseFloat(String(lastSet.weight)) > 0;
+      if (hasW || lastSet.reps) {
+        return `${hasW ? lastSet.weight + ' ' + measurementUnits.weight + ' × ' : ''}${lastSet.reps ? lastSet.reps : ''}`.trim();
       }
     }
-    if (lastPerformance.weight) {
+    const hasW = lastPerformance.weight !== undefined && lastPerformance.weight !== null && lastPerformance.weight !== '' && parseFloat(String(lastPerformance.weight)) > 0;
+    if (hasW) {
       return `${lastPerformance.weight} ${measurementUnits.weight}${lastPerformance.reps ? ' × ' + lastPerformance.reps : ''}`;
+    }
+    if (lastPerformance.reps) {
+      return `${lastPerformance.reps}`;
     }
     return null;
   })();
@@ -227,7 +237,7 @@ export function ExerciseCard({
                   <input 
                     type="text" 
                     value={setRow.weight}
-                    placeholder={lastPerfText ? `Last: ${lastPerfText}` : measurementUnits.weight}
+                    placeholder={isUnweighted ? 'BW / —' : (lastPerfText ? `Last: ${lastPerfText}` : measurementUnits.weight)}
                     onChange={(e) => onSetRowUpdate(exerciseId, sIdx, 'weight', e.target.value, reps, sets)}
                     className="flex-1 min-w-0 bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 font-mono text-xs text-white focus:border-brand-primary outline-none transition-colors text-center"
                   />

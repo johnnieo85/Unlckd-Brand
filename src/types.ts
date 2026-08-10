@@ -193,6 +193,7 @@ export interface UserProfile {
   isPremium: boolean;
   createdAt: any;
   badges: Badge[];
+  removedBadges?: string[];
   gymPin?: string;
   habitList?: string[];
   xp?: number;
@@ -274,7 +275,7 @@ export interface DailyLog {
   };
   completedWorkouts: number;
   recoverySessions?: RecoverySession[];
-  workoutData?: Record<string, { weight?: string; sets?: string; reps?: string; notes?: string; time?: string; completed?: boolean; setRows?: Array<{ reps: string; weight: string; completed?: boolean }> }>;
+  workoutData?: Record<string, { name?: string; weight?: string; sets?: string; reps?: string; notes?: string; time?: string; completed?: boolean; setRows?: Array<{ reps: string; weight: string; completed?: boolean }> }>;
   generalNotes?: string;
   lastUpdated?: any;
   useManualWorkout?: boolean;

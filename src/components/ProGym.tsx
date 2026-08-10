@@ -58,6 +58,7 @@ import {
   RefreshCw,
   RotateCcw,
   AlertTriangle,
+  FileText,
   Award,
   Trophy,
   Waves,
@@ -744,10 +745,11 @@ export const ACCOMPLISHMENT_BADGES: AccomplishmentBadgeDef[] = [
       { tier: 'Gold', tierLevel: 3, targetValue: 20, targetLabel: '20 Days Logged', reqDescription: 'Log all meals for 20 days' },
       { tier: 'Platinum', tierLevel: 4, targetValue: 50, targetLabel: '50 Days Logged', reqDescription: 'Log all meals for 50 days' }
     ],
-    getProgressValue: (reportLogs, currentLog) => {
+    getProgressValue: (reportLogs, currentLog, userProfile) => {
+      if (userProfile?.removedBadges?.includes('macro-chef')) return 0;
       const logs = [...reportLogs];
       if (currentLog) logs.push(currentLog);
-      return logs.filter(l => Boolean(l.meals && l.meals.length > 0)).length;
+      return logs.filter(l => Boolean(l.meals && l.meals.length > 0 && l.meals.some(m => m.completed) && l.meals.filter(m => m.completed).length >= Math.min(3, l.meals.length))).length;
     }
   }
 ];
@@ -814,6 +816,8 @@ export const ProGym = ({
 }) => {
   const numWeeks = getPlanDurationWeeks(latestReport?.userData?.planDuration);
   const [selectedDate, setSelectedDate] = useState(getLocalDateString(new Date()));
+  const today = getLocalDateString(new Date());
+  const isPastDate = selectedDate < today;
 
   const currentGoal = (() => {
     const activeDate = parseLocalDate(selectedDate) || new Date();
@@ -1127,8 +1131,6 @@ export const ProGym = ({
     return 8;
   };
 
-  const today = getLocalDateString(new Date());
-  
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -2106,6 +2108,29 @@ export const ProGym = ({
     return () => clearTimeout(timer);
   }, [log, selectedDate]);
 
+  // Cleanup Macro Chef badge from user profile
+  useEffect(() => {
+    if (!userProfile || !userProfile.userId) return;
+    const hasMacroChefInBadges = userProfile.badges?.some(
+      b => b.id.toLowerCase().includes('macro-chef') || b.id.toLowerCase().includes('macro chef') || b.name.toLowerCase().includes('macro chef')
+    );
+    const isAlreadyInRemoved = userProfile.removedBadges?.includes('macro-chef');
+
+    if (hasMacroChefInBadges || !isAlreadyInRemoved) {
+      const cleanedBadges = (userProfile.badges || []).filter(
+        b => !b.id.toLowerCase().includes('macro-chef') && !b.id.toLowerCase().includes('macro chef') && !b.name.toLowerCase().includes('macro chef')
+      );
+      const updatedRemoved = Array.from(new Set([...(userProfile.removedBadges || []), 'macro-chef']));
+
+      updateUserProfile(userProfile.userId, {
+        badges: cleanedBadges,
+        removedBadges: updatedRemoved
+      }).then(() => {
+        if (onProfileUpdate) onProfileUpdate();
+      }).catch(err => console.error("Error removing Macro Chef badge from profile:", err));
+    }
+  }, [userProfile?.userId, userProfile?.badges?.length, userProfile?.removedBadges?.length]);
+
   const loadData = async (date: string) => {
     setLoading(true);
     const [logData, measurementData, dayMeasurement, allLogs] = await Promise.all([
@@ -2848,8 +2873,17 @@ export const ProGym = ({
           </div>
 
           {/* Right: Actions */}
-          {selectedDate !== today && (
-            <div className="flex items-center gap-2 justify-end shrink-0">
+          <div className="flex items-center gap-2 justify-end shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsProgressReportOpen(true)}
+              className="h-10 px-3 bg-brand-primary/10 border-brand-primary/30 text-brand-primary hover:bg-brand-primary/20 text-xs font-bold gap-1.5 rounded-xl cursor-pointer"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Daily</span> Report
+            </Button>
+            {selectedDate !== today && (
               <Button
                 variant="primary"
                 size="sm"
@@ -2859,41 +2893,52 @@ export const ProGym = ({
                 <RotateCcw className="w-3.5 h-3.5" />
                 Jump to Today
               </Button>
-            </div>
-          )}
+            )}
+          </div>
 
         </div>
 
-        {/* Previous Day Editing Alert Banner */}
-        {selectedDate !== today && (
-          <div className="bg-gradient-to-r from-brand-primary/15 via-brand-primary/10 to-transparent border border-brand-primary/30 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+        {/* Historical Past Date Locked Banner */}
+        {isPastDate && (
+          <div className="bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-transparent border border-amber-500/30 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
             <div className="flex items-start sm:items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-brand-primary/20 text-brand-primary shrink-0 mt-0.5 sm:mt-0">
-                <Calendar className="w-5 h-5" />
+              <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 shrink-0 mt-0.5 sm:mt-0">
+                <Lock className="w-5 h-5" />
               </div>
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-black uppercase tracking-wider text-brand-primary">
-                    Editing Previous Day Entry
+                  <span className="text-xs font-black uppercase tracking-wider text-amber-400">
+                    Historical Log — Locked (Read-Only)
                   </span>
-                  <span className="text-xs bg-brand-primary/20 text-brand-primary px-2.5 py-0.5 rounded-full font-mono font-bold">
+                  <span className="text-xs bg-amber-500/20 text-amber-300 px-2.5 py-0.5 rounded-full font-mono font-bold">
                     {parseLocalDate(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}
                   </span>
                 </div>
-                <p className="text-xs text-gray-300 mt-1">
-                  You are viewing and editing logs for this date. All workout sets, meals, water, steps, sleep, habits, notes & measurements will save directly to this date's log.
+                <p className="text-xs text-gray-300 mt-1 font-medium">
+                  Past entries are locked from editing to keep historical records accurate. Click "Daily Progress Report" to view or export the full report for this date.
                 </p>
               </div>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleJumpToToday}
-              className="gap-2 shrink-0 border-brand-primary/40 text-brand-primary hover:bg-brand-primary/20 font-bold rounded-xl cursor-pointer"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              Return to Today
-            </Button>
+            <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setIsProgressReportOpen(true)}
+                className="h-9 px-3 bg-brand-primary text-brand-dark font-bold hover:bg-brand-primary/90 text-xs gap-1.5 rounded-xl cursor-pointer shadow-md"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                Daily Progress Report
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleJumpToToday}
+                className="h-9 px-3 border-white/20 hover:bg-white/10 text-gray-200 text-xs gap-1.5 rounded-xl cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Jump to Today
+              </Button>
+            </div>
           </div>
         )}
 
@@ -4774,12 +4819,13 @@ export const ProGym = ({
 
         {/* Accomplishment Badges Card */}
         {(() => {
-          const earnedAccomplishmentBadges = ACCOMPLISHMENT_BADGES.filter((badgeDef) => {
+          const validBadges = ACCOMPLISHMENT_BADGES.filter(b => b.id !== 'macro-chef' && !userProfile?.removedBadges?.includes(b.id));
+          const earnedAccomplishmentBadges = validBadges.filter((badgeDef) => {
             const val = badgeDef.getProgressValue(reportLogs, log, userProfile, measurements);
             return badgeDef.tiers.some(t => val >= t.targetValue);
           });
           const displayedAccomplishmentBadges = showAllAccomplishmentBadges 
-            ? ACCOMPLISHMENT_BADGES 
+            ? validBadges 
             : earnedAccomplishmentBadges;
 
           return (
@@ -5275,6 +5321,7 @@ export const ProGym = ({
         isOpen={isProgressReportOpen}
         onClose={() => setIsProgressReportOpen(false)}
         userProfile={userProfile}
+        selectedDate={selectedDate}
         onReportSaved={onReportSaved}
       />
 

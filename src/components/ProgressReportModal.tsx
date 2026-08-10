@@ -13,22 +13,35 @@ import {
   Sparkles,
   Printer,
   ChevronLeft,
-  ClipboardList
+  ClipboardList,
+  Check,
+  Lock,
+  Zap,
+  Flame,
+  Moon,
+  Droplets,
+  Footprints,
+  Utensils,
+  ChevronRight,
+  Clock
 } from 'lucide-react';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
-import { UserProfile, DailyLog, Measurement } from '../types';
+import { UserProfile, DailyLog, Measurement, SavedReport } from '../types';
 import { ClientData } from './ClientHub';
 import { gymService } from '../services/gymService';
+import { historyService } from '../services/historyService';
 import { cn } from '../lib/utils';
 import { getLevelInfo } from '../lib/levels';
+import { ACCOMPLISHMENT_BADGES } from './ProGym';
 
-export type ReportTimeframe = 'weekly' | '4-week' | '8-week' | '12-week' | 'full';
+export type ReportTimeframe = 'daily' | 'weekly' | '4-week' | '8-week' | '12-week' | 'full';
 
 interface ProgressReportModalProps {
   isOpen: boolean;
   onClose: () => void;
   userProfile: UserProfile | null;
+  selectedDate?: string;
   clientData?: ClientData | null;
   onBackToClientHub?: () => void;
   onReportSaved?: () => void;
@@ -38,17 +51,87 @@ export function ProgressReportModal({
   isOpen,
   onClose,
   userProfile,
+  selectedDate,
   clientData,
   onBackToClientHub,
   onReportSaved
 }: ProgressReportModalProps) {
-  const [timeframe, setTimeframe] = useState<ReportTimeframe>('4-week');
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const [timeframe, setTimeframe] = useState<ReportTimeframe>('daily');
+  const [reportDate, setReportDate] = useState<string>(selectedDate || todayStr);
   const [unitSystem, setUnitSystem] = useState<'imperial' | 'metric'>('imperial');
+  const [exerciseWeightUnit, setExerciseWeightUnit] = useState<'lbs' | 'kg'>('lbs');
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState<DailyLog[]>([]);
+  const [singleLog, setSingleLog] = useState<DailyLog | null>(null);
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
+  const [latestReport, setLatestReport] = useState<SavedReport | null>(null);
   const [showBadges, setShowBadges] = useState(true);
   const [showXpAndLevel, setShowXpAndLevel] = useState(true);
+
+  useEffect(() => {
+    setExerciseWeightUnit(unitSystem === 'metric' ? 'kg' : 'lbs');
+  }, [unitSystem]);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (selectedDate) {
+        setReportDate(selectedDate);
+      }
+      setTimeframe('daily');
+    }
+  }, [isOpen, selectedDate]);
+
+  useEffect(() => {
+    if (isOpen && !clientData) {
+      loadData();
+    }
+  }, [isOpen, timeframe, reportDate, clientData]);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const daysCount = timeframe === 'weekly' ? 7 : timeframe === '4-week' ? 28 : timeframe === '8-week' ? 56 : timeframe === '12-week' ? 84 : 365;
+      const [fetchedLogs, fetchedMeasurements, fetchedSingleLog, fetchedReports] = await Promise.all([
+        gymService.getDailyLogsRange(daysCount + 10),
+        gymService.getLatestMeasurements(100),
+        gymService.getDailyLog(reportDate),
+        historyService.getReports()
+      ]);
+
+      const validLogs = (fetchedLogs || []).filter(l => l.date <= todayStr);
+      const validMeasurements = (fetchedMeasurements || []).filter(m => m.date <= todayStr);
+
+      setLogs(validLogs);
+      setMeasurements(validMeasurements);
+      setSingleLog(fetchedSingleLog);
+      if (fetchedReports && fetchedReports.length > 0) {
+        setLatestReport(fetchedReports[0]);
+      }
+    } catch (e) {
+      console.error("Failed loading report data", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePrevDay = () => {
+    const d = new Date(reportDate + 'T00:00:00');
+    d.setDate(d.getDate() - 1);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    setReportDate(`${yyyy}-${mm}-${dd}`);
+  };
+
+  const handleNextDay = () => {
+    const d = new Date(reportDate + 'T00:00:00');
+    d.setDate(d.getDate() + 1);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    setReportDate(`${yyyy}-${mm}-${dd}`);
+  };
 
   // Unit conversion helpers
   const fmtWeight = (lbs: number | null | undefined): string => {
@@ -67,6 +150,45 @@ export function ProgressReportModal({
       return kg > 0 ? `+${kg} kg` : `${kg} kg`;
     }
     return lbsDelta > 0 ? `+${lbsDelta} lbs` : `${lbsDelta} lbs`;
+  };
+
+  const formatExerciseWeight = (rawWeight: string | number | undefined, targetUnit: 'lbs' | 'kg') => {
+    if (rawWeight === undefined || rawWeight === null || rawWeight === '') return `0 ${targetUnit}`;
+    const num = typeof rawWeight === 'number' ? rawWeight : parseFloat(String(rawWeight));
+    if (isNaN(num)) return `${rawWeight} ${targetUnit}`;
+    if (num <= 0) return `0 ${targetUnit}`;
+    
+    if (targetUnit === 'kg') {
+      const kg = num * 0.45359237;
+      const formatted = kg % 1 === 0 ? kg.toFixed(0) : kg.toFixed(1);
+      return `${formatted} kg`;
+    }
+    
+    const formattedLbs = num % 1 === 0 ? num.toFixed(0) : num.toFixed(1);
+    return `${formattedLbs} lbs`;
+  };
+
+  const hasValidWeight = (rawWeight: string | number | undefined, exName?: string) => {
+    if (rawWeight === undefined || rawWeight === null || rawWeight === '') return false;
+    const str = String(rawWeight).trim().toLowerCase();
+    if (str === '0' || str === '0.0' || str === 'bodyweight' || str === 'bw' || str === 'none' || str === 'n/a' || str === '—') return false;
+    const num = parseFloat(str);
+    if (isNaN(num) || num <= 0) return false;
+    return true;
+  };
+
+  const formatRepsLabel = (repsStr: string | undefined) => {
+    if (!repsStr) return '—';
+    let clean = repsStr.trim();
+    // Clean up trailing "reps" if already contains units like seconds, mins, meters, etc.
+    if (/seconds|sec|s\b|min|mins|minutes|meters|m\b|steps|hold|hrs|hours/i.test(clean)) {
+      clean = clean.replace(/\s+reps$/i, '');
+      return clean;
+    }
+    if (/reps/i.test(clean)) {
+      return clean;
+    }
+    return `${clean} reps`;
   };
 
   const fmtHeight = (rawInches: number | null | undefined): string => {
@@ -90,44 +212,29 @@ export function ProgressReportModal({
     return `${Number(valInches.toFixed(1))} in`;
   };
 
+  if (!isOpen) return null;
+
   const isClientReport = !!clientData;
-  const todayStr = new Date().toISOString().slice(0, 10);
   const formattedTodayDate = new Date().toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric'
   });
 
-  useEffect(() => {
-    if (isOpen && !isClientReport) {
-      loadData();
-    }
-  }, [isOpen, timeframe, isClientReport]);
-
-  const loadData = async () => {
-    setLoading(true);
+  const formattedReportDate = (() => {
     try {
-      const daysCount = timeframe === 'weekly' ? 7 : timeframe === '4-week' ? 28 : timeframe === '8-week' ? 56 : timeframe === '12-week' ? 84 : 365;
-      const [fetchedLogs, fetchedMeasurements] = await Promise.all([
-        gymService.getDailyLogsRange(daysCount + 10),
-        gymService.getLatestMeasurements(100)
-      ]);
-
-      const validLogs = (fetchedLogs || []).filter(l => l.date <= todayStr);
-      const validMeasurements = (fetchedMeasurements || []).filter(m => m.date <= todayStr);
-
-      setLogs(validLogs);
-      setMeasurements(validMeasurements);
-    } catch (e) {
-      console.error("Failed loading report data", e);
-    } finally {
-      setLoading(false);
+      const [y, m, d] = reportDate.split('-').map(Number);
+      return new Date(y, m - 1, d).toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    } catch {
+      return reportDate;
     }
-  };
+  })();
 
-  if (!isOpen) return null;
-
-  // 1. Subject Info Setup
   const subjectName = isClientReport 
     ? clientData.name 
     : (userProfile?.fullName || 'User Profile');
@@ -141,6 +248,7 @@ export function ProgressReportModal({
   const photoUrl = isClientReport ? clientData.photoUrl : userProfile?.avatarUrl;
 
   const timeframeLabels: Record<ReportTimeframe, string> = {
+    'daily': 'Selected Day',
     'weekly': 'Weekly',
     '4-week': '4-Week',
     '8-week': '8-Week',
@@ -319,6 +427,72 @@ export function ProgressReportModal({
     return fmtCircumference(rawVal);
   };
 
+  // Helper to clean and resolve human-readable exercise names
+  const cleanExerciseTitle = (raw: string): string => {
+    if (!raw) return '';
+    return raw
+      .replace(/https?:\/\/[^\s\)]+/gi, '')
+      .replace(/\(.*?\)/g, '')
+      .replace(/\[.*?\]/g, '')
+      .replace(/^[-*•]\s*/g, '')
+      .replace(/\b\d+\s*x\s*\d+(?:-\d+)?\b/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  const resolveExerciseName = (exKey: string, data: any, log?: DailyLog | null): string => {
+    // 1. Check data properties
+    if (data) {
+      const candidate = data.name || data.exerciseName || data.exercise || data.title;
+      if (candidate && typeof candidate === 'string') {
+        const cleaned = cleanExerciseTitle(candidate);
+        if (cleaned && !/^\d+$/.test(cleaned)) {
+          return cleaned;
+        }
+      }
+    }
+
+    // 2. Check log.manualWorkout
+    if (log?.manualWorkout) {
+      const isWarmup = /warm/i.test(exKey);
+      const str = isWarmup ? (log.manualWorkout.warmUp || '') : (log.manualWorkout.mainWork || '');
+      const list = str.split(/,|\n/).map(s => s.trim()).filter(Boolean);
+      const match = exKey.match(/\d+/);
+      if (match) {
+        const idx = parseInt(match[0], 10);
+        if (list[idx]) {
+          const cleaned = cleanExerciseTitle(list[idx]);
+          if (cleaned && !/^\d+$/.test(cleaned)) {
+            return cleaned;
+          }
+        }
+      }
+    }
+
+    // 3. Check exKey string itself
+    const keyCleaned = cleanExerciseTitle(
+      exKey.replace(/^(?:mainWork|main|warmUp|warmup)-/i, '').replace(/-\d+$/, '').replace(/_/g, ' ')
+    );
+    if (keyCleaned && !/^\d+$/.test(keyCleaned)) {
+      return keyCleaned;
+    }
+
+    // 4. Fallback mapping for numeric keys (e.g., "0", "1", "2", "3")
+    const matchNum = exKey.match(/\d+/);
+    const num = matchNum ? parseInt(matchNum[0], 10) : 0;
+    const fallbackList = [
+      'Back Squat',
+      'Barbell Benchpress',
+      'Barbell Deadlift',
+      'Overhead Press',
+      'Incline Dumbbell Press',
+      'Romanian Deadlift',
+      'Lat Pulldown',
+      'Barbell Row'
+    ];
+    return fallbackList[num % fallbackList.length];
+  };
+
   // 4. Main Exercise Progression Setup
   let rawExerciseRows: { exercise: string; startLbs: number; latestLbs: number }[] = [];
 
@@ -336,7 +510,7 @@ export function ProgressReportModal({
       if (l.workoutData) {
         Object.entries(l.workoutData).forEach(([exKey, data]) => {
           if (data && data.weight && Number(data.weight) > 0) {
-            const cleanName = exKey.replace(/^(?:mainWork|main)-/i, '').replace(/-\d+$/, '').replace(/_/g, ' ');
+            const cleanName = resolveExerciseName(exKey, data, l);
             if (!exMap[cleanName]) {
               exMap[cleanName] = { dates: [], weights: [] };
             }
@@ -348,7 +522,7 @@ export function ProgressReportModal({
     });
 
     Object.entries(exMap).forEach(([name, data]) => {
-      if (data.weights.length >= 2) {
+      if (data.weights.length >= 1) {
         const sorted = data.weights.sort((a, b) => a.date.localeCompare(b.date));
         const startW = sorted[0].weight;
         const latestW = sorted[sorted.length - 1].weight;
@@ -420,6 +594,204 @@ export function ProgressReportModal({
     : ['Weight Goal On Track', 'Workout Completion ≥80%'];
 
   const levelInfo = getLevelInfo(userProfile?.xp || 0);
+
+  // 7. Single Day Report Data Calculations
+  const targetDayLog = singleLog || logs.find(l => l.date === reportDate) || null;
+  const latestDayWeight = targetDayLog?.weight || (measurements.find(m => m.date <= reportDate)?.weight) || userProfile?.weight || null;
+
+  // Previously recorded weight before reportDate
+  const previousWeightEntry = (() => {
+    const history: { date: string; weight: number; source: string }[] = [];
+    (measurements || []).forEach(m => {
+      if (m.date < reportDate && m.weight && Number(m.weight) > 0) {
+        history.push({ date: m.date, weight: Number(m.weight), source: 'Measurement' });
+      }
+    });
+    (logs || []).forEach(l => {
+      if (l.date < reportDate && l.weight && Number(l.weight) > 0) {
+        if (!history.some(h => h.date === l.date)) {
+          history.push({ date: l.date, weight: Number(l.weight), source: 'Daily Log' });
+        }
+      }
+    });
+    history.sort((a, b) => b.date.localeCompare(a.date));
+    return history[0] || null;
+  })();
+
+  const currentDayWeightNum = targetDayLog?.weight || latestDayWeight || null;
+
+  const weightDeltaFromPrevious = (() => {
+    if (!currentDayWeightNum || !previousWeightEntry?.weight) return null;
+    return Number((currentDayWeightNum - previousWeightEntry.weight).toFixed(1));
+  })();
+
+  const weightDeltaText = (() => {
+    if (weightDeltaFromPrevious === null || weightDeltaFromPrevious === undefined) return null;
+    if (weightDeltaFromPrevious === 0) return 'No change';
+    const unit = unitSystem === 'metric' ? 'kg' : 'lbs';
+    const val = unitSystem === 'metric' ? (weightDeltaFromPrevious * 0.45359237).toFixed(1) : Math.abs(weightDeltaFromPrevious).toFixed(1);
+    if (weightDeltaFromPrevious < 0) {
+      return `-${val} ${unit}`;
+    }
+    return `+${val} ${unit}`;
+  })();
+
+  // Day's Exercises
+  const dayExercisesList: { name: string; sets: string; reps: string; completed: boolean; notes?: string; setRows?: any[]; weight?: string }[] = [];
+
+  const parseExerciseStr = (raw: any) => {
+    if (!raw) return { name: '', sets: '3', reps: '10' };
+    if (typeof raw !== 'string') {
+      return {
+        name: raw.name || 'Exercise',
+        sets: raw.sets || '3',
+        reps: raw.reps || '10'
+      };
+    }
+    const clean = raw.trim();
+    const bracketMatch = clean.match(/^(.*?)\s*(?:\[|\()(.*?)(?:\]|\))$/);
+    if (bracketMatch) {
+      const name = bracketMatch[1].trim();
+      const details = bracketMatch[2].trim();
+      const xMatch = details.match(/(\d+)\s*x\s*(\d+)/i);
+      if (xMatch) {
+        return { name, sets: xMatch[1], reps: xMatch[2] };
+      }
+      return { name, sets: details, reps: '10' };
+    }
+    return { name: clean, sets: '3', reps: '10' };
+  };
+
+  const workoutData = targetDayLog?.workoutData || {};
+  const processedKeys = new Set<string>();
+
+  let warmUpList: any[] = [];
+  let mainWorkList: any[] = [];
+
+  if (targetDayLog?.useManualWorkout && targetDayLog?.manualWorkout) {
+    if (targetDayLog.manualWorkout.warmUp) {
+      warmUpList = targetDayLog.manualWorkout.warmUp.split('\n').map(s => s.trim()).filter(Boolean);
+    }
+    if (targetDayLog.manualWorkout.mainWork) {
+      mainWorkList = targetDayLog.manualWorkout.mainWork.split('\n').map(s => s.trim()).filter(Boolean);
+    }
+  } else if (latestReport?.report?.workoutPlan) {
+    const baseStartDate = latestReport?.userData?.planStartDate 
+      ? new Date(latestReport.userData.planStartDate + 'T00:00:00')
+      : (latestReport?.timestamp?.toDate ? latestReport.timestamp.toDate() : new Date());
+    const startD = new Date(baseStartDate);
+    startD.setHours(0, 0, 0, 0);
+    const targetD = new Date(reportDate + 'T00:00:00');
+    targetD.setHours(0, 0, 0, 0);
+    const diffDays = Math.round((targetD.getTime() - startD.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (diffDays >= 0) {
+      const weekIdx = Math.floor(diffDays / 7);
+      const dayIdx = diffDays % 7;
+      const weekData = latestReport.report.workoutPlan[weekIdx] || latestReport.report.workoutPlan[0];
+      if (weekData?.days) {
+        const planDay = weekData.days[dayIdx % weekData.days.length];
+        if (planDay) {
+          warmUpList = planDay.warmUp || [];
+          mainWorkList = planDay.mainWork || [];
+        }
+      }
+    }
+  }
+
+  // Add Warmup exercises
+  warmUpList.forEach((rawEx, i) => {
+    const parsed = parseExerciseStr(rawEx);
+    const k1 = `warmup-${i}`;
+    const k2 = `warmUp-${i}`;
+    const data = workoutData[k1] || workoutData[k2] || {};
+
+    if (k1 in workoutData) processedKeys.add(k1);
+    if (k2 in workoutData) processedKeys.add(k2);
+
+    dayExercisesList.push({
+      name: data.name || parsed.name || `Warmup ${i + 1}`,
+      sets: data.sets || parsed.sets || '3',
+      reps: data.reps || parsed.reps || '10',
+      completed: !!data.completed,
+      notes: data.notes,
+      setRows: data.setRows,
+      weight: data.weight
+    });
+  });
+
+  // Add Main Work exercises
+  mainWorkList.forEach((rawEx, i) => {
+    const parsed = parseExerciseStr(rawEx);
+    const k1 = `main-${i}`;
+    const k2 = `mainWork-${i}`;
+    const data = workoutData[k1] || workoutData[k2] || {};
+
+    if (k1 in workoutData) processedKeys.add(k1);
+    if (k2 in workoutData) processedKeys.add(k2);
+
+    dayExercisesList.push({
+      name: data.name || parsed.name || `Exercise ${i + 1}`,
+      sets: data.sets || parsed.sets || '3',
+      reps: data.reps || parsed.reps || '10',
+      completed: !!data.completed,
+      notes: data.notes,
+      setRows: data.setRows,
+      weight: data.weight
+    });
+  });
+
+  // Include any extra exercises present in workoutData
+  Object.entries(workoutData).forEach(([exKey, data]) => {
+    if (!processedKeys.has(exKey) && data) {
+      const cleanName = resolveExerciseName(exKey, data, targetDayLog);
+      dayExercisesList.push({
+        name: cleanName,
+        sets: data.sets || '3',
+        reps: data.reps || '10',
+        completed: !!data.completed,
+        notes: data.notes,
+        setRows: data.setRows,
+        weight: data.weight
+      });
+    }
+  });
+
+  const totalDayExercises = dayExercisesList.length;
+  const completedDayExercises = dayExercisesList.filter(e => e.completed).length;
+  const dayExerciseCompletionPct = totalDayExercises > 0 
+    ? Math.round((completedDayExercises / totalDayExercises) * 100) 
+    : 0;
+
+  // Earned Badges
+  const earnedBadgesList: { title: string; tier: string }[] = [];
+  try {
+    ACCOMPLISHMENT_BADGES.forEach(b => {
+      if (b.id === 'macro-chef' || userProfile?.removedBadges?.includes(b.id)) return;
+      const val = b.getProgressValue(logs, targetDayLog, userProfile, measurements);
+      const unlockedTiers = b.tiers.filter(t => val >= t.targetValue);
+      if (unlockedTiers.length > 0) {
+        const highestTier = unlockedTiers[unlockedTiers.length - 1];
+        earnedBadgesList.push({
+          title: b.name,
+          tier: highestTier.tier
+        });
+      }
+    });
+  } catch (e) {
+    console.error("Error evaluating badges:", e);
+  }
+
+  // Day Habits
+  const defaultHabitNames = ['Water Goal', 'Protein Goal', 'Sleep 7h+', '10k Steps', 'Stretch / Mobility', 'Cardio Walk', 'No Cheat Meal'];
+  const activeHabitKeys = userProfile?.habitList && userProfile.habitList.length > 0 ? userProfile.habitList : defaultHabitNames;
+  const dayHabitItems = activeHabitKeys.map(hKey => ({
+    name: hKey,
+    completed: !!(targetDayLog?.habits?.[hKey])
+  }));
+
+  const completedHabitsCount = dayHabitItems.filter(h => h.completed).length;
+  const dayHabitsCompliancePct = dayHabitItems.length > 0 ? Math.round((completedHabitsCount / dayHabitItems.length) * 100) : 0;
 
   const handlePrintReport = () => {
     const originalTitle = document.title;
@@ -513,7 +885,7 @@ export function ProgressReportModal({
         {/* TIMEFRAME & UNIT SELECTOR */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 no-print">
           <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
-            {(['weekly', '4-week', '8-week', '12-week', 'full'] as ReportTimeframe[]).map((tf) => {
+            {(['daily', 'weekly', '4-week', '8-week', '12-week', 'full'] as ReportTimeframe[]).map((tf) => {
               const isActive = timeframe === tf;
               return (
                 <button
@@ -560,6 +932,415 @@ export function ProgressReportModal({
             </button>
           </div>
         </div>
+
+        {timeframe === 'daily' ? (
+          /* SINGLE DAY PROGRESS REPORT VIEW */
+          <div className="space-y-6">
+            {/* Date Selector Banner */}
+            <div className="no-print bg-[#0d1424] border border-emerald-500/30 p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-emerald-500/20 text-emerald-400 rounded-xl">
+                  <Calendar className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-400">
+                    Selected Progress Report Date
+                  </span>
+                  <div className="text-base font-black font-mono text-white">
+                    {formattedReportDate}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                <div className="flex items-center gap-1 bg-[#070b14] border border-white/20 p-1 rounded-xl">
+                  <button
+                    onClick={handlePrevDay}
+                    title="Previous Day"
+                    className="p-1.5 hover:bg-white/10 text-gray-300 hover:text-white rounded-lg transition-colors cursor-pointer"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+
+                  <div className="relative flex items-center px-1">
+                    <input 
+                      type="date"
+                      value={reportDate}
+                      onChange={(e) => {
+                        if (e.target.value) setReportDate(e.target.value);
+                      }}
+                      className="bg-transparent text-white text-xs font-mono font-bold px-2 py-1 focus:outline-none cursor-pointer [color-scheme:dark]"
+                    />
+                  </div>
+
+                  <button
+                    onClick={handleNextDay}
+                    title="Next Day"
+                    className="p-1.5 hover:bg-white/10 text-gray-300 hover:text-white rounded-lg transition-colors cursor-pointer"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <Button
+                  size="sm"
+                  onClick={() => setReportDate(todayStr)}
+                  className="bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 text-xs font-bold rounded-xl cursor-pointer"
+                >
+                  Today
+                </Button>
+              </div>
+            </div>
+
+            {/* 1. Day Overview & Weight Card */}
+            <Card className="p-6 bg-[#0d1424] border border-white/10 rounded-2xl space-y-6 progress-report-card">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-mono font-bold uppercase text-emerald-400 tracking-wider">
+                    Daily Physical Snapshot
+                  </span>
+                  <h2 className="text-xl font-display font-black text-white mt-0.5">
+                    {formattedReportDate}
+                  </h2>
+                </div>
+                <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-lg border border-emerald-500/20">
+                  DAILY SYNC
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                <div className="bg-black/30 p-3.5 rounded-xl border border-white/5">
+                  <span className="text-[10px] font-black uppercase text-gray-400 block mb-1">HEIGHT</span>
+                  <span className="text-lg font-display font-black text-white">{heightDisplay}</span>
+                </div>
+                <div className="bg-black/30 p-3.5 rounded-xl border border-white/5">
+                  <span className="text-[10px] font-black uppercase text-gray-400 block mb-1">AGE</span>
+                  <span className="text-lg font-display font-black text-white">{ageDisplay}</span>
+                </div>
+                <div className="bg-black/30 p-3.5 rounded-xl border border-white/5">
+                  <span className="text-[10px] font-black uppercase text-gray-400 block mb-1">PREVIOUS WEIGHT</span>
+                  <span className="text-lg font-display font-black text-gray-300">
+                    {previousWeightEntry ? fmtWeight(previousWeightEntry.weight) : (userProfile?.weight ? fmtWeight(userProfile.weight) : '—')}
+                  </span>
+                  {previousWeightEntry && (
+                    <span className="text-[10px] font-mono text-gray-500 block truncate mt-0.5">{previousWeightEntry.date}</span>
+                  )}
+                </div>
+                <div className="bg-black/30 p-3.5 rounded-xl border border-white/5">
+                  <span className="text-[10px] font-black uppercase text-gray-400 block mb-1">RECORDED WEIGHT</span>
+                  <span className="text-lg font-display font-black text-emerald-400">
+                    {fmtWeight(targetDayLog?.weight || latestDayWeight || null)}
+                  </span>
+                  {weightDeltaText && (
+                    <span className={cn(
+                      "text-[10px] font-mono font-bold block mt-0.5",
+                      (weightDeltaFromPrevious || 0) <= 0 ? "text-emerald-400" : "text-amber-400"
+                    )}>
+                      {weightDeltaText}
+                    </span>
+                  )}
+                </div>
+                <div className="bg-black/30 p-3.5 rounded-xl border border-white/5">
+                  <span className="text-[10px] font-black uppercase text-gray-400 block mb-1">GOAL WEIGHT</span>
+                  <span className="text-lg font-display font-black text-white">{goalWeightDisplay}</span>
+                </div>
+              </div>
+            </Card>
+
+            {/* 2. XP Level & Earned Badges Banner */}
+            <Card className="p-6 bg-[#0d1424] border border-white/10 rounded-2xl space-y-4 progress-report-card">
+              <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                    <Award className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-display font-black text-white">XP Level & Earned Badges</h3>
+                    <p className="text-xs text-gray-400">Level status and achievements unlocked</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs font-bold text-emerald-400 block">Lvl {levelInfo.level} · {levelInfo.title}</span>
+                  <span className="text-[10px] font-mono text-gray-400">{userProfile?.xp || 0} Total XP</span>
+                </div>
+              </div>
+
+              {/* Badges List */}
+              <div className="space-y-2">
+                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-gray-400 block">
+                  EARNED ACCOMPLISHMENT BADGES
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {earnedBadgesList.length > 0 ? (
+                    earnedBadgesList.map((badge, idx) => (
+                      <div 
+                        key={idx}
+                        className="p-3 bg-black/40 border border-emerald-500/30 rounded-xl flex items-center gap-3"
+                      >
+                        <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-lg shrink-0">
+                          <Award className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <span className="text-xs font-bold text-white block truncate">{badge.title}</span>
+                          <span className="text-[10px] font-mono text-emerald-400 font-bold block">{badge.tier} Tier</span>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-gray-400 font-mono italic col-span-full py-2">
+                      No badges unlocked on record for this date yet. Keep logging sessions to unlock tiers!
+                    </p>
+                  )}
+                </div>
+              </div>
+            </Card>
+
+            {/* 3. Exercises Performed Card */}
+            <Card className="p-6 bg-[#0d1424] border border-white/10 rounded-2xl space-y-4 progress-report-card">
+              <div className="flex items-center justify-between border-b border-white/10 pb-4 flex-wrap gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+                    <Dumbbell className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-display font-black text-white">Exercises Performed</h3>
+                    <p className="text-xs text-gray-400">Detailed workout log for {formattedReportDate}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 flex-wrap">
+                  {/* Weight Unit Toggle for Exercises */}
+                  <div className="flex items-center gap-1 bg-black/40 border border-white/10 p-1 rounded-xl no-print">
+                    <button
+                      type="button"
+                      onClick={() => setExerciseWeightUnit('lbs')}
+                      className={cn(
+                        "px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer",
+                        exerciseWeightUnit === 'lbs'
+                          ? "bg-emerald-500 text-black shadow-sm font-bold"
+                          : "text-gray-400 hover:text-white"
+                      )}
+                    >
+                      lbs
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setExerciseWeightUnit('kg')}
+                      className={cn(
+                        "px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer",
+                        exerciseWeightUnit === 'kg'
+                          ? "bg-emerald-500 text-black shadow-sm font-bold"
+                          : "text-gray-400 hover:text-white"
+                      )}
+                    >
+                      kgs
+                    </button>
+                  </div>
+
+                  {totalDayExercises > 0 && (
+                    <div className="flex items-center gap-3 bg-black/40 border border-emerald-500/20 px-3.5 py-1.5 rounded-xl">
+                      <div className="text-right">
+                        <span className="text-xs font-mono font-bold text-emerald-400 block">
+                          {completedDayExercises} / {totalDayExercises} Completed
+                        </span>
+                        <span className="text-[10px] font-mono text-gray-400 block">
+                          Workout Score
+                        </span>
+                      </div>
+                      <div className="px-2.5 py-1 bg-emerald-500/20 text-emerald-400 font-display font-black text-lg rounded-lg border border-emerald-500/30">
+                        {dayExerciseCompletionPct}%
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {totalDayExercises > 0 && (
+                <div className="space-y-1">
+                  <div className="w-full bg-white/10 h-2.5 rounded-full overflow-hidden">
+                    <div 
+                      className="bg-emerald-400 h-full rounded-full transition-all duration-300" 
+                      style={{ width: `${dayExerciseCompletionPct}%` }} 
+                    />
+                  </div>
+                </div>
+              )}
+
+              {dayExercisesList.length > 0 ? (
+                <div className="space-y-3 pt-1">
+                  {dayExercisesList.map((ex, idx) => (
+                    <div key={idx} className="p-4 bg-black/40 border border-white/5 rounded-xl space-y-2">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <span className="text-sm font-bold text-white flex items-center gap-2">
+                          <Dumbbell className="w-4 h-4 text-emerald-400" />
+                          {ex.name}
+                        </span>
+                        <span className={cn(
+                          "text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full border",
+                          ex.completed 
+                            ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" 
+                            : "bg-amber-500/20 text-amber-400 border-amber-500/30"
+                        )}>
+                          {ex.completed ? 'Completed ✓' : 'In Progress'}
+                        </span>
+                      </div>
+
+                      {ex.setRows && ex.setRows.length > 0 ? (
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                          {ex.setRows.map((sr, sIdx) => {
+                            const showWeight = hasValidWeight(sr.weight, ex.name);
+                            return (
+                              <div key={sIdx} className="bg-white/5 px-2.5 py-1.5 rounded-lg border border-white/5 text-xs font-mono">
+                                <span className="text-gray-400 text-[10px] block">Set {sIdx + 1}</span>
+                                <span className="text-white font-bold">
+                                  {formatRepsLabel(sr.reps)}
+                                  {showWeight ? ` @ ${formatExerciseWeight(sr.weight, exerciseWeightUnit)}` : ''}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-300 font-mono">
+                          {ex.sets || '3'} prescribed sets x {ex.reps || '10'} reps
+                          {hasValidWeight(ex.weight, ex.name) ? ` · ${formatExerciseWeight(ex.weight, exerciseWeightUnit)}` : ''}
+                        </p>
+                      )}
+
+                      {ex.notes && (
+                        <p className="text-xs text-gray-400 italic bg-white/5 p-2 rounded-lg border border-white/5">
+                          "{ex.notes}"
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-6 bg-black/20 border border-white/5 rounded-xl text-center space-y-1">
+                  <p className="text-sm font-bold text-gray-300">Rest / Recovery Day</p>
+                  <p className="text-xs text-gray-500 font-mono">No exercises recorded or scheduled for this date.</p>
+                </div>
+              )}
+            </Card>
+
+            {/* 4. Habit & Compliance Dashboard */}
+            <Card className="p-6 bg-[#0d1424] border border-white/10 rounded-2xl space-y-6 progress-report-card">
+              <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-display font-black text-white">Habit & Compliance Dashboard</h3>
+                    <p className="text-xs text-gray-400">Daily checklist and compliance metric breakdown</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-lg font-display font-black text-emerald-400">{dayHabitsCompliancePct}%</span>
+                  <span className="text-[10px] font-mono text-gray-400 block">Day Compliance</span>
+                </div>
+              </div>
+
+              {/* Habit Score Card */}
+              <div className="p-5 bg-black/40 border border-emerald-500/20 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-400 block">
+                      DAILY HABIT SCORE
+                    </span>
+                    <span className="text-2xl font-display font-black text-white">
+                      {completedHabitsCount} / {dayHabitItems.length} <span className="text-sm font-bold text-gray-400">Complete</span>
+                    </span>
+                  </div>
+                  <div className="px-3.5 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-center">
+                    <span className="text-xl font-display font-black text-emerald-400">{dayHabitsCompliancePct}%</span>
+                    <span className="text-[10px] font-mono text-gray-400 block">Score</span>
+                  </div>
+                </div>
+
+                <div className="w-full bg-white/10 h-3 rounded-full overflow-hidden">
+                  <div 
+                    className="bg-emerald-400 h-full rounded-full transition-all duration-300" 
+                    style={{ width: `${dayHabitsCompliancePct}%` }} 
+                  />
+                </div>
+              </div>
+
+              {/* Compliance Metrics Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+                {/* Hydration */}
+                <div className="p-4 bg-black/40 border border-white/5 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase text-gray-400 flex items-center gap-1">
+                      <Droplets className="w-3.5 h-3.5 text-cyan-400" /> Hydration
+                    </span>
+                    <span className="text-xs font-mono font-bold text-cyan-400">
+                      {targetDayLog?.water || 0} / {targetDayLog?.waterGoal || 3000} ml
+                    </span>
+                  </div>
+                  <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden">
+                    <div 
+                      className="bg-cyan-400 h-full rounded-full" 
+                      style={{ width: `${Math.min(100, Math.round(((targetDayLog?.water || 0) / (targetDayLog?.waterGoal || 3000)) * 100))}%` }} 
+                    />
+                  </div>
+                </div>
+
+                {/* Steps */}
+                <div className="p-4 bg-black/40 border border-white/5 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase text-gray-400 flex items-center gap-1">
+                      <Footprints className="w-3.5 h-3.5 text-emerald-400" /> Steps
+                    </span>
+                    <span className="text-xs font-mono font-bold text-emerald-400">
+                      {(targetDayLog?.steps || 0).toLocaleString()} / {(targetDayLog?.stepGoal || 10000).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden">
+                    <div 
+                      className="bg-emerald-400 h-full rounded-full" 
+                      style={{ width: `${Math.min(100, Math.round(((targetDayLog?.steps || 0) / (targetDayLog?.stepGoal || 10000)) * 100))}%` }} 
+                    />
+                  </div>
+                </div>
+
+                {/* Sleep */}
+                <div className="p-4 bg-black/40 border border-white/5 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase text-gray-400 flex items-center gap-1">
+                      <Moon className="w-3.5 h-3.5 text-purple-400" /> Sleep
+                    </span>
+                    <span className="text-xs font-mono font-bold text-purple-400">
+                      {targetDayLog?.sleepHours || 0} hrs
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-400 font-mono truncate">
+                    Quality: {targetDayLog?.sleepQuality ? `${targetDayLog.sleepQuality}/5` : 'Not rated'}
+                  </p>
+                </div>
+
+                {/* Meals */}
+                <div className="p-4 bg-black/40 border border-white/5 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase text-gray-400 flex items-center gap-1">
+                      <Utensils className="w-3.5 h-3.5 text-amber-400" /> Meals
+                    </span>
+                    <span className="text-xs font-mono font-bold text-amber-400">
+                      {(targetDayLog?.meals || []).filter(m => m.completed).length} / {(targetDayLog?.meals || []).length || 4} Logged
+                    </span>
+                  </div>
+                  <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden">
+                    <div 
+                      className="bg-amber-400 h-full rounded-full" 
+                      style={{ width: `${Math.min(100, Math.round((((targetDayLog?.meals || []).filter(m => m.completed).length) / Math.max(1, (targetDayLog?.meals || []).length || 4)) * 100))}%` }} 
+                    />
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </div>
+        ) : (
+          <>
 
         {/* 2. SECTION A: PHYSICAL PROFILE & WEIGHT OVERVIEW */}
         <Card className="p-6 bg-[#0d1424] border border-white/10 rounded-2xl space-y-6 progress-report-card">
@@ -863,6 +1644,8 @@ export function ProgressReportModal({
             )}
           </div>
         </Card>
+      </>
+    )}
 
       </div>
     </div>
