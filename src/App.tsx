@@ -1519,7 +1519,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-brand-dark text-gray-100 selection:bg-brand-primary selection:text-white relative overflow-x-hidden">
       {/* Background decorative elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+      <div className="fixed inset-0 overflow-hidden pointer-events-none no-print">
         <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-brand-primary/10 blur-[120px] rounded-full" />
         <div className="absolute top-[20%] -right-[5%] w-[30%] h-[30%] bg-brand-accent/5 blur-[100px] rounded-full" />
         <div className="absolute -bottom-[10%] left-[20%] w-[50%] h-[50%] bg-brand-primary/5 blur-[150px] rounded-full" />
@@ -3271,7 +3271,7 @@ export default function App() {
               key="report"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="space-y-16 max-w-5xl mx-auto relative"
+              className="space-y-16 max-w-5xl mx-auto relative transformation-report-container"
             >
               {/* Download Button Actions */}
               <div className="flex justify-end items-center gap-4 no-print border-b border-white/5 pb-8">

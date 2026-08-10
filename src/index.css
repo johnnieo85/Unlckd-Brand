@@ -82,69 +82,75 @@
   @media print {
     @page {
       size: letter portrait;
-      margin: 4mm;
+      margin: 6mm;
     }
 
     .no-print {
       display: none !important;
     }
     
-    html, body {
+    html, body, #root, #root > div, main, .min-h-screen {
       background: #070b14 !important;
       color: #f3f4f6 !important;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
       width: 100% !important;
+      height: auto !important;
+      min-height: 100% !important;
+      max-height: none !important;
+      overflow: visible !important;
+      overflow-x: visible !important;
+      overflow-y: visible !important;
+      position: static !important;
       margin: 0 !important;
       padding: 0 !important;
+      transform: none !important;
     }
 
-    /* Hide background Gym Hub elements when progress report is being printed */
+    /* Prevent inline transforms from clipping print output */
+    [style*="transform"],
+    .transformation-report-container,
+    .progress-report-container,
+    .progress-report-modal-wrapper {
+      transform: none !important;
+      filter: none !important;
+    }
+
+    /* Hide background elements when printing progress report modal */
     body.printing-progress-report > *:not(.progress-report-modal-wrapper),
-    body.printing-progress-report #root > div > *:not(.progress-report-modal-wrapper):not(:has(.progress-report-modal-wrapper)),
-    body.printing-progress-report .space-y-6 > *:not(.progress-report-modal-wrapper),
-    body.printing-progress-report .space-y-8 > *:not(.progress-report-modal-wrapper) {
+    body.printing-progress-report #root > div > *:not(.progress-report-modal-wrapper) {
       display: none !important;
     }
 
-    /* Hide all non-modal elements by default */
-    body.printing-progress-report * {
-      visibility: hidden;
-    }
-
-    /* Force modal wrapper and its contents to be visible */
-    body.printing-progress-report .progress-report-modal-wrapper,
-    body.printing-progress-report .progress-report-modal-wrapper * {
-      visibility: visible !important;
-    }
-
-    /* Modal printable container override */
+    /* Force modal wrapper to flow naturally across multiple pages in print */
     .progress-report-modal-wrapper {
-      position: absolute !important;
-      left: 0 !important;
-      top: 0 !important;
+      position: static !important;
+      left: auto !important;
+      top: auto !important;
       width: 100% !important;
       height: auto !important;
       min-height: 100% !important;
+      max-height: none !important;
       background: #070b14 !important;
       overflow: visible !important;
+      overflow-x: visible !important;
+      overflow-y: visible !important;
       display: block !important;
       padding: 0 !important;
       margin: 0 !important;
-      z-index: 999999 !important;
+      z-index: 1 !important;
     }
 
-    .progress-report-container {
+    .progress-report-container,
+    .transformation-report-container {
       max-width: 100% !important;
       padding: 0 !important;
       margin: 0 !important;
       width: 100% !important;
-      font-size: 85% !important;
-      zoom: 0.80 !important; /* Perfect scaling for 1-page output */
-      -webkit-transform: scale(0.80) !important;
-      -webkit-transform-origin: top left !important;
-      transform: scale(0.80) !important;
-      transform-origin: top left !important;
+      height: auto !important;
+      overflow: visible !important;
+      zoom: normal !important;
+      transform: none !important;
     }
 
     /* Force 2-column grid side-by-side layout in print */
@@ -154,93 +160,52 @@
       gap: 0.5rem !important;
     }
 
-    /* Compact spacing for single page print fit */
-    .progress-report-container > * + * {
-      margin-top: 0.3rem !important;
-    }
-
-    .progress-report-container .space-y-6 > * + * {
-      margin-top: 0.3rem !important;
-    }
-
     .progress-report-card {
       break-inside: avoid !important;
       page-break-inside: avoid !important;
       background-color: #0d1424 !important;
       border: 1px solid rgba(255, 255, 255, 0.15) !important;
       box-shadow: none !important;
-      padding: 0.4rem 0.5rem !important;
+      padding: 0.5rem 0.6rem !important;
       border-radius: 0.5rem !important;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
 
-    .progress-report-card > * + * {
-      margin-top: 0.2rem !important;
+    /* Section & Page break controls */
+    section,
+    .report-section {
+      break-inside: auto !important;
+      page-break-inside: auto !important;
+      height: auto !important;
+      overflow: visible !important;
     }
 
-    .progress-report-card .space-y-4 > * + * {
-      margin-top: 0.2rem !important;
+    .print-break-before {
+      break-before: page !important;
+      page-break-before: always !important;
     }
 
-    .progress-report-card .space-y-6 > * + * {
-      margin-top: 0.2rem !important;
+    .print-break-after {
+      break-after: page !important;
+      page-break-after: always !important;
     }
 
-    .progress-report-card .space-y-3 > * + * {
-      margin-top: 0.15rem !important;
-    }
-
-    /* Force tables and set grids to be compact when printing */
-    .progress-report-card table th,
-    .progress-report-card table td {
-      padding: 0.2rem 0.35rem !important;
-      font-size: 9.5px !important;
-      line-height: 1.15 !important;
-    }
-
-    .progress-report-card h1 {
-      font-size: 1.1rem !important;
-      line-height: 1.1 !important;
-    }
-
-    .progress-report-card h2,
-    .progress-report-card h3 {
-      font-size: 0.85rem !important;
-      line-height: 1.15 !important;
-    }
-
-    .progress-report-card p {
-      font-size: 9.5px !important;
-      line-height: 1.2 !important;
-    }
-
-    .progress-report-card .grid {
-      gap: 0.3rem !important;
-    }
-
-    .progress-report-card .p-3,
-    .progress-report-card .p-3.5,
-    .progress-report-card .p-4,
-    .progress-report-card .p-5,
-    .progress-report-card .p-6 {
-      padding: 0.3rem 0.45rem !important;
-    }
-
-    /* Scale down images and icons in print */
-    .progress-report-container img {
-      max-height: 32px !important;
-      max-width: 32px !important;
-    }
-
-    .print-break-inside-avoid, tr, section {
-      page-break-inside: avoid !important;
+    .print-break-inside-avoid, tr, .bg-brand-surface {
       break-inside: avoid !important;
+      page-break-inside: avoid !important;
     }
 
     table {
       width: 100% !important;
       border-collapse: collapse !important;
+      break-inside: auto !important;
+      page-break-inside: auto !important;
+    }
+
+    table tr {
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
     }
 
     table tr td, table tr th {
@@ -248,7 +213,6 @@
       print-color-adjust: exact !important;
     }
 
-    /* Links should stay visible in PDF */
     a {
       text-decoration: none !important;
       color: #10b981 !important;
