@@ -75,9 +75,11 @@ export function ProgressReportModal({
 
   useEffect(() => {
     if (!isOpen) return;
+    document.body.classList.add('printing-progress-report');
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
+      document.body.classList.remove('printing-progress-report');
       document.body.style.overflow = originalOverflow;
     };
   }, [isOpen]);
