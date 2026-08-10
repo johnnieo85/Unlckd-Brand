@@ -57,7 +57,7 @@
   @media print {
     @page {
       size: letter portrait;
-      margin: 4mm;
+      margin: 2mm;
     }
 
     .no-print {
@@ -71,6 +71,7 @@
       print-color-adjust: exact !important;
       width: 100% !important;
       height: 100% !important;
+      max-height: 100vh !important;
       overflow: hidden !important;
       position: static !important;
     }
@@ -85,6 +86,7 @@
       max-height: 100vh !important;
       display: block !important;
       padding: 0 !important;
+      margin: 0 !important;
     }
 
     .progress-report-container {
@@ -92,14 +94,21 @@
       padding: 0 !important;
       margin: 0 !important;
       width: 100% !important;
-      font-size: 82% !important;
-      zoom: 0.8 !important; /* Scales report layout to guarantee single-page printable fit */
-      transform-origin: top left;
+      font-size: 75% !important;
+      zoom: 0.60 !important; /* Condenses report layout to guarantee 1-page fit */
+      -webkit-transform: scale(0.60) !important;
+      -webkit-transform-origin: top left !important;
+      transform: scale(0.60) !important;
+      transform-origin: top left !important;
     }
 
     /* Compact spacing for single page print fit */
     .progress-report-container > * + * {
-      margin-top: 0.35rem !important;
+      margin-top: 0.2rem !important;
+    }
+
+    .progress-report-container .space-y-6 > * + * {
+      margin-top: 0.2rem !important;
     }
 
     .progress-report-card {
@@ -108,40 +117,54 @@
       background-color: #0d1424 !important;
       border: 1px solid rgba(255, 255, 255, 0.15) !important;
       box-shadow: none !important;
-      padding: 0.4rem 0.6rem !important;
-      border-radius: 0.5rem !important;
+      padding: 0.25rem 0.4rem !important;
+      border-radius: 0.375rem !important;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
 
     .progress-report-card > * + * {
-      margin-top: 0.25rem !important;
+      margin-top: 0.15rem !important;
+    }
+
+    .progress-report-card .space-y-4 > * + * {
+      margin-top: 0.15rem !important;
+    }
+
+    .progress-report-card .space-y-6 > * + * {
+      margin-top: 0.15rem !important;
+    }
+
+    .progress-report-card .space-y-3 > * + * {
+      margin-top: 0.1rem !important;
     }
 
     /* Force tables and set grids to be compact when printing */
     .progress-report-card table th,
     .progress-report-card table td {
-      padding: 0.2rem 0.4rem !important;
-      font-size: 10px !important;
+      padding: 0.12rem 0.25rem !important;
+      font-size: 8.5px !important;
+      line-height: 1.1 !important;
     }
 
     .progress-report-card h1 {
-      font-size: 1.25rem !important;
-      line-height: 1.2 !important;
+      font-size: 1rem !important;
+      line-height: 1.1 !important;
     }
 
     .progress-report-card h2,
     .progress-report-card h3 {
-      font-size: 0.9rem !important;
-      line-height: 1.2 !important;
+      font-size: 0.75rem !important;
+      line-height: 1.1 !important;
     }
 
     .progress-report-card p {
-      font-size: 10px !important;
+      font-size: 8.5px !important;
+      line-height: 1.15 !important;
     }
 
     .progress-report-card .grid {
-      gap: 0.35rem !important;
+      gap: 0.2rem !important;
     }
 
     .progress-report-card .p-3,
@@ -149,13 +172,13 @@
     .progress-report-card .p-4,
     .progress-report-card .p-5,
     .progress-report-card .p-6 {
-      padding: 0.35rem 0.5rem !important;
+      padding: 0.2rem 0.35rem !important;
     }
 
     /* Scale down images and icons in print */
     .progress-report-container img {
-      max-height: 36px !important;
-      max-width: 36px !important;
+      max-height: 28px !important;
+      max-width: 28px !important;
     }
 
     .print-break-inside-avoid, tr, section {
