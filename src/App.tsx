@@ -74,6 +74,7 @@ import { Header } from './components/Header';
 import { Logo } from './components/Logo';
 import { LevelInfoModal } from './components/LevelInfoModal';
 import { ProgressReportModal } from './components/ProgressReportModal';
+import { SubscriptionModal } from './components/SubscriptionModal';
 import { ClientData } from './components/ClientHub';
 
 const cleanEvaluationText = (text: string) => {
@@ -715,6 +716,7 @@ export default function App() {
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [isLevelModalOpen, setIsLevelModalOpen] = useState(false);
+  const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
   const [clientReportData, setClientReportData] = useState<ClientData | null>(null);
   const [isClientReportOpen, setIsClientReportOpen] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
@@ -1540,6 +1542,7 @@ export default function App() {
         setShowGymAuth={setShowGymAuth}
         onShowAccount={() => setIsAccountModalOpen(true)}
         onOpenLevelModal={() => setIsLevelModalOpen(true)}
+        onOpenSubscriptionModal={() => setIsSubscriptionModalOpen(true)}
       />
 
       <main className="relative pt-32 pb-20 px-6 max-w-6xl mx-auto">
@@ -1600,6 +1603,7 @@ export default function App() {
                 hasAccess={hasAccess || false}
                 isPremium={isPremium}
                 onOpenLevelModal={() => setIsLevelModalOpen(true)}
+                onOpenSubscriptionModal={() => setIsSubscriptionModalOpen(true)}
               />
             </motion.div>
           ) : (
@@ -4741,6 +4745,16 @@ export default function App() {
         onBackToClientHub={() => {
           setIsClientReportOpen(false);
           setClientReportData(null);
+        }}
+      />
+
+      <SubscriptionModal
+        isOpen={isSubscriptionModalOpen}
+        onClose={() => setIsSubscriptionModalOpen(false)}
+        userProfile={userProfile}
+        onProfileUpdated={(updatedProfile) => {
+          setUserProfile(updatedProfile);
+          refreshProfile();
         }}
       />
     </div>

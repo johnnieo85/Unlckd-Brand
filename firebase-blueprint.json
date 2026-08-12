@@ -28,7 +28,14 @@
         "displayName": { "type": "string" },
         "photoURL": { "type": "string" },
         "level": { "type": "number" },
-        "xp": { "type": "number" }
+        "xp": { "type": "number" },
+        "plan": { "type": "string", "enum": ["free", "pro", "coach"] },
+        "billingCycle": { "type": "string", "enum": ["monthly", "annual", "lifetime"] },
+        "renewalDate": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "past_due", "canceled", "trialing"] },
+        "clientBand": { "type": "string", "enum": ["1-5", "6-15", "16-30", "31+"] },
+        "cancelAtPeriodEnd": { "type": "boolean" },
+        "subscriptionId": { "type": "string" }
       },
       "required": ["userId", "email", "hasAccess"]
     },

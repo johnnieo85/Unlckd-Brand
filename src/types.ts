@@ -186,6 +186,11 @@ export interface Badge {
   unlockedAt: string;
 }
 
+export type SubscriptionPlanType = 'free' | 'pro' | 'coach';
+export type BillingCycleType = 'monthly' | 'annual' | 'lifetime';
+export type SubscriptionStatusType = 'active' | 'past_due' | 'canceled' | 'trialing';
+export type ClientCountBand = '1-5' | '6-15' | '16-30' | '31+';
+
 export interface UserProfile {
   userId: string;
   email: string;
@@ -199,6 +204,14 @@ export interface UserProfile {
   xp?: number;
   streak?: number;
   membershipTier?: 'standard' | 'trainer';
+  // Subscription state fields
+  plan?: SubscriptionPlanType;
+  billingCycle?: BillingCycleType;
+  renewalDate?: string;
+  status?: SubscriptionStatusType;
+  clientBand?: ClientCountBand;
+  cancelAtPeriodEnd?: boolean;
+  subscriptionId?: string;
   avatarUrl?: string;
   fullName?: string;
   age?: string;

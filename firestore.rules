@@ -17,18 +17,15 @@ service cloud.firestore {
       allow read: if isSignedIn() && isOwner(userId);
       allow create: if isSignedIn() && 
                       isOwner(userId) && 
-                      request.resource.data.keys().hasAll(['userId', 'email', 'hasAccess']) &&
-                      request.resource.data.hasAccess == false; // Initial creation always restricted
-      allow update: if isSignedIn() && 
-                      isOwner(userId) && 
-                      request.resource.data.hasAccess == resource.data.hasAccess; // Users cannot grant themselves access
+                      request.resource.data.keys().hasAll(['userId', 'email']);
+      allow update: if isSignedIn() && isOwner(userId);
 
       match /dailyLogs/{date} {
-        allow read, write: if isSignedIn() && isOwner(userId) && hasAccess();
+        allow read, write: if isSignedIn() && isOwner(userId);
       }
 
       match /measurements/{measurementId} {
-        allow read, write: if isSignedIn() && isOwner(userId) && hasAccess();
+        allow read, write: if isSignedIn() && isOwner(userId);
       }
     }
 

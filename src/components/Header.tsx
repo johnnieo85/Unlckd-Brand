@@ -10,7 +10,8 @@ import {
   Settings,
   Menu,
   X,
-  Users
+  Users,
+  CreditCard
 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Card';
@@ -35,6 +36,7 @@ export interface HeaderProps {
   setShowGymAuth: (show: boolean) => void;
   onShowAccount: () => void;
   onOpenLevelModal?: () => void;
+  onOpenSubscriptionModal?: () => void;
 }
 
 const formatShortName = (fullName?: string | null, email?: string | null) => {
@@ -75,7 +77,8 @@ export const Header: React.FC<HeaderProps> = ({
   handleSignOut,
   setShowGymAuth,
   onShowAccount,
-  onOpenLevelModal
+  onOpenLevelModal,
+  onOpenSubscriptionModal
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -96,6 +99,19 @@ export const Header: React.FC<HeaderProps> = ({
         />
         
         <div className="flex items-center gap-2 sm:gap-4 no-print">
+          {onOpenSubscriptionModal && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onOpenSubscriptionModal}
+              className="hidden lg:flex items-center gap-2 px-3.5 py-2 bg-brand-primary/10 border-brand-primary/30 text-brand-primary rounded-full text-xs font-bold hover:bg-brand-primary/20 transition-all shadow-sm cursor-pointer"
+              title="View & Manage Subscription Tiers"
+            >
+              <CreditCard className="w-3.5 h-3.5" />
+              <span>Billing & Plans</span>
+            </Button>
+          )}
+
           <a 
             href="https://unlckdbrand.com/unlckd-pro-trainer" 
             target="_blank" 
@@ -218,6 +234,11 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
 
                 <div className="flex items-center gap-1">
+                  {onOpenSubscriptionModal && (
+                    <Button variant="ghost" size="icon" onClick={onOpenSubscriptionModal} className="hover:bg-white/5 text-brand-primary hover:text-white" title="Manage Subscription & Pricing">
+                      <CreditCard className="w-4 h-4 text-brand-primary" />
+                    </Button>
+                  )}
                   <Button variant="ghost" size="icon" onClick={() => setActiveTab('profile')} className={cn("hover:bg-white/5", activeTab === 'profile' ? "text-brand-primary bg-white/10" : "text-gray-400 hover:text-white")} title="Profile & Settings">
                     <Settings className="w-4 h-4" />
                   </Button>
@@ -323,6 +344,21 @@ export const Header: React.FC<HeaderProps> = ({
                 >
                   <Users className="w-4 h-4 text-amber-400" />
                   <span>Client Hub</span>
+                </Button>
+              )}
+
+              {onOpenSubscriptionModal && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    onOpenSubscriptionModal();
+                    setMobileMenuOpen(false);
+                  }}
+                  className="justify-start gap-2.5 text-xs font-bold py-2.5 bg-brand-primary/10 border-brand-primary/30 text-brand-primary hover:bg-brand-primary/20 col-span-2 cursor-pointer"
+                >
+                  <CreditCard className="w-4 h-4 text-brand-primary" />
+                  <span>Billing & Subscription Plans</span>
                 </Button>
               )}
 

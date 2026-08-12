@@ -16,7 +16,8 @@ import {
   Sparkles,
   Camera,
   Trash2,
-  Activity
+  Activity,
+  CreditCard
 } from 'lucide-react';
 import { Card, Badge as UiBadge } from './ui/Card';
 import { Button } from './ui/Button';
@@ -39,6 +40,7 @@ interface ProfilePageProps {
   hasAccess: boolean;
   isPremium: boolean;
   onOpenLevelModal?: () => void;
+  onOpenSubscriptionModal?: () => void;
 }
 
 const DEFAULT_YEAR_BADGES: UserBadge[] = [
@@ -70,7 +72,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   loadHistory,
   hasAccess,
   isPremium,
-  onOpenLevelModal
+  onOpenLevelModal,
+  onOpenSubscriptionModal
 }) => {
   const isTrainer = userProfile?.membershipTier === 'trainer';
 
@@ -551,6 +554,32 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
             </motion.div>
           )}
         </AnimatePresence>
+      </Card>
+
+      {/* Subscription & Billing Section */}
+      <Card className="p-4 sm:p-6 bg-gradient-to-r from-brand-surface via-brand-surface to-brand-primary/10 border-brand-primary/30 space-y-4 rounded-2xl relative overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <CreditCard className="w-5 h-5 text-brand-primary" />
+              <h3 className="text-sm font-black uppercase tracking-wider text-white">Membership Plan & Billing</h3>
+            </div>
+            <p className="text-xs text-gray-400">
+              Current Plan: <span className="text-white font-bold capitalize">{userProfile?.plan || 'Free'}</span>
+              {userProfile?.billingCycle && <span className="text-gray-500 font-mono"> ({userProfile.billingCycle})</span>}
+              {userProfile?.clientBand && <span className="text-amber-400 font-mono"> • {userProfile.clientBand} Clients</span>}
+            </p>
+          </div>
+          {onOpenSubscriptionModal && (
+            <Button
+              onClick={onOpenSubscriptionModal}
+              className="bg-brand-primary text-brand-dark font-bold text-xs uppercase tracking-wider py-2.5 px-4 hover:bg-brand-primary/90 shadow-lg shadow-brand-primary/20 shrink-0 cursor-pointer"
+            >
+              <CreditCard className="w-4 h-4 mr-1.5" />
+              Manage Subscription & Pricing
+            </Button>
+          )}
+        </div>
       </Card>
 
       {/* Editable Fields Grid (Collapsible) */}

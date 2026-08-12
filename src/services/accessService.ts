@@ -2,20 +2,29 @@ import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { User as FirebaseUser } from 'firebase/auth';
 
-import { UserProfile, Badge } from '../types';
+import { UserProfile, SubscriptionPlanType, BillingCycleType, SubscriptionStatusType, ClientCountBand } from '../types';
 
 export async function ensureUserProfile(user: FirebaseUser): Promise<UserProfile> {
   const userRef = doc(db, 'users', user.uid);
   const userSnap = await getDoc(userRef);
 
+  const defaultRenewalDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
   if (!userSnap.exists()) {
     const newProfile: UserProfile = {
       userId: user.uid,
       email: user.email || '',
-      hasAccess: false, // Default to no access
+      hasAccess: true, // Standard user access granted
       isPremium: false,
       createdAt: serverTimestamp(),
       badges: [],
+      plan: 'free',
+      billingCycle: 'monthly',
+      renewalDate: defaultRenewalDate,
+      status: 'active',
+      clientBand: '1-5',
+      cancelAtPeriodEnd: false,
+      subscriptionId: `sub_free_${user.uid.slice(0, 8)}`,
       monthlyGoal: {
         title: "The Stepper May Mission",
         description: "Average 10,000 steps daily throughout May to unlock the elite status.",
@@ -28,12 +37,69 @@ export async function ensureUserProfile(user: FirebaseUser): Promise<UserProfile
     return newProfile;
   }
 
-  return userSnap.data() as UserProfile;
+  const existingData = userSnap.data() as UserProfile;
+  
+  // Backfill subscription state if missing in existing profile
+  const needsBackfill = !existingData.plan || !existingData.status || !existingData.renewalDate;
+  if (needsBackfill) {
+    const defaultPlan: SubscriptionPlanType = existingData.isPremium ? 'pro' : 'free';
+    const updatedState: Partial<UserProfile> = {
+      plan: existingData.plan || defaultPlan,
+      billingCycle: existingData.billingCycle || 'monthly',
+      renewalDate: existingData.renewalDate || defaultRenewalDate,
+      status: existingData.status || 'active',
+      clientBand: existingData.clientBand || '1-5',
+      cancelAtPeriodEnd: existingData.cancelAtPeriodEnd ?? false,
+      subscriptionId: existingData.subscriptionId || `sub_${defaultPlan}_${user.uid.slice(0, 8)}`
+    };
+    await setDoc(userRef, updatedState, { merge: true });
+    return { ...existingData, ...updatedState };
+  }
+
+  return existingData;
 }
 
 export async function updateUserProfile(userId: string, data: Partial<UserProfile>): Promise<void> {
   const userRef = doc(db, 'users', userId);
   await setDoc(userRef, data, { merge: true });
+}
+
+export async function updateSubscriptionPlan(
+  userId: string,
+  params: {
+    plan: SubscriptionPlanType;
+    billingCycle: BillingCycleType;
+    clientBand?: ClientCountBand;
+    status?: SubscriptionStatusType;
+    renewalDate?: string;
+    cancelAtPeriodEnd?: boolean;
+  }
+): Promise<UserProfile> {
+  const userRef = doc(db, 'users', userId);
+  const now = new Date();
+  const nextRenewal = params.renewalDate || new Date(now.setDate(now.getDate() + (params.billingCycle === 'annual' ? 365 : 30))).toISOString().split('T')[0];
+  const newStatus = params.status || 'active';
+
+  const isPaid = params.plan === 'pro' || params.plan === 'coach';
+  const isTrainer = params.plan === 'coach';
+
+  const updateData: Partial<UserProfile> = {
+    plan: params.plan,
+    billingCycle: params.billingCycle,
+    clientBand: params.clientBand || '1-5',
+    status: newStatus,
+    renewalDate: nextRenewal,
+    cancelAtPeriodEnd: params.cancelAtPeriodEnd ?? false,
+    subscriptionId: `sub_${params.plan}_${userId.slice(0, 8)}_${Date.now().toString().slice(-4)}`,
+    hasAccess: true,
+    isPremium: isPaid,
+    membershipTier: isTrainer ? 'trainer' : 'standard'
+  };
+
+  await setDoc(userRef, updateData, { merge: true });
+  
+  const updatedSnap = await getDoc(userRef);
+  return updatedSnap.data() as UserProfile;
 }
 
 export async function checkUserAccess(userId: string): Promise<boolean> {
@@ -49,7 +115,7 @@ export async function checkUserAccess(userId: string): Promise<boolean> {
 
 export async function unlockPremium(userId: string): Promise<void> {
   const userRef = doc(db, 'users', userId);
-  await setDoc(userRef, { isPremium: true }, { merge: true });
+  await setDoc(userRef, { isPremium: true, plan: 'pro', status: 'active' }, { merge: true });
 }
 
 export async function updateGymPin(userId: string, pin: string): Promise<void> {
