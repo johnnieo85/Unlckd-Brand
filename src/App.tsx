@@ -1545,7 +1545,7 @@ export default function App() {
         onOpenSubscriptionModal={() => setIsSubscriptionModalOpen(true)}
       />
 
-      <main className="relative pt-32 pb-20 px-6 max-w-6xl mx-auto">
+      <main className="relative pt-28 sm:pt-32 pb-20 px-3 sm:px-6 max-w-6xl mx-auto">
         <AnimatePresence mode="wait">
           {activeTab === 'gym' ? (
             <motion.div

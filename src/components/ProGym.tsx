@@ -3721,7 +3721,7 @@ export const ProGym = ({
           </div>
 
           {/* Workout Details */}
-          <Card className="p-6 md:p-8 bg-brand-surface border-white/5">
+          <Card className="p-4 sm:p-6 md:p-8 bg-brand-surface border-white/5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="p-2 bg-brand-primary/10 rounded-lg shrink-0">
@@ -4018,7 +4018,7 @@ export const ProGym = ({
       </Card>
 
           {/* Meal Log */}
-          <Card className="p-6 md:p-8 bg-brand-surface border-white/5">
+          <Card className="p-4 sm:p-6 md:p-8 bg-brand-surface border-white/5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
               <div className="flex items-center gap-3">
                 <div 

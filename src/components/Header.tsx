@@ -82,6 +82,8 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  const isCoach = userProfile?.plan === 'coach' || userProfile?.membershipTier === 'trainer';
+
   const displayName = formatShortName(
     userProfile?.fullName || user?.displayName,
     user?.email
@@ -193,7 +195,9 @@ export const Header: React.FC<HeaderProps> = ({
                         </Badge>
                       </span>
                     )}
-                    {hasAccess ? (
+                    {isCoach ? (
+                      <Badge className="text-[8px] h-3.5 px-1 py-0 border-purple-500/30 bg-purple-500/20 text-purple-300 uppercase font-black leading-none shadow-[0_0_8px_rgba(168,85,247,0.3)]">Coach</Badge>
+                    ) : hasAccess ? (
                       <Badge className="text-[8px] h-3.5 px-1 py-0 border-brand-primary/20 bg-brand-primary/10 text-brand-primary uppercase font-black leading-none">Pro</Badge>
                     ) : (
                       <Badge className="text-[8px] h-3.5 px-1 py-0 border-red-500/20 bg-red-500/10 text-red-500 uppercase font-black leading-none">Restricted</Badge>
@@ -201,41 +205,48 @@ export const Header: React.FC<HeaderProps> = ({
                   </div>
                   <motion.div 
                     initial={false}
-                    animate={isPremium ? {
-                      textShadow: [
-                        "0 0 5px rgba(251, 191, 36, 0.4)",
-                        "0 0 15px rgba(251, 191, 36, 0.8)",
-                        "0 0 5px rgba(251, 191, 36, 0.4)"
-                      ],
-                      scale: [1, 1.02, 1]
-                    } : {}}
+                    animate={
+                      isCoach ? {
+                        textShadow: [
+                          "0 0 6px rgba(168, 85, 247, 0.6)",
+                          "0 0 20px rgba(168, 85, 247, 1)",
+                          "0 0 6px rgba(168, 85, 247, 0.6)"
+                        ],
+                        scale: [1, 1.03, 1]
+                      } : isPremium ? {
+                        textShadow: [
+                          "0 0 5px rgba(251, 191, 36, 0.4)",
+                          "0 0 15px rgba(251, 191, 36, 0.8)",
+                          "0 0 5px rgba(251, 191, 36, 0.4)"
+                        ],
+                        scale: [1, 1.02, 1]
+                      } : {}
+                    }
                     transition={{
                       duration: 3,
                       repeat: Infinity,
                       ease: "easeInOut"
                     }}
                     className={cn(
-                      "text-xs font-bold flex items-center justify-end gap-1.5 group-hover:text-brand-primary transition-colors whitespace-nowrap",
-                      isPremium ? "text-amber-400" : "text-gray-200"
+                      "text-xs font-bold flex items-center justify-end gap-1.5 transition-colors whitespace-nowrap",
+                      isCoach ? "text-purple-300 font-extrabold group-hover:text-purple-200" : isPremium ? "text-amber-400 group-hover:text-brand-primary" : "text-gray-200 group-hover:text-brand-primary"
                     )}
                   >
                     {userProfile?.avatarUrl && (
-                      <div className="w-5 h-5 rounded-full overflow-hidden border border-brand-primary/50 bg-black/50 shrink-0">
+                      <div className={cn(
+                        "w-5 h-5 rounded-full overflow-hidden border bg-black/50 shrink-0",
+                        isCoach ? "border-purple-400/80 shadow-[0_0_8px_rgba(168,85,247,0.5)]" : "border-brand-primary/50"
+                      )}>
                         <img src={userProfile.avatarUrl} alt={displayName} className="w-full h-full object-cover" />
                       </div>
                     )}
-                    <span>{displayName}</span>
-                    {isPremium && (
-                      <span className="bg-amber-400/20 px-1 py-0.5 rounded border border-amber-400/30 text-[8px] font-black tracking-tighter uppercase leading-none">
-                        PREMIUM
-                      </span>
-                    )}
+                    <span className={isCoach ? "text-purple-300 drop-shadow-[0_0_8px_rgba(168,85,247,0.8)]" : ""}>{displayName}</span>
                   </motion.div>
                 </div>
 
                 <div className="flex items-center gap-1">
                   {onOpenSubscriptionModal && (
-                    <Button variant="ghost" size="icon" onClick={onOpenSubscriptionModal} className="hover:bg-white/5 text-brand-primary hover:text-white" title="Manage Subscription & Pricing">
+                    <Button variant="ghost" size="icon" onClick={onOpenSubscriptionModal} className="hover:bg-white/5 text-brand-primary hover:text-white" title="Billing & Purchase Plans">
                       <CreditCard className="w-4 h-4 text-brand-primary" />
                     </Button>
                   )}

@@ -407,9 +407,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 <UiBadge className={cn(
                   "text-[9px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md border shrink-0",
                   membershipTier === 'coach'
-                    ? "bg-amber-400/20 text-amber-400 border-amber-400/40" 
+                    ? "bg-purple-500/20 text-purple-300 border-purple-500/40 shadow-[0_0_8px_rgba(168,85,247,0.3)]" 
                     : membershipTier === 'premium'
-                    ? "bg-purple-500/20 text-purple-300 border-purple-500/40"
+                    ? "bg-amber-400/20 text-amber-400 border-amber-400/40"
                     : "bg-brand-primary/20 text-brand-primary border-brand-primary/40"
                 )}>
                   {accountStatusLabel}
@@ -514,13 +514,18 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 {/* Core Info */}
                 <div className="space-y-2.5 text-center sm:text-left flex-1">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-2 justify-center sm:justify-start">
-                    <h1 className="text-2xl font-display font-black text-white">{fullName}</h1>
+                    <h1 className={cn(
+                      "text-2xl font-display font-black",
+                      membershipTier === 'coach' ? "text-purple-300 drop-shadow-[0_0_12px_rgba(168,85,247,0.85)] animate-pulse" : "text-white"
+                    )}>
+                      {fullName}
+                    </h1>
                     <UiBadge className={cn(
                       "text-[9px] font-black uppercase tracking-wider self-center sm:self-auto px-2.5 py-0.5 rounded-md border",
                       membershipTier === 'coach'
-                        ? "bg-amber-400/20 text-amber-400 border-amber-400/40" 
+                        ? "bg-purple-500/20 text-purple-300 border-purple-500/40 shadow-[0_0_8px_rgba(168,85,247,0.3)]" 
                         : membershipTier === 'premium'
-                        ? "bg-purple-500/20 text-purple-300 border-purple-500/40"
+                        ? "bg-amber-400/20 text-amber-400 border-amber-400/40"
                         : "bg-brand-primary/20 text-brand-primary border-brand-primary/40"
                     )}>
                       {accountStatusLabel}
@@ -573,10 +578,10 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
           {onOpenSubscriptionModal && (
             <Button
               onClick={onOpenSubscriptionModal}
-              className="bg-brand-primary text-brand-dark font-bold text-xs uppercase tracking-wider py-2.5 px-4 hover:bg-brand-primary/90 shadow-lg shadow-brand-primary/20 shrink-0 cursor-pointer"
+              className="bg-brand-primary text-brand-dark font-black text-xs uppercase tracking-wider py-2.5 px-4 hover:bg-brand-primary/90 shadow-lg shadow-brand-primary/20 shrink-0 cursor-pointer"
             >
               <CreditCard className="w-4 h-4 mr-1.5" />
-              Manage Subscription & Pricing
+              Billing & Purchase Plans
             </Button>
           )}
         </div>

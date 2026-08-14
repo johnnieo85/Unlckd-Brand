@@ -84,7 +84,7 @@ export function ExerciseCard({
 
   return (
     <div 
-      className={`p-4 sm:p-5 rounded-2xl border transition-all ${
+      className={`p-3 sm:p-4 md:p-5 rounded-2xl border transition-all ${
         isCollapsed ? 'space-y-0' : 'space-y-3'
       } ${
         isCompleted 
@@ -93,19 +93,19 @@ export function ExerciseCard({
       }`}
     >
       {/* Top Header */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3 flex-1 min-w-0">
+      <div className="flex items-start justify-between gap-2 sm:gap-3">
+        <div className="flex items-start gap-2.5 sm:gap-3.5 flex-1 min-w-0">
           <button 
             type="button"
             onClick={() => onToggle(exerciseId, reps, sets)}
-            className={`w-6 h-6 rounded-lg border flex items-center justify-center transition-all shrink-0 mt-0.5 cursor-pointer ${
+            className={`w-5 h-5 sm:w-6 sm:h-6 rounded-lg border flex items-center justify-center transition-all shrink-0 mt-0.5 cursor-pointer ${
               isCompleted 
                 ? "bg-emerald-500 border-emerald-500 text-brand-dark shadow-md shadow-emerald-500/20" 
                 : "border-white/20 hover:border-emerald-400/50 bg-black/30"
             }`}
             title={isCompleted ? "Mark workout in-progress" : "Mark entire exercise completed"}
           >
-            {isCompleted && <Check className="w-4 h-4 stroke-[3]" />}
+            {isCompleted && <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" />}
           </button>
 
           <div 
@@ -123,16 +123,16 @@ export function ExerciseCard({
                 />
               </div>
             ) : (
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="block min-w-0">
                 <a 
                   href={url || getSearchUrl(name, 'Workouts')}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
-                  className="group/title inline-flex items-center gap-1.5 hover:underline decoration-brand-primary decoration-2"
+                  className="group/title inline-block text-left hover:underline decoration-brand-primary decoration-2"
                   title={`Search "${name}" demonstration on YouTube`}
                 >
-                  <h4 className={`text-base font-bold text-white group-hover/title:text-brand-primary transition-all ${
+                  <h4 className={`text-sm sm:text-base font-bold text-white leading-snug sm:leading-normal break-words group-hover/title:text-brand-primary transition-colors ${
                     isCompleted ? "line-through text-gray-400" : ""
                   }`}>
                     {name}
@@ -141,31 +141,31 @@ export function ExerciseCard({
               </div>
             )}
 
-            <div className="flex items-center gap-3 flex-wrap mt-0.5">
-              <p className="text-xs text-gray-400 font-mono">
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap mt-0.5 sm:mt-1">
+              <p className="text-[11px] sm:text-xs text-gray-400 font-mono leading-tight">
                 {sets ? `${sets} ${sets === '1' ? 'set' : 'sets'}` : '3 sets'} × {reps || '10-12 reps'}
               </p>
 
               {/* Display previously performed weight tracking badge */}
               {lastPerfText && (
-                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-md text-[10px] font-mono text-emerald-400 font-bold">
-                  <History className="w-3 h-3 shrink-0" />
-                  <span>Last used weight: <strong className="text-white">{lastPerfText}</strong></span>
+                <div className="inline-flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-md text-[9px] sm:text-[10px] font-mono text-emerald-400 font-bold max-w-full">
+                  <History className="w-2.5 h-2.5 sm:w-3 sm:h-3 shrink-0" />
+                  <span className="truncate">Last: <strong className="text-white">{lastPerfText}</strong></span>
                 </div>
               )}
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-0.5 sm:gap-1 shrink-0 ml-1">
           <a 
             href={url || getSearchUrl(name, 'Workouts')} 
             target="_blank" 
             rel="noopener noreferrer"
-            className="text-gray-500 hover:text-brand-primary p-1.5 rounded-lg hover:bg-white/5 transition-colors shrink-0"
+            className="text-gray-500 hover:text-brand-primary p-1 sm:p-1.5 rounded-lg hover:bg-white/5 transition-colors shrink-0"
             title="Search or view exercise demonstration"
           >
-            <ExternalLink className="w-4 h-4" />
+            <ExternalLink className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </a>
           {onRemoveManual && (
             <button
@@ -174,19 +174,19 @@ export function ExerciseCard({
                 e.stopPropagation();
                 onRemoveManual(section, index);
               }}
-              className="text-gray-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-white/5 transition-colors cursor-pointer shrink-0"
+              className="text-gray-500 hover:text-red-400 p-1 sm:p-1.5 rounded-lg hover:bg-white/5 transition-colors cursor-pointer shrink-0"
               title="Delete exercise or warm-up"
             >
-              <Trash2 className="w-4 h-4" />
+              <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
           )}
           <button
             type="button"
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="text-gray-400 hover:text-white p-1.5 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+            className="text-gray-400 hover:text-white p-1 sm:p-1.5 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
             title={isCollapsed ? "Expand workout details" : "Collapse workout details"}
           >
-            {isCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+            {isCollapsed ? <ChevronDown className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <ChevronUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
           </button>
         </div>
       </div>
