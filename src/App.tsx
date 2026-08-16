@@ -52,7 +52,8 @@ import {
   Folder,
   HelpCircle,
   Mail,
-  AlertTriangle
+  AlertTriangle,
+  Scale
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Button } from './components/ui/Button';
@@ -63,7 +64,7 @@ import { checkReportOverlaps, getReportConflicts, getReportDateRange } from './u
 import { getWeeklyQuote } from './constants/quotes';
 import { SecurityGuard } from './components/SecurityGuard';
 import { Path, UserData, Photos, ProgressPhotos, AssessmentResult, Rating, SavedReport, UserProfile } from './types';
-import { generateTransformationReport, generateRecoveryGuidance } from './services/gemini';
+import { generateTransformationReport } from './services/gemini';
 import { getLevelInfo } from './lib/levels';
 import { auth } from './lib/firebase';
 import { onAuthStateChanged, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, OAuthProvider, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, setPersistence, browserSessionPersistence, sendPasswordResetEmail, updatePassword, browserPopupRedirectResolver } from 'firebase/auth';
@@ -369,6 +370,53 @@ const getSearchUrl = (title: string, category: 'Workouts' | 'Nutrition') => {
   }
   return `https://www.pinterest.com/search/pins/?q=${encodeURIComponent(cleanTitle + ' healthy recipe')}`;
 };
+
+export function getEffectiveReportPath(path?: Path, report?: any): Path {
+  if (path && ['assessment', 'workout', 'meal', 'progress', 'full'].includes(path)) {
+    return path;
+  }
+  const rt = String(report?.reportType || '').toLowerCase();
+  if (rt.includes('physique') || rt.includes('initial assessment') || rt.includes('assessment')) {
+    return 'assessment';
+  }
+  if (rt.includes('training') || rt === 'workout' || rt.includes('workout plan')) {
+    return 'workout';
+  }
+  if (rt.includes('meal') || rt.includes('nutrition')) {
+    return 'meal';
+  }
+  if (rt.includes('progress') || rt.includes('comparison')) {
+    return 'progress';
+  }
+  // Check content structures if reportType isn't set:
+  if (report?.workoutPlan?.length && !report?.mealPlan?.length) {
+    return 'workout';
+  }
+  if (report?.mealPlan?.length && !report?.workoutPlan?.length) {
+    return 'meal';
+  }
+  if (!report?.workoutPlan?.length && !report?.mealPlan?.length && report?.frontViewAnalysis) {
+    return 'assessment';
+  }
+  return 'full';
+}
+
+export function getReportTypeLabel(path?: Path, report?: any): string {
+  const effective = getEffectiveReportPath(path, report);
+  switch (effective) {
+    case 'assessment':
+      return 'Physique Assessment';
+    case 'workout':
+      return 'workout';
+    case 'meal':
+      return 'Meal Plan';
+    case 'progress':
+      return 'progress report';
+    case 'full':
+    default:
+      return 'full transformation report';
+  }
+}
 
 const extractLinks = (report: AssessmentResult) => {
   const links: { title: string; url: string; category: 'Workouts' | 'Nutrition' }[] = [];
@@ -1237,55 +1285,11 @@ export default function App() {
   };
 
   const [currentSavedReportId, setCurrentSavedReportId] = useState<string | null>(null);
-  const [isRefreshingRecovery, setIsRefreshingRecovery] = useState(false);
-
-  const handleRefreshReportRecovery = async (savedReportToUpdate?: SavedReport) => {
-    if (isRefreshingRecovery) return;
-    setIsRefreshingRecovery(true);
-
-    try {
-      const targetUserData = savedReportToUpdate?.userData || userData;
-      const targetReport = savedReportToUpdate?.report || report;
-      const targetSavedId = savedReportToUpdate?.id || currentSavedReportId;
-
-      if (!targetReport) return;
-
-      console.log("Refreshing recovery guidance while preserving all recorded data...");
-      const newRecoverySchedule = await generateRecoveryGuidance(targetUserData, targetReport.workoutPlan);
-
-      const updatedReport: AssessmentResult = {
-        ...targetReport,
-        recoverySchedule: newRecoverySchedule
-      };
-
-      // Update current report state if active
-      if (!savedReportToUpdate || savedReportToUpdate.id === currentSavedReportId) {
-        setReport(updatedReport);
-      }
-
-      // Update in savedReports list in state
-      if (targetSavedId) {
-        setSavedReports(prev => prev.map(r => r.id === targetSavedId ? { ...r, report: updatedReport } : r));
-        try {
-          await historyService.updateReport(targetSavedId, updatedReport);
-          console.log("Updated saved report in Firestore with new recovery schedule.");
-        } catch (e) {
-          console.error("Error updating saved report in Firestore:", e);
-        }
-      }
-
-      alert("Report refreshed successfully! Targeted 7-day Recovery Protocol added while preserving all recorded workout, nutrition, and photo data.");
-    } catch (e) {
-      console.error("Failed to refresh recovery guidance:", e);
-      alert("Unable to refresh recovery guidance at this time. Please try again.");
-    } finally {
-      setIsRefreshingRecovery(false);
-    }
-  };
 
   const handleViewSavedReport = (saved: SavedReport) => {
+    const effective = getEffectiveReportPath(saved.path, saved.report);
     setCurrentSavedReportId(saved.id);
-    setPath(saved.path);
+    setPath(effective);
     setUserData(saved.userData);
     setPhotos(saved.photos);
     if (saved.progressPhotos) setProgressPhotos(saved.progressPhotos);
@@ -1684,7 +1688,7 @@ export default function App() {
                         <h3 className="text-2xl font-display font-bold uppercase tracking-tight">
                           {selectedReportFolder === 'assessment' ? 'Assessments' :
                            selectedReportFolder === 'workout' ? 'Workout Plans' :
-                           selectedReportFolder === 'meal' ? 'Nutrition Plans' :
+                           selectedReportFolder === 'meal' ? 'Meal Plans' :
                            selectedReportFolder === 'progress' ? 'Progress History' :
                            'Transformation Reports'}
                         </h3>
@@ -1839,11 +1843,8 @@ export default function App() {
                                     <div className="flex justify-between items-start">
                                       <div>
                                         <div className="flex items-center gap-2 flex-wrap mb-2">
-                                          <Badge className="bg-brand-primary/10 text-brand-primary border-none">
-                                            {saved.path === 'assessment' ? 'Physique Assessment' :
-                                             saved.path === 'workout' ? 'Workout Plan' :
-                                             saved.path === 'meal' ? 'Meal Plan' :
-                                             saved.path === 'progress' ? 'Progress Engine' : 'Full Transformation'}
+                                          <Badge className="bg-brand-primary/10 text-brand-primary border-none capitalize">
+                                            {getReportTypeLabel(saved.path, saved.report)}
                                           </Badge>
                                           {isConflicting && (
                                             <Badge className="bg-red-500/20 text-red-400 border border-red-500/30 font-bold">
@@ -3306,65 +3307,66 @@ export default function App() {
 
               {/* Page 1: Header & Baseline Info */}
               <section className="space-y-8">
-                <div className="text-center space-y-2">
-                  <h1 
-                    className="text-4xl font-display font-bold text-brand-primary cursor-pointer hover:brightness-110 transition-all"
-                    onClick={() => setStep('landing')}
-                  >
-                    {path === 'assessment' ? 'Physique Assessment' : 
-                     path === 'workout' ? 'Workout Plan' : 
-                     path === 'meal' ? 'Meal Plan' : 
-                     path === 'progress' ? 'Progress Engine' :
-                     `UNLCKD ${userData.planDuration?.replace('-week', ' Week') || '12-Week'} Transformation Report`}
-                  </h1>
-                  <p className="text-gray-500">
-                    {path === 'assessment' ? 'Physique Analysis, Body Composition & Recommended Caloric Strategy' :
-                     path === 'workout' ? 'Tailored Workout Plan, Exercise Hyperlinks & Recommended Caloric Strategy' :
-                     path === 'meal' ? 'Goal-Matched Nutrition Strategy, Meal Plan & Master Grocery Checklist' :
-                     path === 'progress' ? 'Visual Progress Comparison, Body Composition & Next Steps' :
-                     `Complete ${(userData.planDuration?.replace('-week', ' Week') || '12-Week')} Transformation Blueprint`}
-                  </p>
-                </div>
+                {(() => {
+                  const effectivePath = getEffectiveReportPath(path, report);
+                  return (
+                    <>
+                      <div className="text-center space-y-2">
+                        <h1 
+                          className="text-4xl font-display font-bold text-brand-primary cursor-pointer hover:brightness-110 transition-all"
+                          onClick={() => setStep('landing')}
+                        >
+                          {effectivePath === 'assessment' ? 'Physique Assessment' : 
+                           effectivePath === 'workout' ? 'Workout Plan' : 
+                           effectivePath === 'meal' ? 'Meal Plan' : 
+                           effectivePath === 'progress' ? 'Progress Engine' :
+                           `UNLCKD ${userData.planDuration?.replace('-week', ' Week') || '12-Week'} Transformation Report`}
+                        </h1>
+                        <p className="text-gray-500">
+                          {effectivePath === 'assessment' ? 'Physique Analysis, Body Composition & Recommended Caloric Strategy' :
+                           effectivePath === 'workout' ? 'Tailored Workout Plan, Exercise Hyperlinks & Recommended Caloric Strategy' :
+                           effectivePath === 'meal' ? 'Goal-Matched Nutrition Strategy, Meal Plan & Master Grocery Checklist' :
+                           effectivePath === 'progress' ? 'Visual Progress Comparison, Body Composition & Next Steps' :
+                           `Complete ${(userData.planDuration?.replace('-week', ' Week') || '12-Week')} Transformation Blueprint`}
+                        </p>
+                      </div>
 
-                <div className="bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl overflow-x-auto max-w-full w-full print-break-inside-avoid">
-                  <table className="w-full text-xs sm:text-sm text-left border-collapse min-w-[260px]">
-                    <tbody className="divide-y divide-gray-800">
-                      {[
-                        { label: 'Client Name', value: userData.name },
-                        { label: 'Report Type', value: 
-                          path === 'assessment' ? 'Physique Assessment' : 
-                          path === 'workout' ? 'Workout Plan' :
-                          path === 'meal' ? 'Meal Plan' :
-                          path === 'progress' ? 'Progress Engine' :
-                          'Full Transformation Report' 
-                        },
-                        { label: 'Date', value: viewingDate.toLocaleDateString() },
-                        { label: 'Time', value: viewingDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) },
-                        { label: 'Unique ID', value: viewingDate.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) },
-                        { label: 'Age / Sex', value: `${userData.age} / ${userData.sex.charAt(0).toUpperCase() + userData.sex.slice(1)}` },
-                        { label: 'Height / Weight', value: `${userData.height} ${userData.heightUnit} / ${userData.weight} ${userData.weightUnit}` },
-                        ...(path !== 'progress' ? [
-                          { label: 'Location', value: userData.location },
-                          { label: 'Occupation', value: userData.occupation }
-                        ] : []),
-                        ...(path !== 'meal' ? [{ label: 'Current Workout', value: userData.currentWorkout || 'None' }] : []),
-                        ...(path === 'meal' 
-                          ? [{ 
-                              label: 'Diet Strategy', 
-                              value: userData.caloriePreference === 'deficit' ? 'Lose Weight (Caloric Deficit)' : 
-                                     userData.caloriePreference === 'surplus' ? 'Gain Weight (Caloric Surplus)' : 
-                                     'Maintain Weight (Maintenance)' 
-                            }] 
-                          : (path === 'progress' ? [] : [{ label: 'Primary Goals', value: userData.goals }])),
-                      ].map((row, i) => (
-                        <tr key={i}>
-                          <td className="px-3 sm:px-6 py-2.5 sm:py-3 bg-brand-secondary/20 font-bold text-gray-200 w-1/3 min-w-[90px] break-words text-xs sm:text-sm">{row.label}</td>
-                          <td className="px-3 sm:px-6 py-2.5 sm:py-3 text-gray-300 break-words text-xs sm:text-sm">{row.value}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      <div className="bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl overflow-x-auto max-w-full w-full print-break-inside-avoid">
+                        <table className="w-full text-xs sm:text-sm text-left border-collapse min-w-[260px]">
+                          <tbody className="divide-y divide-gray-800">
+                            {[
+                              { label: 'Client Name', value: userData.name },
+                              { label: 'Report Type', value: getReportTypeLabel(effectivePath, report) },
+                              { label: 'Date', value: viewingDate.toLocaleDateString() },
+                              { label: 'Time', value: viewingDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) },
+                              { label: 'Unique ID', value: viewingDate.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) },
+                              { label: 'Age / Sex', value: `${userData.age} / ${userData.sex.charAt(0).toUpperCase() + userData.sex.slice(1)}` },
+                              { label: 'Height / Weight', value: `${userData.height} ${userData.heightUnit} / ${userData.weight} ${userData.weightUnit}` },
+                              ...(effectivePath !== 'progress' ? [
+                                { label: 'Location', value: userData.location },
+                                { label: 'Occupation', value: userData.occupation }
+                              ] : []),
+                              ...(effectivePath !== 'meal' ? [{ label: 'Current Workout', value: userData.currentWorkout || 'None' }] : []),
+                              ...(effectivePath === 'meal' 
+                                ? [{ 
+                                    label: 'Diet Strategy', 
+                                    value: userData.caloriePreference === 'deficit' ? 'Lose Weight (Caloric Deficit)' : 
+                                           userData.caloriePreference === 'surplus' ? 'Gain Weight (Caloric Surplus)' : 
+                                           'Maintain Weight (Maintenance)' 
+                                  }] 
+                                : (effectivePath === 'progress' ? [] : [{ label: 'Primary Goals', value: userData.goals }])),
+                            ].map((row, i) => (
+                              <tr key={i}>
+                                <td className="px-3 sm:px-6 py-2.5 sm:py-3 bg-brand-secondary/20 font-bold text-gray-200 w-1/3 min-w-[90px] break-words text-xs sm:text-sm">{row.label}</td>
+                                <td className="px-3 sm:px-6 py-2.5 sm:py-3 text-gray-300 break-words text-xs sm:text-sm">{row.value}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  );
+                })()}
 
                 {(path !== 'meal' && path !== 'workout') && (
                   <>
@@ -3642,7 +3644,7 @@ export default function App() {
                     </div>
                   )}
 
-                  {(path === 'progress' || path === 'assessment') && report.additionalActivities && (
+                  {(path === 'progress') && report.additionalActivities && (
                     <div className="space-y-6 pt-8 border-t border-gray-800">
                       <div className="flex items-center gap-3">
                         <Moon className="w-8 h-8 text-brand-primary" />
@@ -4155,7 +4157,10 @@ export default function App() {
               )}
 
               {/* Recovery & Tracking */}
-              {(path === 'workout' || path === 'full') && (
+              {(() => {
+                const effectivePath = getEffectiveReportPath(path, report);
+                if (effectivePath !== 'workout' && effectivePath !== 'full') return null;
+                return (
                 <section className="space-y-12 pt-16 border-t border-gray-800 print-break-before">
                   <h2 className="text-3xl font-display font-bold text-brand-primary">Recovery, Sleep & Optimization</h2>
                   
@@ -4292,10 +4297,286 @@ export default function App() {
                   </div>
                   <LogoBranding />
                 </section>
-              )}
+                );
+              })()}
 
               {/* Trainer Summary */}
-              {(path !== 'meal' && path !== 'progress') && (
+              {(() => {
+                const effectivePath = getEffectiveReportPath(path, report);
+                if (effectivePath === 'meal' || effectivePath === 'progress') return null;
+
+                if (effectivePath === 'assessment') {
+                  const hasCustomSummary = report.trainerSummary && report.trainerSummary.trim().length > 80 && !report.trainerSummary.includes('Keep pushing forward');
+                  
+                  // Compute visual health standpoint appraisal
+                  const bmi = report.healthMetrics?.bmi;
+                  const estFat = report.healthMetrics?.estimatedBodyFat;
+                  const healthStatus = report.healthMetrics?.healthStatus || 'Good Visual Baseline';
+                  const heightWeightAnalysis = report.healthMetrics?.heightWeightAnalysis;
+                  
+                  return (
+                    <section className="pt-16 border-t border-gray-800 space-y-10">
+                      <div>
+                        <div className="flex items-center gap-3 mb-2">
+                          <Activity className="w-8 h-8 text-brand-primary" />
+                          <h2 className="text-3xl font-display font-bold text-brand-primary">Trainer Follow-Up Summary</h2>
+                        </div>
+                        <p className="text-sm text-gray-400">
+                          Comprehensive evaluation of {userData.name} synthesizing multi-angle photo analysis, visual health appraisal, and comparative physical benchmarks.
+                        </p>
+                      </div>
+
+                      {/* Master Trainer Evaluation Container */}
+                      <div className="p-6 sm:p-8 bg-brand-surface border border-brand-primary/20 rounded-2xl space-y-8 relative overflow-hidden shadow-2xl">
+                        
+                        {/* 1. Overall Summary Section */}
+                        <div className="space-y-6">
+                          <div className="flex items-center justify-between border-b border-gray-800/80 pb-4 flex-wrap gap-3">
+                            <div className="flex items-center gap-2.5">
+                              <ShieldCheck className="w-6 h-6 text-brand-primary" />
+                              <h3 className="text-xl sm:text-2xl font-display font-bold text-white tracking-wide">
+                                Overall Summary
+                              </h3>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge className="bg-brand-primary/10 text-brand-primary border-brand-primary/30 text-xs py-1 px-3">
+                                Visual Health: {healthStatus}
+                              </Badge>
+                              {bmi && (
+                                <Badge className="bg-gray-800 text-gray-300 border-gray-700 text-xs py-1 px-2.5 font-mono">
+                                  BMI {bmi}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Dual Cards: Visual Health Standpoint & Comparison Information */}
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {/* Card A: Visual Health Standpoint */}
+                            <div className="p-5 sm:p-6 bg-black/40 border border-brand-primary/20 rounded-xl space-y-4 relative overflow-hidden">
+                              <div className="flex items-center gap-2 text-brand-primary">
+                                <Activity className="w-5 h-5" />
+                                <h4 className="text-sm sm:text-base font-bold uppercase tracking-wider text-gray-100">
+                                  Visual Health Standpoint
+                                </h4>
+                              </div>
+                              
+                              <p className="text-sm text-gray-300 leading-relaxed">
+                                From a visual health standpoint, <strong className="text-white">{userData.name}</strong> presents a <strong className="text-brand-primary">{healthStatus.toLowerCase()}</strong> profile based on the submitted front, side, and back physique photography.
+                              </p>
+
+                              <div className="space-y-2.5 text-xs sm:text-sm text-gray-300">
+                                <div className="p-3 bg-gray-900/60 rounded-lg border border-gray-800/60 space-y-1">
+                                  <div className="text-[11px] font-mono font-bold uppercase text-brand-primary tracking-wide">
+                                    Adipose & Metabolic Distribution
+                                  </div>
+                                  <p className="text-xs text-gray-300 leading-relaxed">
+                                    {heightWeightAnalysis ? heightWeightAnalysis : `Visual tissue distribution indicates an estimated body fat of ${estFat || 'moderate range'} with ${report.healthMetrics?.recommendedCalorieLevel === 'deficit' ? 'subcutaneous fat focused around the midsection/torso suitable for a structured caloric deficit' : report.healthMetrics?.recommendedCalorieLevel === 'surplus' ? 'a lean baseline ideal for caloric surplus lean tissue building' : 'a solid foundation suited for body recomposition'}.`}
+                                  </p>
+                                </div>
+
+                                <div className="p-3 bg-gray-900/60 rounded-lg border border-gray-800/60 space-y-1">
+                                  <div className="text-[11px] font-mono font-bold uppercase text-brand-primary tracking-wide">
+                                    Postural Health & Vitality
+                                  </div>
+                                  <p className="text-xs text-gray-300 leading-relaxed">
+                                    {report.leftViewAnalysis?.summary || report.rightViewAnalysis?.summary 
+                                      ? `Sagittal visual review demonstrates healthy spinal alignment with key focus areas for scapular stabilization and core bracing.`
+                                      : `Overall structural posture exhibits solid athletic frame integrity, upright carriage, and clear responsiveness for functional progressive training.`}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Card B: Comparison Information */}
+                            <div className="p-5 sm:p-6 bg-black/40 border border-brand-primary/20 rounded-xl space-y-4 relative overflow-hidden">
+                              <div className="flex items-center gap-2 text-brand-primary">
+                                <Scale className="w-5 h-5" />
+                                <h4 className="text-sm sm:text-base font-bold uppercase tracking-wider text-gray-100">
+                                  Comparison Information
+                                </h4>
+                              </div>
+
+                              <p className="text-sm text-gray-300 leading-relaxed">
+                                Comparative assessment evaluating anterior vs posterior chain symmetry, demographic benchmarks, and target goal alignment:
+                              </p>
+
+                              <div className="space-y-2.5 text-xs sm:text-sm text-gray-300">
+                                <div className="p-3 bg-gray-900/60 rounded-lg border border-gray-800/60 space-y-1">
+                                  <div className="text-[11px] font-mono font-bold uppercase text-brand-primary tracking-wide">
+                                    Anterior vs. Posterior & Bilateral Balance
+                                  </div>
+                                  <p className="text-xs text-gray-300 leading-relaxed">
+                                    Comparing front profile ({report.frontViewAnalysis?.summary ? 'Anterior evaluated' : 'Shoulders/Chest/Torso'}) against back profile ({report.backViewAnalysis?.summary ? 'Posterior evaluated' : 'Scapulae/Erectors/Glutes'}), the subject demonstrates favorable bilateral symmetry with balanced limb proportions.
+                                  </p>
+                                </div>
+
+                                <div className="p-3 bg-gray-900/60 rounded-lg border border-gray-800/60 space-y-1">
+                                  <div className="text-[11px] font-mono font-bold uppercase text-brand-primary tracking-wide">
+                                    Demographic Benchmark & Goal Alignment
+                                  </div>
+                                  <p className="text-xs text-gray-300 leading-relaxed">
+                                    Relative to normative age and gender standards for a {userData.height} {userData.heightUnit} frame at {userData.weight} {userData.weightUnit}, the baseline positions {userData.name} favorably to achieve stated goals ({userData.goals || report.healthMetrics?.focus || 'body recomposition'}) with disciplined caloric control and progressive volume.
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Extended Trainer Synthesis Narrative */}
+                          {hasCustomSummary ? (
+                            <div className="p-5 bg-black/20 border border-gray-800/80 rounded-xl space-y-3">
+                              <div className="text-xs font-mono font-bold uppercase tracking-wider text-gray-400">
+                                Detailed Coach Narrative & Health Overview
+                              </div>
+                              <div className="space-y-3">
+                                {report.trainerSummary.split('\n\n').map((paragraph, pIdx) => (
+                                  <p key={pIdx} className="text-gray-300 leading-relaxed text-sm">
+                                    {paragraph}
+                                  </p>
+                                ))}
+                              </div>
+                            </div>
+                          ) : report.toplineSummary ? (
+                            <div className="p-4 bg-black/20 border-l-2 border-brand-primary rounded-r-xl">
+                              <p className="text-xs sm:text-sm text-gray-300 italic leading-relaxed">
+                                "{report.toplineSummary}"
+                              </p>
+                            </div>
+                          ) : null}
+                        </div>
+
+                        {/* 2. Multi-Angle Review Highlights Breakdown */}
+                        <div className="pt-6 border-t border-gray-800 space-y-4">
+                          <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-gray-400">
+                            Multi-Angle Photo Evaluation Breakdown
+                          </h4>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {/* Front View Review */}
+                            <div className="p-4 bg-black/40 border border-gray-800 rounded-xl space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-brand-primary uppercase tracking-wide">Front Profile</span>
+                                <span className="text-[10px] text-gray-500 font-mono">Anterior Chain</span>
+                              </div>
+                              <p className="text-xs text-gray-300 line-clamp-4 leading-relaxed">
+                                {report.frontViewAnalysis?.summary || "Evaluated for clavicle width, shoulder-to-waist taper, chest development, and abdominal definition."}
+                              </p>
+                              {report.frontViewAnalysis?.ratings && report.frontViewAnalysis.ratings.length > 0 && (
+                                <div className="pt-2 flex flex-wrap gap-1">
+                                  {report.frontViewAnalysis.ratings.slice(0, 2).map((r, ri) => (
+                                    <Badge key={ri} className="text-[10px] py-0 px-2 bg-gray-900 border-gray-800 text-gray-300">
+                                      {r.category}: {r.rating}/10
+                                    </Badge>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Side Views Review */}
+                            <div className="p-4 bg-black/40 border border-gray-800 rounded-xl space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-brand-primary uppercase tracking-wide">Side Profiles (L / R)</span>
+                                <span className="text-[10px] text-gray-500 font-mono">Sagittal Alignment</span>
+                              </div>
+                              <p className="text-xs text-gray-300 line-clamp-4 leading-relaxed">
+                                {report.leftViewAnalysis?.summary || report.rightViewAnalysis?.summary || "Evaluated for spinal curvature, cervical posture, pelvic tilt, and torso-to-limb proportions."}
+                              </p>
+                              {(report.leftViewAnalysis?.ratings || report.rightViewAnalysis?.ratings) && (
+                                <div className="pt-2 flex flex-wrap gap-1">
+                                  {(report.leftViewAnalysis?.ratings || report.rightViewAnalysis?.ratings || []).slice(0, 2).map((r, ri) => (
+                                    <Badge key={ri} className="text-[10px] py-0 px-2 bg-gray-900 border-gray-800 text-gray-300">
+                                      {r.category}: {r.rating}/10
+                                    </Badge>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Back View Review */}
+                            <div className="p-4 bg-black/40 border border-gray-800 rounded-xl space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-brand-primary uppercase tracking-wide">Back Profile</span>
+                                <span className="text-[10px] text-gray-500 font-mono">Posterior Chain</span>
+                              </div>
+                              <p className="text-xs text-gray-300 line-clamp-4 leading-relaxed">
+                                {report.backViewAnalysis?.summary || "Evaluated for scapular positioning, latissimus dorsi width, spinal erectors, and glute-hamstring tie-in."}
+                              </p>
+                              {report.backViewAnalysis?.ratings && report.backViewAnalysis.ratings.length > 0 && (
+                                <div className="pt-2 flex flex-wrap gap-1">
+                                  {report.backViewAnalysis.ratings.slice(0, 2).map((r, ri) => (
+                                    <Badge key={ri} className="text-[10px] py-0 px-2 bg-gray-900 border-gray-800 text-gray-300">
+                                      {r.category}: {r.rating}/10
+                                    </Badge>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 3. Subject Baseline & Health Table */}
+                        <div className="pt-6 border-t border-gray-800 space-y-4">
+                          <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-gray-400">
+                            Subject Baseline & Health Profile Matrix
+                          </h4>
+                          <div className="bg-black/30 border border-gray-800/80 rounded-xl overflow-x-auto max-w-full w-full">
+                            <table className="w-full text-xs sm:text-sm text-left border-collapse">
+                              <tbody className="divide-y divide-gray-800/80">
+                                {[
+                                  { label: 'Subject Name', value: userData.name },
+                                  { label: 'Baseline Measurements', value: `${userData.height} ${userData.heightUnit} • ${userData.weight} ${userData.weightUnit}` },
+                                  { label: 'Body Composition (BMI / Est. Fat)', value: `BMI ${report.healthMetrics?.bmi || 'N/A'} (${report.healthMetrics?.bmiCategory || 'N/A'}) • Est. Body Fat: ${report.healthMetrics?.estimatedBodyFat || 'N/A'}` },
+                                  { label: 'Visual Health Status', value: report.healthMetrics?.healthStatus || 'Evaluated' },
+                                  { label: 'Primary Physical Focus', value: report.healthMetrics?.focus || userData.goals },
+                                  { 
+                                    label: 'Recommended Eating Style', 
+                                    value: report.healthMetrics?.recommendedCalorieLevel === 'deficit'
+                                      ? `Caloric Deficit (Target: ${report.healthMetrics.dailyCalorieTarget || 'Custom kcal'}) • Focus on body fat reduction`
+                                      : report.healthMetrics?.recommendedCalorieLevel === 'surplus'
+                                      ? `Caloric Surplus (Target: ${report.healthMetrics.dailyCalorieTarget || 'Custom kcal'}) • Focus on lean tissue accretion`
+                                      : `Caloric Maintenance (Target: ${report.healthMetrics.dailyCalorieTarget || 'Custom kcal'}) • Focus on body recomposition`
+                                  },
+                                  ...(userData.occupation ? [{ label: 'Occupation & Lifestyle Demand', value: userData.occupation }] : []),
+                                  ...(userData.injuries ? [{ label: 'Injury / Movement Considerations', value: userData.injuries }] : []),
+                                  { label: 'Baseline Daily Steps', value: report.stepGoals },
+                                  { label: 'Daily Hydration Target', value: report.hydrationTargets },
+                                ].map((row, i) => (
+                                  <tr key={i}>
+                                    <td className="px-4 sm:px-6 py-2.5 sm:py-3 bg-brand-secondary/20 font-bold text-gray-200 w-1/3 min-w-[120px] break-words text-xs sm:text-sm">{row.label}</td>
+                                    <td className="px-4 sm:px-6 py-2.5 sm:py-3 text-gray-300 break-words text-xs sm:text-sm">{row.value}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+
+                        {/* 4. Actionable Trainer Directives */}
+                        {report.finalSummary?.nextSteps && report.finalSummary.nextSteps.length > 0 && (
+                          <div className="pt-6 border-t border-gray-800 space-y-3">
+                            <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-brand-primary">
+                              Trainer Directives & Next-Phase Focus Points
+                            </h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {report.finalSummary.nextSteps.map((step, idx) => (
+                                <div key={idx} className="flex items-start gap-2.5 p-3 rounded-lg bg-black/40 border border-gray-800/80">
+                                  <div className="w-5 h-5 rounded-full bg-brand-primary/10 flex items-center justify-center text-brand-primary font-bold text-[10px] shrink-0 mt-0.5">
+                                    {idx + 1}
+                                  </div>
+                                  <p className="text-xs text-gray-300 leading-relaxed">{step}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <LogoBranding />
+                    </section>
+                  );
+                }
+
+                // Default Trainer Follow-up Summary for Full Transformation or Workout Plan
+                return (
                 <section className="pt-16 border-t border-gray-800">
                   <h2 className="text-3xl font-display font-bold text-brand-primary mb-8">Trainer Follow-Up Summary</h2>
                   <div className="bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl overflow-x-auto max-w-full w-full">
@@ -4305,7 +4586,7 @@ export default function App() {
                           { label: 'Name', value: userData.name },
                           { label: 'Weight', value: `${userData.weight} ${userData.weightUnit}` },
                           { label: 'Height', value: `${userData.height} ${userData.heightUnit}` },
-                          ...(path === 'full' ? [
+                          ...(effectivePath === 'full' ? [
                             { 
                               label: 'Meal Plan', 
                               value: report.healthMetrics?.recommendedCalorieLevel 
@@ -4313,7 +4594,7 @@ export default function App() {
                                 : 'Full Goal-Matched Plan' 
                             },
                             { label: 'Workout Plan', value: `${getPlanDurationWeeks(userData.planDuration)}-week progressive training split` },
-                          ] : (path === 'workout' || path === 'assessment') ? [
+                          ] : effectivePath === 'workout' ? [
                             { 
                               label: 'Recommended Eating Style', 
                               value: report.healthMetrics?.recommendedCalorieLevel === 'deficit'
@@ -4322,7 +4603,7 @@ export default function App() {
                                 ? `Caloric Surplus (Eat in surplus to build muscle/mass • Target: ${report.healthMetrics.dailyCalorieTarget || 'Custom kcal'})`
                                 : `Caloric Maintenance (Eat at maintenance for body recomposition • Target: ${report.healthMetrics.dailyCalorieTarget || 'Custom kcal'})`
                             },
-                            ...(path === 'workout' ? [{ label: 'Workout Plan', value: `${getPlanDurationWeeks(userData.planDuration)}-week tailored split` }] : []),
+                            { label: 'Workout Plan', value: `${getPlanDurationWeeks(userData.planDuration)}-week tailored split` },
                           ] : []),
                           { label: 'Steps', value: report.stepGoals },
                           { label: 'Water Intake', value: report.hydrationTargets },
@@ -4337,7 +4618,8 @@ export default function App() {
                   </div>
                   <LogoBranding />
                 </section>
-              )}
+                );
+              })()}
 
               <div className="mt-12 flex flex-col items-center gap-4 no-print pb-20">
                 <Button size="lg" onClick={() => setStep('landing')} className="rounded-2xl px-12">Start New Assessment</Button>

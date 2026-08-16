@@ -403,10 +403,10 @@ export const ClientHub: React.FC<ClientHubProps> = ({
                           report.type === 'progress' && "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
                           report.type === 'assessment' && "bg-amber-400/10 text-amber-400 border-amber-400/20"
                         )}>
-                          {report.type === 'full' ? 'Full Transformation' : 
+                          {report.type === 'full' ? 'full transformation report' : 
                            report.type === 'meal' ? 'Meal Plan' : 
-                           report.type === 'workout' ? 'Workout Plan' :
-                           report.type === 'progress' ? 'Progress Engine' : 'Physique Assessment'}
+                           report.type === 'workout' ? 'workout' :
+                           report.type === 'progress' ? 'progress report' : 'Physique Assessment'}
                         </Badge>
                       </div>
 

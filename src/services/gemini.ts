@@ -323,7 +323,8 @@ async function generatePhysiqueAnalysis(
 async function generateHealthAndSupport(
   userData: UserData,
   isResubmit: boolean,
-  path: string
+  path: string,
+  physiqueAnalysis?: any
 ): Promise<any> {
   const model = "gemini-flash-latest";
 
@@ -367,6 +368,19 @@ async function generateHealthAndSupport(
        - Set "recommendedCalorieLevel" in healthMetrics to strictly one of: "deficit", "maintenance", or "surplus".
        - Set "dailyCalorieTarget" in healthMetrics to a concrete daily target (e.g. "2,100 - 2,300 kcal/day").
        - In "nutritionStrategy", write 2 focused paragraphs detailing this recommended eating style (caloric deficit/maintenance/surplus), daily protein guidelines, and whole food nutrition fundamentals without full meal plans or diet fads.` : includeGrocery ? `5. Comprehensive Nutrition strategy for the full ${userData.planDuration || '12-week'} duration. This strategy MUST reference at least 5 key specific meals or ingredients that appear in the meal plan, including their names and verified links. 6. Grocery store recommendation.` : "5. Motivation and general Nutrition strategies."}
+    ${path === 'assessment' ? `6. TRAINER FOLLOW-UP SUMMARY (OVERALL SUMMARY & VISUAL HEALTH EVALUATION):
+       In "trainerSummary", write an extended, comprehensive multi-paragraph evaluation synthesizing the subject's entire assessment across ALL photo reviews (Front, Back, Left Side, and Right Side profiles).
+       ${physiqueAnalysis ? `Here are the photo review findings:
+       - Front View Summary: ${physiqueAnalysis.frontViewAnalysis?.summary || 'Evaluated'}
+       - Left Side Summary: ${physiqueAnalysis.leftViewAnalysis?.summary || 'Evaluated'}
+       - Right Side Summary: ${physiqueAnalysis.rightViewAnalysis?.summary || 'Evaluated'}
+       - Back View Summary: ${physiqueAnalysis.backViewAnalysis?.summary || 'Evaluated'}
+       - Topline Overview: ${physiqueAnalysis.toplineSummary || 'Evaluated'}
+       ` : ''}
+       Structure the trainer summary to clearly address:
+       1. Overall Summary & Visual Health Standpoint: Explicitly explain whether the individual is viewed as healthy from a visual and physiological standpoint based on the photos (assessing body composition, muscular tone, posture, structural balance, adipose distribution, and vitality).
+       2. Comparison Information: Detail key comparative insights comparing anterior vs posterior balance, bilateral symmetry (left vs right), and comparisons against normative demographic benchmarks and their stated target goals (${userData.goals || 'physique progression'}).
+       3. Actionable Coaching Directives: Clear, encouraging next-phase recommendations.` : ''}
     
     UNIT ALIGNMENT: 
     - If user weight is in 'lbs', use US Imperial units for food: oz, lbs, cups, tsp, tbsp.
@@ -898,7 +912,7 @@ export async function generateTransformationReport(
           result = { ...result, ...physique };
         }
         console.log("Generating health and support...");
-        const lifestyle = await generateHealthAndSupport(cleanUserData, isResubmit, path);
+        const lifestyle = await generateHealthAndSupport(cleanUserData, isResubmit, path, result);
         result = { ...result, ...lifestyle };
       } catch (e) {
         console.error("Analysis step failed:", e);
@@ -961,10 +975,10 @@ export async function generateTransformationReport(
     const finalResult = result as AssessmentResult;
     
     // Add report type metadata matching menu selection
-    (finalResult as any).reportType = path === 'progress' ? 'Progress Engine' : 
-                                    path === 'assessment' ? 'Physique Assessment' :
-                                    path === 'workout' ? 'Workout Plan' :
-                                    path === 'meal' ? 'Meal Plan' : 'Full Transformation Report';
+    (finalResult as any).reportType = path === 'assessment' ? 'Physique Assessment' : 
+                                    path === 'workout' ? 'workout' :
+                                    path === 'meal' ? 'Meal Plan' :
+                                    path === 'progress' ? 'progress report' : 'full transformation report';
     
     // Ensure all required fields exist to avoid UI crashes
     finalResult.toplineSummary = finalResult.toplineSummary || "Assessment incoming...";
