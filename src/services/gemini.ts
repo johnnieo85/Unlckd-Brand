@@ -232,10 +232,13 @@ async function generatePhysiqueAnalysis(
     2. Detailed Ratings & Summaries for ALL views (Front, Back, Left, Right).
     Note: The goal is ${userData.goals}.
 
-    LINK QUALITY PROTOCOL:
+    ${path === 'assessment' ? `EXERCISE NAMING PROTOCOL (NO WEB LINKS):
+    - DO NOT include web address links, URLs, YouTube search links, or Markdown links in any summaries or evaluations.
+    - Only include the clean, plain exercise name (e.g., "Seated Cable Row", "Incline Dumbbell Press", "Romanian Deadlift", "Dead Bug").
+    - NEVER append URLs like "Seated Cable Row(https://...)" or "[Seated Cable Row](https://...)". Always write clean plain text: "Seated Cable Row".` : `LINK QUALITY PROTOCOL:
     - If you reference any specific exercises or movements in your summaries, you MUST hyperlink them using Markdown: [Exercise Name](VideoURL).
     - Use this YouTube search link: https://www.youtube.com/results?search_query=[EXERCISE+NAME]+exercise+tutorial
-    - NEVER provide raw URLs in parentheses like "Exercise Name (URL)". ONLY use Markdown links where the name is the clickable text.
+    - NEVER provide raw URLs in parentheses like "Exercise Name (URL)". ONLY use Markdown links where the name is the clickable text.`}
     
     STRICT EXCLUSION: Do NOT include any grocery lists or meal plan details in this specific analysis.
   `;
@@ -380,20 +383,26 @@ async function generateHealthAndSupport(
        Structure the trainer summary to clearly address:
        1. Overall Summary & Visual Health Standpoint: Explicitly explain whether the individual is viewed as healthy from a visual and physiological standpoint based on the photos (assessing body composition, muscular tone, posture, structural balance, adipose distribution, and vitality).
        2. Comparison Information: Detail key comparative insights comparing anterior vs posterior balance, bilateral symmetry (left vs right), and comparisons against normative demographic benchmarks and their stated target goals (${userData.goals || 'physique progression'}).
-       3. Actionable Coaching Directives: Clear, encouraging next-phase recommendations.` : ''}
+       3. Actionable Coaching Directives & Recommended Timeline: Clear, encouraging next-phase recommendations. Always mention the timeline as recommended (e.g., "recommended ${userData.planDuration || '12-week'} block" or "recommended ${userData.planDuration || '12-week'} training cycle", NOT a mandatory schedule).
+       
+       STRICT LINK RULE FOR PHYSIQUE ASSESSMENT TRAINER SUMMARY:
+       - ABSOLUTELY DO NOT include any website links, YouTube search links, markdown hyperlinks [Exercise](URL), or raw URLs in the trainerSummary for this physique assessment report. Keep all exercise, movement, and coaching references strictly in clean, plain professional text without any hyperlinks or URLs.` : ''}
     
     UNIT ALIGNMENT: 
     - If user weight is in 'lbs', use US Imperial units for food: oz, lbs, cups, tsp, tbsp.
     - If user weight is in 'kg', use Metric units for food: g, kg, ml, l.
     The user's weight unit is: ${userData.weightUnit || 'lbs'}.
     
-    LINK QUALITY PROTOCOL:
+    ${path === 'assessment' ? `EXERCISE & NUTRITION NAMING (NO WEB LINKS):
+    - For this assessment report, DO NOT include any web address links, URLs, YouTube search links, Pinterest links, or Markdown hyperlinks [Name](URL).
+    - Only include clean, plain exercise and food names (e.g. "Seated Cable Row", "Incline Dumbbell Press", "Romanian Deadlift").
+    - NEVER provide raw URLs or URLs in parentheses like "Seated Cable Row(https://...)".` : `LINK QUALITY PROTOCOL:
     - For EVERY exercise demonstration mentioned, you MUST use the appropriate link:
       https://www.youtube.com/results?search_query=[EXERCISE+NAME]+exercise+tutorial
     - For EVERY nutrition or recipe mention, you MUST use this Pinterest search link: https://www.pinterest.com/search/pins/?q=[MEAL+NAME]+healthy+recipe
     - NEVER provide raw URLs in parentheses like "(https://...)". 
     - You MUST use Markdown hyperlinks: [Exercise/Meal Name](SearchURL).
-    - Only the Name should be clickable. No visible plain-text URLs on the report.
+    - Only the Name should be clickable. No visible plain-text URLs on the report.`}
   `;
 
   const response = await withRetry(() => ai.models.generateContent({

@@ -83,6 +83,38 @@ const cleanEvaluationText = (text: string) => {
   return text.replace(/,?\s*search_query=[^\s\)]+/gi, '');
 };
 
+const cleanPlainTextWithoutUrls = (text: string): string => {
+  if (!text) return '';
+  let cleaned = String(text);
+  
+  // 1. Replace markdown links with their text: [Exercise Name](https://...) -> Exercise Name
+  cleaned = cleaned.replace(/\[([^\]\n\r]+)\]\s*\((?:https?:\/\/[^\s\)]+|[^\)\n\r]+)\)/gi, '$1');
+  
+  // 2. Remove isolated or attached parenthesized web addresses: (https://www.youtube.com/...)
+  cleaned = cleaned.replace(/\(\s*https?:\/\/[^\s\)]+\s*\)/gi, '');
+  
+  // 3. Remove raw URLs: https://www.youtube.com/... or https://...
+  cleaned = cleaned.replace(/https?:\/\/[^\s\),;"]+/gi, '');
+  
+  // 4. Remove residual brackets around words: [Exercise Name] -> Exercise Name
+  cleaned = cleaned.replace(/\[([^\]\n\r]+)\]/g, '$1');
+  
+  // 5. Remove empty parentheses / brackets
+  cleaned = cleaned.replace(/\(\s*\)/g, '').replace(/\[\s*\]/g, '');
+  
+  // 6. Ensure timeline is framed as recommended: (e.g. "this 12-week block" -> "recommended 12-week block")
+  cleaned = cleaned.replace(/\b(?:this|the|a)\s+(\d+(?:-\s*week|\s+week))\s+(block|phase|cycle|protocol|program|timeline)\b/gi, 'recommended $1 $2');
+  
+  // 7. Normalize whitespace and punctuation spacing
+  cleaned = cleaned.replace(/[ \t]+/g, ' ')
+    .replace(/[ \t]+([.,;:!?])/g, '$1')
+    .trim();
+  
+  return cleaned;
+};
+
+const formatPhysiqueCoachNarrative = (text: string) => cleanPlainTextWithoutUrls(text);
+
 const FormattedEvaluation = ({ content }: { content: string }) => {
   if (!content) return null;
   const cleaned = cleanEvaluationText(content);
@@ -175,7 +207,7 @@ const RatingTable = ({ title, ratings = [], summary, photo }: { title: string; r
           <div className="p-4 sm:p-6 bg-brand-primary/5 border border-brand-primary/10 rounded-2xl text-xs sm:text-sm text-gray-300 leading-relaxed italic relative overflow-hidden print:bg-gray-50 print:border-gray-200 print:text-gray-700 break-words">
             <div className="absolute top-0 left-0 w-1 h-full bg-brand-primary/40 print:bg-gray-400" />
             <div className="markdown-body">
-              <ReactMarkdown>{summary}</ReactMarkdown>
+              <ReactMarkdown>{cleanPlainTextWithoutUrls(summary)}</ReactMarkdown>
             </div>
           </div>
         )}
@@ -277,7 +309,7 @@ const ProgressComparison = ({ title, ratings = [], summary, beforePhoto, afterPh
           <div className="p-4 sm:p-6 bg-brand-primary/5 border border-brand-primary/10 rounded-2xl text-xs sm:text-sm text-gray-300 leading-relaxed italic relative overflow-hidden print:bg-gray-50 print:border-gray-200 print:text-gray-700 break-words">
             <div className="absolute top-0 left-0 w-1 h-full bg-brand-primary/40 print:bg-gray-400" />
             <div className="markdown-body">
-              <ReactMarkdown>{summary}</ReactMarkdown>
+              <ReactMarkdown>{cleanPlainTextWithoutUrls(summary)}</ReactMarkdown>
             </div>
           </div>
         )}
@@ -4430,17 +4462,21 @@ export default function App() {
                                 Detailed Coach Narrative & Health Overview
                               </div>
                               <div className="space-y-3">
-                                {report.trainerSummary.split('\n\n').map((paragraph, pIdx) => (
-                                  <p key={pIdx} className="text-gray-300 leading-relaxed text-sm">
-                                    {paragraph}
-                                  </p>
-                                ))}
+                                {report.trainerSummary.split('\n\n').map((paragraph, pIdx) => {
+                                  const formatted = formatPhysiqueCoachNarrative(paragraph);
+                                  if (!formatted) return null;
+                                  return (
+                                    <p key={pIdx} className="text-gray-300 leading-relaxed text-sm">
+                                      {formatted}
+                                    </p>
+                                  );
+                                })}
                               </div>
                             </div>
                           ) : report.toplineSummary ? (
                             <div className="p-4 bg-black/20 border-l-2 border-brand-primary rounded-r-xl">
                               <p className="text-xs sm:text-sm text-gray-300 italic leading-relaxed">
-                                "{report.toplineSummary}"
+                                "{formatPhysiqueCoachNarrative(report.toplineSummary)}"
                               </p>
                             </div>
                           ) : null}
@@ -4459,7 +4495,7 @@ export default function App() {
                                 <span className="text-[10px] text-gray-500 font-mono">Anterior Chain</span>
                               </div>
                               <p className="text-xs text-gray-300 line-clamp-4 leading-relaxed">
-                                {report.frontViewAnalysis?.summary || "Evaluated for clavicle width, shoulder-to-waist taper, chest development, and abdominal definition."}
+                                {cleanPlainTextWithoutUrls(report.frontViewAnalysis?.summary) || "Evaluated for clavicle width, shoulder-to-waist taper, chest development, and abdominal definition."}
                               </p>
                               {report.frontViewAnalysis?.ratings && report.frontViewAnalysis.ratings.length > 0 && (
                                 <div className="pt-2 flex flex-wrap gap-1">
@@ -4479,7 +4515,7 @@ export default function App() {
                                 <span className="text-[10px] text-gray-500 font-mono">Sagittal Alignment</span>
                               </div>
                               <p className="text-xs text-gray-300 line-clamp-4 leading-relaxed">
-                                {report.leftViewAnalysis?.summary || report.rightViewAnalysis?.summary || "Evaluated for spinal curvature, cervical posture, pelvic tilt, and torso-to-limb proportions."}
+                                {cleanPlainTextWithoutUrls(report.leftViewAnalysis?.summary || report.rightViewAnalysis?.summary) || "Evaluated for spinal curvature, cervical posture, pelvic tilt, and torso-to-limb proportions."}
                               </p>
                               {(report.leftViewAnalysis?.ratings || report.rightViewAnalysis?.ratings) && (
                                 <div className="pt-2 flex flex-wrap gap-1">
@@ -4499,7 +4535,7 @@ export default function App() {
                                 <span className="text-[10px] text-gray-500 font-mono">Posterior Chain</span>
                               </div>
                               <p className="text-xs text-gray-300 line-clamp-4 leading-relaxed">
-                                {report.backViewAnalysis?.summary || "Evaluated for scapular positioning, latissimus dorsi width, spinal erectors, and glute-hamstring tie-in."}
+                                {cleanPlainTextWithoutUrls(report.backViewAnalysis?.summary) || "Evaluated for scapular positioning, latissimus dorsi width, spinal erectors, and glute-hamstring tie-in."}
                               </p>
                               {report.backViewAnalysis?.ratings && report.backViewAnalysis.ratings.length > 0 && (
                                 <div className="pt-2 flex flex-wrap gap-1">
