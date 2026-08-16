@@ -1724,11 +1724,11 @@ export default function App() {
                         {selectedReportFolder === 'all' ? (
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {[
-                              { id: 'assessment', name: 'Assessments', icon: Search, desc: 'Detailed physique analysis' },
-                              { id: 'workout', name: 'Workout Plans', icon: Dumbbell, desc: 'Custom training protocols' },
-                              { id: 'meal', name: 'Nutrition Plans', icon: Utensils, desc: 'Meal and macro strategies' },
-                              { id: 'progress', name: 'Progress History', icon: LineChart, desc: 'Transformation comparisons' },
-                              { id: 'full', name: 'Transformation Reports', icon: FileText, desc: 'Complete unified strategies' },
+                              { id: 'assessment', name: 'Physique Assessment', icon: Search, desc: 'Detailed physique analysis' },
+                              { id: 'workout', name: 'Workout Plan', icon: Dumbbell, desc: 'Custom training protocols' },
+                              { id: 'meal', name: 'Meal Plan', icon: Utensils, desc: 'Meal and macro strategies' },
+                              { id: 'progress', name: 'Progress Engine', icon: LineChart, desc: 'Transformation comparisons' },
+                              { id: 'full', name: 'Full Transformation', icon: FileText, desc: 'Complete unified strategies' },
                             ].map((folder) => {
                               const count = savedReports.filter(r => r.path === folder.id).length;
                               const folderHasConflict = folder.id === 'full' && reportConflicts.length > 0;
@@ -1840,17 +1840,11 @@ export default function App() {
                                       <div>
                                         <div className="flex items-center gap-2 flex-wrap mb-2">
                                           <Badge className="bg-brand-primary/10 text-brand-primary border-none">
-                                            {saved.path.toUpperCase()}
+                                            {saved.path === 'assessment' ? 'Physique Assessment' :
+                                             saved.path === 'workout' ? 'Workout Plan' :
+                                             saved.path === 'meal' ? 'Meal Plan' :
+                                             saved.path === 'progress' ? 'Progress Engine' : 'Full Transformation'}
                                           </Badge>
-                                          {(!saved.report.recoverySchedule || saved.report.recoverySchedule.length === 0) ? (
-                                            <Badge className="bg-amber-400/10 text-amber-400 border border-amber-400/20 font-bold">
-                                              + RECOVERY READY
-                                            </Badge>
-                                          ) : (
-                                            <Badge className="bg-purple-500/10 text-purple-400 border border-purple-500/20 font-bold">
-                                              ✓ RECOVERY ACTIVE
-                                            </Badge>
-                                          )}
                                           {isConflicting && (
                                             <Badge className="bg-red-500/20 text-red-400 border border-red-500/30 font-bold">
                                               ⚠️ OVERLAPPING DATES
@@ -1876,20 +1870,15 @@ export default function App() {
                                       "{saved.report.toplineSummary}"
                                     </p>
                                     <div className="pt-3 flex items-center justify-between border-t border-white/5">
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleRefreshReportRecovery(saved);
-                                        }}
-                                        disabled={isRefreshingRecovery}
-                                        className="text-brand-primary hover:text-brand-primary/80 text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
-                                        title="Refresh report to attach 7-day Recovery Protocol while preserving all workout and nutrition logs"
-                                      >
-                                        <Zap className="w-3.5 h-3.5" />
-                                        Refresh Recovery
-                                      </button>
+                                      <span className="text-[10px] text-brand-primary/80 font-mono uppercase font-bold">
+                                        {saved.path === 'assessment' ? 'Physique Assessment' :
+                                         saved.path === 'workout' ? `${getPlanDurationWeeks(saved.userData.planDuration)}-Week Split` :
+                                         saved.path === 'meal' ? `${getPlanDurationWeeks(saved.userData.planDuration)}-Week Meal Plan` :
+                                         saved.path === 'progress' ? 'Progress Comparison' :
+                                         `${getPlanDurationWeeks(saved.userData.planDuration)}-Week Transformation`}
+                                      </span>
                                       <span className="text-[10px] text-gray-500 font-mono">
-                                        {saved.report.recoverySchedule?.length ? `${saved.report.recoverySchedule.length} Recovery Days` : 'No Recovery'}
+                                        {saved.userData.weight} {saved.userData.weightUnit}
                                       </span>
                                     </div>
                                     {isConflicting && (
@@ -3322,18 +3311,17 @@ export default function App() {
                     className="text-4xl font-display font-bold text-brand-primary cursor-pointer hover:brightness-110 transition-all"
                     onClick={() => setStep('landing')}
                   >
-                    {(report as any).reportType || (
-                      path === 'meal' ? 'UNLCKD Meal Plan' : 
-                      path === 'workout' ? 'UNLCKD Workout Plan' : 
-                      path === 'progress' ? 'UNLCKD Weekly Comparison Report' :
-                      path === 'assessment' ? 'UNLCKD Physique Assessment' :
-                      `UNLCKD ${userData.planDuration?.replace('-week', ' Week') || '12-Week'} Transformation Report`
-                    )}
+                    {path === 'assessment' ? 'Physique Assessment' : 
+                     path === 'workout' ? 'Workout Plan' : 
+                     path === 'meal' ? 'Meal Plan' : 
+                     path === 'progress' ? 'Progress Engine' :
+                     `UNLCKD ${userData.planDuration?.replace('-week', ' Week') || '12-Week'} Transformation Report`}
                   </h1>
                   <p className="text-gray-500">
-                    {path === 'meal' ? 'Nutrition Strategy, Meal Plan, and Grocery List' :
-                     path === 'workout' ? 'Training Plan, Recovery, and Hydration Strategy' :
-                     path === 'assessment' ? 'Physique Analysis and Body Composition Assessment' :
+                    {path === 'assessment' ? 'Physique Analysis, Body Composition & Recommended Caloric Strategy' :
+                     path === 'workout' ? 'Tailored Workout Plan, Exercise Hyperlinks & Recommended Caloric Strategy' :
+                     path === 'meal' ? 'Goal-Matched Nutrition Strategy, Meal Plan & Master Grocery Checklist' :
+                     path === 'progress' ? 'Visual Progress Comparison, Body Composition & Next Steps' :
                      `Complete ${(userData.planDuration?.replace('-week', ' Week') || '12-Week')} Transformation Blueprint`}
                   </p>
                 </div>
@@ -3344,10 +3332,11 @@ export default function App() {
                       {[
                         { label: 'Client Name', value: userData.name },
                         { label: 'Report Type', value: 
-                          path === 'progress' ? 'UNLCKD Weekly Comparison Report' : 
-                          path === 'meal' ? 'Meal Plan' :
+                          path === 'assessment' ? 'Physique Assessment' : 
                           path === 'workout' ? 'Workout Plan' :
-                          'Transformation Report' 
+                          path === 'meal' ? 'Meal Plan' :
+                          path === 'progress' ? 'Progress Engine' :
+                          'Full Transformation Report' 
                         },
                         { label: 'Date', value: viewingDate.toLocaleDateString() },
                         { label: 'Time', value: viewingDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) },
@@ -3696,6 +3685,51 @@ export default function App() {
                       </div>
                     </div>
                   </div>
+
+                  {path === 'workout' && (
+                    <div className="space-y-6 pt-4">
+                      <div className="flex items-center gap-3">
+                        <Utensils className="w-7 h-7 text-brand-primary" />
+                        <h2 className="text-3xl font-display font-bold text-brand-primary">Recommended Eating Style & Caloric Strategy</h2>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <Card className="p-6 bg-brand-surface border-gray-800">
+                          <div className="flex items-center gap-3 mb-4">
+                            <Utensils className="w-5 h-5 text-brand-primary" />
+                            <h3 className="font-bold text-gray-200">Metabolic Energy Strategy</h3>
+                          </div>
+                          <div className="space-y-4">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-gray-400">Recommended Style</span>
+                              <Badge className={cn(
+                                "capitalize font-bold",
+                                report.healthMetrics?.recommendedCalorieLevel === 'deficit' ? "bg-red-500/10 text-red-500 border-red-500/20" :
+                                report.healthMetrics?.recommendedCalorieLevel === 'surplus' ? "bg-blue-500/10 text-blue-500 border-blue-500/20" :
+                                "bg-green-500/10 text-green-500 border-green-500/20"
+                              )}>
+                                {report.healthMetrics?.recommendedCalorieLevel === 'deficit' ? 'Caloric Deficit (Weight Loss)' :
+                                 report.healthMetrics?.recommendedCalorieLevel === 'surplus' ? 'Caloric Surplus (Muscle Building)' :
+                                 'Caloric Maintenance'}
+                              </Badge>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-gray-400">Daily Calorie Target</span>
+                              <span className="text-lg font-mono font-bold text-brand-primary">{report.healthMetrics?.dailyCalorieTarget || 'Custom Macro Split'}</span>
+                            </div>
+                          </div>
+                        </Card>
+                        <Card className="p-6 bg-brand-surface border-gray-800">
+                          <div className="flex items-center gap-3 mb-4">
+                            <Target className="w-5 h-5 text-brand-primary" />
+                            <h3 className="font-bold text-gray-200">Eating Style Guidelines</h3>
+                          </div>
+                          <p className="text-sm text-gray-300 leading-relaxed italic">
+                            "{report.nutritionStrategy || 'Follow a balanced whole-food nutritional strategy aligned with your daily caloric target and adequate protein to fuel training recovery.'}"
+                          </p>
+                        </Card>
+                      </div>
+                    </div>
+                  )}
 
                   {path === 'workout' && (
                     <SupplementSection supplements={report.supplementRecommendations} />
@@ -4121,7 +4155,7 @@ export default function App() {
               )}
 
               {/* Recovery & Tracking */}
-              {(path !== 'meal' && path !== 'progress') && (
+              {(path === 'workout' || path === 'full') && (
                 <section className="space-y-12 pt-16 border-t border-gray-800 print-break-before">
                   <h2 className="text-3xl font-display font-bold text-brand-primary">Recovery, Sleep & Optimization</h2>
                   
@@ -4190,45 +4224,16 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  {(report.recoverySchedule && report.recoverySchedule.length > 0) && (
+                    <div className="space-y-4">
                       <div>
                         <h3 className="text-xl font-display font-bold text-gray-200 flex items-center gap-2">
                           <Zap className="w-5 h-5 text-brand-primary" />
                           Suggested Recovery Protocol
                         </h3>
-                        <p className="text-xs text-gray-400">Targeted recovery modalities tailored to your training split & recorded progress.</p>
+                        <p className="text-xs text-gray-400">Targeted recovery modalities tailored to your training split.</p>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleRefreshReportRecovery()}
-                        disabled={isRefreshingRecovery}
-                        className="border-brand-primary/40 text-brand-primary hover:bg-brand-primary/10 rounded-xl gap-2 self-start sm:self-auto shrink-0"
-                      >
-                        <RefreshCw className={cn("w-3.5 h-3.5", isRefreshingRecovery && "animate-spin")} />
-                        {isRefreshingRecovery ? "Updating Recovery..." : "Refresh Recovery Guidance"}
-                      </Button>
-                    </div>
 
-                    {(!report.recoverySchedule || report.recoverySchedule.length === 0) ? (
-                      <div className="bg-brand-secondary/10 border border-brand-primary/30 p-5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
-                        <div className="space-y-1 text-center sm:text-left">
-                          <h4 className="text-sm font-bold text-gray-200">New Recovery Guidance Feature Available</h4>
-                          <p className="text-xs text-gray-400">
-                            This report was generated prior to the Recovery Feature release. Click refresh to automatically generate 7-day modalities while keeping all recorded workout and nutrition data intact!
-                          </p>
-                        </div>
-                        <Button
-                          onClick={() => handleRefreshReportRecovery()}
-                          disabled={isRefreshingRecovery}
-                          className="bg-brand-primary text-brand-dark font-bold text-xs rounded-xl shrink-0 gap-2"
-                        >
-                          <Zap className="w-4 h-4" />
-                          {isRefreshingRecovery ? "Generating..." : "Add Recovery Guidance"}
-                        </Button>
-                      </div>
-                    ) : (
                       <div className="bg-brand-secondary/10 border border-brand-secondary/30 rounded-xl overflow-x-auto max-w-full w-full">
                         <table className="w-full text-xs sm:text-sm text-left border-collapse min-w-[320px]">
                           <thead className="bg-brand-secondary/20 text-gray-400 uppercase text-[10px] tracking-wider">
@@ -4239,7 +4244,7 @@ export default function App() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-800">
-                            {report.recoverySchedule?.map((row, i) => (
+                            {report.recoverySchedule.map((row, i) => (
                               <tr key={i} className="hover:bg-brand-secondary/5 transition-colors">
                                 <td className="px-3 sm:px-6 py-3 bg-brand-secondary/20 font-bold text-gray-200 border-r border-gray-800 break-words text-xs sm:text-sm align-top">
                                   {row.day}
@@ -4271,8 +4276,8 @@ export default function App() {
                           </tbody>
                         </table>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
                   <div className="space-y-4">
                     <h3 className="text-xl font-display font-bold text-gray-200">Practical Water Schedule</h3>
@@ -4300,8 +4305,25 @@ export default function App() {
                           { label: 'Name', value: userData.name },
                           { label: 'Weight', value: `${userData.weight} ${userData.weightUnit}` },
                           { label: 'Height', value: `${userData.height} ${userData.heightUnit}` },
-                          ...(path !== 'workout' ? [{ label: 'Meal Plan', value: report.trainerSummary.split('\n')[0] }] : []),
-                          { label: 'Workout Plan', value: report.trainerSummary.split('\n')[1] || '7-day tailored split' },
+                          ...(path === 'full' ? [
+                            { 
+                              label: 'Meal Plan', 
+                              value: report.healthMetrics?.recommendedCalorieLevel 
+                                ? `${report.healthMetrics.recommendedCalorieLevel === 'deficit' ? 'Caloric Deficit' : report.healthMetrics.recommendedCalorieLevel === 'surplus' ? 'Caloric Surplus' : 'Caloric Maintenance'}${report.healthMetrics.dailyCalorieTarget ? ` (${report.healthMetrics.dailyCalorieTarget})` : ''}` 
+                                : 'Full Goal-Matched Plan' 
+                            },
+                            { label: 'Workout Plan', value: `${getPlanDurationWeeks(userData.planDuration)}-week progressive training split` },
+                          ] : (path === 'workout' || path === 'assessment') ? [
+                            { 
+                              label: 'Recommended Eating Style', 
+                              value: report.healthMetrics?.recommendedCalorieLevel === 'deficit'
+                                ? `Caloric Deficit (Eat below maintenance for fat/weight loss • Target: ${report.healthMetrics.dailyCalorieTarget || 'Custom kcal'})`
+                                : report.healthMetrics?.recommendedCalorieLevel === 'surplus'
+                                ? `Caloric Surplus (Eat in surplus to build muscle/mass • Target: ${report.healthMetrics.dailyCalorieTarget || 'Custom kcal'})`
+                                : `Caloric Maintenance (Eat at maintenance for body recomposition • Target: ${report.healthMetrics.dailyCalorieTarget || 'Custom kcal'})`
+                            },
+                            ...(path === 'workout' ? [{ label: 'Workout Plan', value: `${getPlanDurationWeeks(userData.planDuration)}-week tailored split` }] : []),
+                          ] : []),
                           { label: 'Steps', value: report.stepGoals },
                           { label: 'Water Intake', value: report.hydrationTargets },
                         ].map((row, i) => (
@@ -4320,14 +4342,6 @@ export default function App() {
               <div className="mt-12 flex flex-col items-center gap-4 no-print pb-20">
                 <Button size="lg" onClick={() => setStep('landing')} className="rounded-2xl px-12">Start New Assessment</Button>
                 <div className="flex flex-wrap items-center justify-center gap-3">
-                  <button 
-                    onClick={() => handleRefreshReportRecovery()}
-                    disabled={isRefreshingRecovery}
-                    className="text-brand-primary hover:text-brand-primary/80 text-xs font-bold uppercase tracking-widest transition-colors flex items-center gap-2 bg-brand-primary/10 border border-brand-primary/30 px-4 py-2.5 rounded-xl cursor-pointer disabled:opacity-50"
-                  >
-                    <Zap className={cn("w-4 h-4", isRefreshingRecovery && "animate-spin")} />
-                    {isRefreshingRecovery ? "Refreshing Recovery Guidance..." : "Refresh Report (Add Recovery Guidance)"}
-                  </button>
                   <button 
                     onClick={() => processReport(true)}
                     className="text-gray-500 hover:text-brand-primary text-xs font-bold uppercase tracking-widest transition-colors flex items-center gap-2 px-4 py-2.5"

@@ -68,7 +68,7 @@ export interface ClientData {
   badges?: string[];
   reports: {
     id: string;
-    type: 'full' | 'meal' | 'assessment';
+    type: 'full' | 'meal' | 'assessment' | 'workout' | 'progress';
     title: string;
     date: string;
     summary: string;
@@ -399,9 +399,14 @@ export const ClientHub: React.FC<ClientHubProps> = ({
                           "text-[9px] font-black uppercase px-2 py-0.5",
                           report.type === 'full' && "bg-brand-primary/10 text-brand-primary border-brand-primary/20",
                           report.type === 'meal' && "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+                          report.type === 'workout' && "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
+                          report.type === 'progress' && "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
                           report.type === 'assessment' && "bg-amber-400/10 text-amber-400 border-amber-400/20"
                         )}>
-                          {report.type === 'full' ? 'Full Transformation' : report.type === 'meal' ? 'Meal Plan' : 'Physique Scan'}
+                          {report.type === 'full' ? 'Full Transformation' : 
+                           report.type === 'meal' ? 'Meal Plan' : 
+                           report.type === 'workout' ? 'Workout Plan' :
+                           report.type === 'progress' ? 'Progress Engine' : 'Physique Assessment'}
                         </Badge>
                       </div>
 
@@ -415,7 +420,7 @@ export const ClientHub: React.FC<ClientHubProps> = ({
                           /* Physique Assessment is explicitly NOT syncable */
                           <div className="flex items-center gap-2 text-amber-400/80 text-[11px] font-mono font-bold bg-amber-400/5 px-3 py-1.5 rounded-xl border border-amber-400/20 w-full">
                             <Eye className="w-3.5 h-3.5 shrink-0" />
-                            <span>View-Only Report • Physique Scans Cannot Sync to Gym Hub</span>
+                            <span>View-Only Report • Physique Assessments Cannot Sync to Gym Hub</span>
                           </div>
                         ) : (
                           /* Full Transformation & Meal Plan are Syncable */

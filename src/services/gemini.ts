@@ -328,6 +328,8 @@ async function generateHealthAndSupport(
   const model = "gemini-flash-latest";
 
   const includeGrocery = path === 'full' || path === 'meal';
+  const isDietRestricted = path === 'assessment' || path === 'workout';
+  const includeRecovery = path === 'full' || path === 'workout';
 
   const prompt = `
     Generate health metrics and supportive guidance for "UNLCKD Pro Trainer".
@@ -348,7 +350,7 @@ async function generateHealthAndSupport(
     1. Health Metrics (BMI, Body Fat, Calorie Targets).
     2. Daily Life (Sleep, Water, Steps).
     3. Supplement Strategy: Recommend specific fitness and nutritional supplements (e.g., Protein Powder, Creatine, Omega-3s, Multivitamins) tailored to their goals and equipment access.
-    4. RECOVERY & MODALITY PROTOCOL:
+    ${includeRecovery ? `4. RECOVERY & MODALITY PROTOCOL:
        Generate a 7-day "recoverySchedule" complimenting the user's workout schedule. For each day (Monday through Sunday), prescribe specific targeted recovery modalities such as:
        - Infrared Sauna (15-20 mins @ 165-175°F for GH release & CNS relaxation)
        - Steam Room (12-15 mins @ 110-115°F for moist heat & joint cartilage warmth)
@@ -356,8 +358,15 @@ async function generateHealthAndSupport(
        - Percussive Therapy / Theragun & Foam Rolling (10 mins on trained muscle groups)
        - Contrast Therapy / Cold Plunge (3 cycles: 15m Sauna + 3m Cold Plunge @ 48°F)
        - Deep Tissue / Sports Massage or Active Spinal Decompression (on active recovery days)
-       Populate "modalities" (array of strings), "duration" (string), and "notes" (string) for each day in "recoverySchedule".
-    ${includeGrocery ? `5. Comprehensive Nutrition strategy for the full ${userData.planDuration || '12-week'} duration. This strategy MUST reference at least 5 key specific meals or ingredients that appear in the meal plan, including their names and verified links. 6. Grocery store recommendation.` : "5. Motivation and general Nutrition strategies."}
+       Populate "modalities" (array of strings), "duration" (string), and "notes" (string) for each day in "recoverySchedule".` : `4. RECOVERY & MODALITY PROTOCOL:
+       Do NOT provide a suggested recovery protocol for this report type. Keep "recoverySchedule" as an empty array [].`}
+    ${isDietRestricted ? `5. RECOMMENDED EATING STYLE (STRICT NO FULL MEAL PLAN & NO DIET FADS):
+       - Do NOT offer a full meal plan, recipes, or day-by-day food menus.
+       - Do NOT recommend any named diets or dietary labels (e.g. absolutely NO vegan, carnivore, keto, paleo, pescatarian, intermittent fasting, etc.).
+       - Prescribe a clear "recommended eating style" strictly focused on energy balance and metabolic goals: specifically recommend whether to eat at a caloric deficit (to lose weight / body fat), caloric maintenance (to maintain weight and recomposition), or caloric surplus (to gain muscle / mass).
+       - Set "recommendedCalorieLevel" in healthMetrics to strictly one of: "deficit", "maintenance", or "surplus".
+       - Set "dailyCalorieTarget" in healthMetrics to a concrete daily target (e.g. "2,100 - 2,300 kcal/day").
+       - In "nutritionStrategy", write 2 focused paragraphs detailing this recommended eating style (caloric deficit/maintenance/surplus), daily protein guidelines, and whole food nutrition fundamentals without full meal plans or diet fads.` : includeGrocery ? `5. Comprehensive Nutrition strategy for the full ${userData.planDuration || '12-week'} duration. This strategy MUST reference at least 5 key specific meals or ingredients that appear in the meal plan, including their names and verified links. 6. Grocery store recommendation.` : "5. Motivation and general Nutrition strategies."}
     
     UNIT ALIGNMENT: 
     - If user weight is in 'lbs', use US Imperial units for food: oz, lbs, cups, tsp, tbsp.
@@ -378,17 +387,26 @@ async function generateHealthAndSupport(
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     config: {
       systemInstruction: `
-        You are a master performance nutritionist. Return ONLY valid JSON.
+        You are a master performance coach and nutritionist. Return ONLY valid JSON.
         
+        ${isDietRestricted ? `
+        EATING STYLE PROTOCOL (NO FULL MEAL PLAN, NO DIET FADS):
+        - DO NOT provide a full meal plan, day-to-day recipes, or meal tables.
+        - DO NOT recommend named diets or dietary fads (e.g., absolutely NO vegan, carnivore, keto, paleo, etc.).
+        - Prescribe a recommended eating style focused on caloric balance: eating at a caloric deficit to lose weight/body fat, caloric maintenance for body recomposition, or caloric surplus to gain muscle/weight.
+        - Set healthMetrics.recommendedCalorieLevel to "deficit", "maintenance", or "surplus".
+        ` : `
         NUTRITION PROTOCOL:
         - When recommending meals, ensure quantities align with the unit system: ${userData.weightUnit === 'lbs' ? 'oz/lbs' : 'grams/kg'}.
         - Every single meal or ingredient mentioned in your summaries/strategies MUST be a specific, individually listed item that will appear in the final plan.
-        - SUPPLEMENTS & VITAMINS: Provide 3-5 specific recommendations (e.g., Protein, Creatine, Omega-3, Zinc, Multivitamins) tailored to their goals and health profile.
-        - SAFETY: Verify recommendations do not conflict with any stated health issues or injuries.
-        - LINKS: For each supplement, provide a high-quality manufacturer or informational URL in the "link" field. Do NOT use markdown in the JSON "link" property, only the raw URL. Use markdown [Name](Link) format ONLY in the text summaries.
-        - NEVER use generic advice. Reference at least 5-7 specific meals by name and provide their verified search links using the pattern [Meal Name](SearchURL).
+        - Reference at least 5-7 specific meals by name and provide their verified search links using the pattern [Meal Name](SearchURL).
         - Use the search tool to verify every single meal link leads to a high-quality recipe.
         - NO RAW URLS as text. Only use Markdown: [Meal Name](Link).
+        `}
+        
+        SUPPLEMENTS & VITAMINS: Provide 3-5 specific recommendations (e.g., Protein, Creatine, Omega-3, Zinc, Multivitamins) tailored to their goals and health profile.
+        SAFETY: Verify recommendations do not conflict with any stated health issues or injuries.
+        LINKS: For each supplement, provide a high-quality manufacturer or informational URL in the "link" field. Do NOT use markdown in the JSON "link" property, only the raw URL. Use markdown [Name](Link) format ONLY in the text summaries.
         
         WORKOUT PROTOCOL:
         - When discussing training strategy, reference specific, individual exercises (e.g., "Incorporate [Romanian Deadlifts](VideoURL) for posterior chain...").
@@ -942,11 +960,11 @@ export async function generateTransformationReport(
     // Final Validation & Cleanup
     const finalResult = result as AssessmentResult;
     
-    // Add report type metadata
-    (finalResult as any).reportType = path === 'progress' ? 'Progress Comparison' : 
-                                    path === 'assessment' ? 'Initial Assessment' :
-                                    path === 'workout' ? 'Training Split' :
-                                    path === 'meal' ? 'Meal Plan' : 'Full Transformation';
+    // Add report type metadata matching menu selection
+    (finalResult as any).reportType = path === 'progress' ? 'Progress Engine' : 
+                                    path === 'assessment' ? 'Physique Assessment' :
+                                    path === 'workout' ? 'Workout Plan' :
+                                    path === 'meal' ? 'Meal Plan' : 'Full Transformation Report';
     
     // Ensure all required fields exist to avoid UI crashes
     finalResult.toplineSummary = finalResult.toplineSummary || "Assessment incoming...";
@@ -962,7 +980,7 @@ export async function generateTransformationReport(
     finalResult.workoutPlan = finalResult.workoutPlan || [];
     finalResult.mealPlan = finalResult.mealPlan || [];
     finalResult.groceryList = finalResult.groceryList || [];
-    finalResult.recoverySchedule = finalResult.recoverySchedule || [];
+    finalResult.recoverySchedule = (path === 'full' || path === 'workout') ? (finalResult.recoverySchedule || []) : [];
     finalResult.waterSchedule = finalResult.waterSchedule || [];
     finalResult.supplementRecommendations = finalResult.supplementRecommendations || [];
     
