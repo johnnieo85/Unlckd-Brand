@@ -383,7 +383,10 @@ async function generateHealthAndSupport(
        Structure the trainer summary to clearly address:
        1. Overall Summary & Visual Health Standpoint: Explicitly explain whether the individual is viewed as healthy from a visual and physiological standpoint based on the photos (assessing body composition, muscular tone, posture, structural balance, adipose distribution, and vitality).
        2. Comparison Information: Detail key comparative insights comparing anterior vs posterior balance, bilateral symmetry (left vs right), and comparisons against normative demographic benchmarks and their stated target goals (${userData.goals || 'physique progression'}).
-       3. Actionable Coaching Directives & Recommended Timeline: Clear, encouraging next-phase recommendations. Always mention the timeline as recommended (e.g., "recommended ${userData.planDuration || '12-week'} block" or "recommended ${userData.planDuration || '12-week'} training cycle", NOT a mandatory schedule).
+       3. Actionable Coaching Directives & Recommended Time Frame:
+          - DO NOT say "Moving forward into this 12-week block" or assume the person has already committed to any program or fixed block.
+          - Instead, based on their visual baseline and current body composition, recommend a realistic timeframe (e.g. "To develop a healthier, leaner physique and achieve sustainable body recomposition, a recommended 12 to 16-week phase is advised...").
+          - Give them clear, encouraging coach directives (nutritional energy balance, progressive overload, daily activity/steps, and sleep/recovery) tailored to help them build their desired physique during that recommended timeframe.
        
        STRICT LINK RULE FOR PHYSIQUE ASSESSMENT TRAINER SUMMARY:
        - ABSOLUTELY DO NOT include any website links, YouTube search links, markdown hyperlinks [Exercise](URL), or raw URLs in the trainerSummary for this physique assessment report. Keep all exercise, movement, and coaching references strictly in clean, plain professional text without any hyperlinks or URLs.` : ''}

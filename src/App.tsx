@@ -102,8 +102,11 @@ const cleanPlainTextWithoutUrls = (text: string): string => {
   // 5. Remove empty parentheses / brackets
   cleaned = cleaned.replace(/\(\s*\)/g, '').replace(/\[\s*\]/g, '');
   
-  // 6. Ensure timeline is framed as recommended: (e.g. "this 12-week block" -> "recommended 12-week block")
-  cleaned = cleaned.replace(/\b(?:this|the|a)\s+(\d+(?:-\s*week|\s+week))\s+(block|phase|cycle|protocol|program|timeline)\b/gi, 'recommended $1 $2');
+  // 6. Reframe timeline as a recommended timeframe to develop a healthier / desired physique
+  cleaned = cleaned.replace(/Moving forward into (?:this|the|a) (\d+(?:-\s*week|\s+week))\s+(?:block|phase|cycle|protocol|program)[,\s]*/gi, 'To develop a healthier and more desired physique, a recommended $1 timeframe is advised: ');
+  cleaned = cleaned.replace(/Actionable Coaching Directives:\s*Moving forward into [^,.:]*[,\s:]*/gi, 'Actionable Coaching Directives: To develop a healthier and more desired physique, a recommended 12-week timeframe is advised: ');
+  cleaned = cleaned.replace(/\b(?:into|throughout|during)\s+(?:this|the)\s+(\d+(?:-\s*week|\s+week))\s+(block|phase|cycle|protocol|program)\b/gi, 'across a recommended $1 timeframe');
+  cleaned = cleaned.replace(/\b(?:this|the|a)\s+(\d+(?:-\s*week|\s+week))\s+(block|phase|cycle|protocol|program|timeline)\b/gi, 'recommended $1 timeframe');
   
   // 7. Normalize whitespace and punctuation spacing
   cleaned = cleaned.replace(/[ \t]+/g, ' ')
