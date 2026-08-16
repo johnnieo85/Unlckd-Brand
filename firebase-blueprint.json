@@ -6,6 +6,8 @@
       "type": "object",
       "properties": {
         "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
         "timestamp": { "type": "string", "format": "date-time" },
         "path": { "type": "string" },
         "userData": { "type": "object" },
@@ -13,7 +15,7 @@
         "photos": { "type": "object" },
         "progressPhotos": { "type": "object" }
       },
-      "required": ["id", "timestamp", "path", "userData", "report", "photos"]
+      "required": ["id", "userId", "timestamp", "path", "userData", "report", "photos"]
     },
     "User": {
       "title": "User Profile",
@@ -22,20 +24,25 @@
       "properties": {
         "userId": { "type": "string" },
         "email": { "type": "string" },
+        "fullName": { "type": "string" },
+        "displayName": { "type": "string" },
         "hasAccess": { "type": "boolean" },
         "isPremium": { "type": "boolean" },
         "createdAt": { "type": "string", "format": "date-time" },
-        "displayName": { "type": "string" },
         "photoURL": { "type": "string" },
+        "avatarUrl": { "type": "string" },
         "level": { "type": "number" },
         "xp": { "type": "number" },
+        "streak": { "type": "number" },
+        "membershipTier": { "type": "string" },
         "plan": { "type": "string", "enum": ["free", "pro", "coach"] },
         "billingCycle": { "type": "string", "enum": ["monthly", "annual", "lifetime"] },
         "renewalDate": { "type": "string" },
         "status": { "type": "string", "enum": ["active", "past_due", "canceled", "trialing"] },
         "clientBand": { "type": "string", "enum": ["1-5", "6-15", "16-30", "31+"] },
         "cancelAtPeriodEnd": { "type": "boolean" },
-        "subscriptionId": { "type": "string" }
+        "subscriptionId": { "type": "string" },
+        "gymPin": { "type": "string" }
       },
       "required": ["userId", "email", "hasAccess"]
     },

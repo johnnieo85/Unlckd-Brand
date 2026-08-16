@@ -214,6 +214,7 @@ export interface UserProfile {
   subscriptionId?: string;
   avatarUrl?: string;
   fullName?: string;
+  displayName?: string;
   age?: string;
   sex?: string;
   location?: string;

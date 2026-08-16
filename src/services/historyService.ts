@@ -69,6 +69,7 @@ export const historyService = {
     try {
       const docRef = await addDoc(collection(db, 'reports'), {
         userId: auth.currentUser.uid,
+        userEmail: auth.currentUser.email || '',
         id: crypto.randomUUID(),
         timestamp: serverTimestamp(),
         path,

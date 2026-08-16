@@ -9,11 +9,16 @@ export async function ensureUserProfile(user: FirebaseUser): Promise<UserProfile
   const userSnap = await getDoc(userRef);
 
   const defaultRenewalDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const userEmail = user.email || '';
+  const emailIdentifier = userEmail || user.displayName || user.uid;
+  const sanitizedEmailTag = (userEmail || user.uid).replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 24);
 
   if (!userSnap.exists()) {
     const newProfile: UserProfile = {
       userId: user.uid,
-      email: user.email || '',
+      email: userEmail,
+      fullName: emailIdentifier,
+      displayName: emailIdentifier,
       hasAccess: true, // Standard user access granted
       isPremium: false,
       createdAt: serverTimestamp(),
@@ -24,7 +29,7 @@ export async function ensureUserProfile(user: FirebaseUser): Promise<UserProfile
       status: 'active',
       clientBand: '1-5',
       cancelAtPeriodEnd: false,
-      subscriptionId: `sub_free_${user.uid.slice(0, 8)}`,
+      subscriptionId: `sub_free_${sanitizedEmailTag}`,
       monthlyGoal: {
         title: "The Stepper May Mission",
         description: "Average 10,000 steps daily throughout May to unlock the elite status.",
@@ -39,18 +44,36 @@ export async function ensureUserProfile(user: FirebaseUser): Promise<UserProfile
 
   const existingData = userSnap.data() as UserProfile;
   
+  // Update identification if fullName/displayName/email is missing or uses placeholder name
+  const isPlaceholderName = !existingData.fullName || 
+                           existingData.fullName === 'User' || 
+                           existingData.fullName === 'Marcus Vance' ||
+                           existingData.fullName === 'User Profile';
+
+  const needsIdentityUpdate = isPlaceholderName || 
+                             (!existingData.email && userEmail) ||
+                             !existingData.displayName;
+
   // Backfill subscription state if missing in existing profile
   const needsBackfill = !existingData.plan || !existingData.status || !existingData.renewalDate;
-  if (needsBackfill) {
+
+  if (needsBackfill || needsIdentityUpdate) {
     const defaultPlan: SubscriptionPlanType = existingData.isPremium ? 'pro' : 'free';
+    const resolvedFullName = !isPlaceholderName && existingData.fullName 
+      ? existingData.fullName 
+      : (userEmail || existingData.fullName || user.displayName || 'User');
+
     const updatedState: Partial<UserProfile> = {
+      email: userEmail || existingData.email || '',
+      fullName: resolvedFullName,
+      displayName: userEmail || existingData.displayName || resolvedFullName,
       plan: existingData.plan || defaultPlan,
       billingCycle: existingData.billingCycle || 'monthly',
       renewalDate: existingData.renewalDate || defaultRenewalDate,
       status: existingData.status || 'active',
       clientBand: existingData.clientBand || '1-5',
       cancelAtPeriodEnd: existingData.cancelAtPeriodEnd ?? false,
-      subscriptionId: existingData.subscriptionId || `sub_${defaultPlan}_${user.uid.slice(0, 8)}`
+      subscriptionId: existingData.subscriptionId || `sub_${defaultPlan}_${sanitizedEmailTag}`
     };
     await setDoc(userRef, updatedState, { merge: true });
     return { ...existingData, ...updatedState };
