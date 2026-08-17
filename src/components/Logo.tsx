@@ -1,60 +1,81 @@
 import React from 'react';
-import { Activity } from 'lucide-react';
 import { cn } from '../lib/utils';
 
-interface LogoProps {
+export interface LogoProps {
   className?: string;
-  iconClassName?: string;
+  imgClassName?: string;
   textClassName?: string;
   onClick?: () => void;
   size?: 'sm' | 'md' | 'lg';
+  alt?: string;
+  showSubtitle?: boolean;
+  subtitle?: string;
 }
+
+export const LOGO_ASSET_URL = 'https://unlckdprotrainer.com/assets/unlckd-pro-logo.png';
 
 export const Logo: React.FC<LogoProps> = ({ 
   className, 
-  iconClassName,
-  textClassName, 
+  imgClassName,
+  textClassName,
   onClick,
-  size = 'md'
+  size = 'md',
+  alt = 'UNLCKD PRO',
+  showSubtitle = true,
+  subtitle = 'Pro Trainer'
 }) => {
+  // Responsive scaling:
+  // Mobile: ~115–140px wide
+  // Desktop: ~150–180px wide
   const sizeClasses = {
-    sm: {
-      container: 'w-7 h-7 rounded-[3px]',
-      icon: 'w-4 h-4',
-      text: 'text-lg'
-    },
-    md: {
-      container: 'w-9 h-9 rounded-[4px]',
-      icon: 'w-5 h-5',
-      text: 'text-2xl'
-    },
-    lg: {
-      container: 'w-11 h-11 rounded-[4px]',
-      icon: 'w-6 h-6',
-      text: 'text-3xl'
-    }
+    sm: 'w-[105px] sm:w-[120px] lg:w-[135px]',
+    md: 'w-[115px] sm:w-[135px] md:w-[150px] lg:w-[165px]',
+    lg: 'w-[130px] sm:w-[150px] md:w-[170px] lg:w-[185px]'
+  };
+
+  const subtitleClasses = {
+    sm: 'text-[11px] sm:text-xs',
+    md: 'text-xs sm:text-sm',
+    lg: 'text-sm sm:text-base'
   };
 
   return (
     <div 
-      className={cn("flex items-center gap-2.5 cursor-pointer group select-none", className)}
+      className={cn(
+        "inline-flex items-center gap-2 sm:gap-2.5 cursor-pointer select-none bg-transparent border-0 outline-none shadow-none p-0 m-0 group", 
+        className
+      )}
       onClick={onClick}
     >
-      <div className={cn(
-        sizeClasses[size].container,
-        "bg-brand-primary flex items-center justify-center transition-transform group-hover:scale-102 print:bg-black print:text-white",
-        iconClassName
-      )}>
-        <Activity className={cn(sizeClasses[size].icon, "text-black print:text-white stroke-[2.5]")} />
-      </div>
-      <span className={cn(
-        "font-display font-extrabold tracking-normal uppercase transition-colors print:text-black leading-none",
-        sizeClasses[size].text,
-        textClassName
-      )}>
-        UNLCKD <span className="text-brand-primary">PRO</span>
-      </span>
+      <img
+        src="https://unlckdprotrainer.com/assets/unlckd-pro-logo.png"
+        alt={alt}
+        loading="eager"
+        decoding="async"
+        // @ts-ignore
+        fetchPriority="high"
+        className={cn(
+          sizeClasses[size],
+          "h-auto max-h-8 sm:max-h-10 md:max-h-11 object-contain bg-transparent border-0 outline-none shadow-none transition-transform duration-150 group-hover:opacity-95 active:scale-[0.99]",
+          imgClassName
+        )}
+        style={{
+          background: 'transparent',
+          border: 'none',
+          boxShadow: 'none'
+        }}
+      />
+      {showSubtitle && (
+        <div className="flex items-center pl-2 sm:pl-2.5 border-l border-[#292929]">
+          <span className={cn(
+            "font-display font-bold uppercase tracking-wider text-[#D1D1D1] group-hover:text-brand-primary transition-colors whitespace-nowrap",
+            subtitleClasses[size],
+            textClassName
+          )}>
+            {subtitle}
+          </span>
+        </div>
+      )}
     </div>
   );
 };
-
