@@ -77,6 +77,7 @@ import { LevelInfoModal } from './components/LevelInfoModal';
 import { ProgressReportModal } from './components/ProgressReportModal';
 import { SubscriptionModal } from './components/SubscriptionModal';
 import { ClientData } from './components/ClientHub';
+import { LandingPage } from './components/LandingPage';
 
 const cleanEvaluationText = (text: string) => {
   if (!text) return '';
@@ -1237,22 +1238,22 @@ export default function App() {
 
     if (errorMessage.includes('requests-from-referer') || errorCode.includes('requests-from-referer') || errorMessage.includes('are-blocked')) {
       const hostname = window.location.hostname;
-      setAuthError(`REFERRER RESTRICTION BLOCKED: Requests from domain '${hostname}' are blocked by Google Cloud API Key referrer restrictions. To fix this: Go to Google Cloud Console > APIs & Services > Credentials > Edit your Web API Key > set Application Restrictions to 'None' or add 'https://${hostname}/*' to the HTTP Referrers allowed list.`);
+      setAuthError(`Connection restriction: Sign-in requests from domain '${hostname}' are currently restricted. Please try Email sign-in or check authorized domains.`);
       return;
     }
 
     if (errorCode === 'auth/unauthorized-domain' || errorMessage.includes('unauthorized-domain')) {
       const hostname = window.location.hostname;
-      setAuthError(`DOMAIN NOT AUTHORIZED: The domain '${hostname}' is not in your Firebase Authorized Domains list. Go to Firebase Console > Authentication > Settings > Authorized Domains and add '${hostname}' and 'www.${hostname}'.`);
+      setAuthError(`Domain authorization: The domain '${hostname}' is not currently authorized for sign-in. Please use Email/Password sign-in or verify authorized domains.`);
       return;
     }
 
     if (errorCode === 'auth/popup-closed-by-user') {
       const isIframe = window.self !== window.top;
       if (isIframe) {
-        setAuthError("The sign-in window was closed or blocked. In this preview, security rules may prevent the login. Try Email login or 'Open in Standard Tab'.");
+        setAuthError("The sign-in window was closed or blocked. Try Email sign-in or opening the app in a new window.");
       } else {
-        setAuthError("The sign-in process was interrupted. If the window closed by itself, check if your domain reached the Google consent screen correctly.");
+        setAuthError("The sign-in process was interrupted. Please try again.");
       }
       return;
     }
@@ -1260,14 +1261,14 @@ export default function App() {
     let message = "Authentication failed. Please try again.";
     
     if (errorMessage.includes('api-key-expired') || errorCode === 'auth/api-key-expired' || errorCode === 'auth/invalid-api-key') {
-      message = "FIREBASE CONFIGURATION ERROR: The Web API key in firebase-applet-config.json has expired or is invalid. Please renew or re-provision your Firebase API key.";
+      message = "Authentication service temporarily unavailable. Please try again shortly.";
       setAuthError(message);
       return;
     }
 
     const isSecurityError = errorMessage.includes('insecure') || error?.name === 'SecurityError';
     if (isSecurityError) {
-      message = "Browser security settings blocked this action. This often happens in iframes or Private Browsing mode. Try opening the app in a new tab or use Email/Password sign-in.";
+      message = "Browser security settings blocked this action. Try opening the app in a new tab or use Email/Password sign-in.";
       setAuthError(message);
       return;
     }
@@ -1278,7 +1279,7 @@ export default function App() {
         break;
       case 'auth/unauthorized-domain':
         const host = window.location.hostname;
-        message = `CRITICAL: The domain '${host}' is NOT AUTHORIZED in your Firebase project. Please go to your Firebase Console > Authentication > Settings > Authorized Domains and manually add '${host}' and 'www.${host}' to the list.`;
+        message = `Sign-in from domain '${host}' is currently not permitted. Please use Email sign-in.`;
         break;
       case 'auth/network-request-failed':
         message = "Network error. Please check your connection and try again.";
@@ -1289,11 +1290,11 @@ export default function App() {
         message = "Invalid email or password. Please check your credentials.";
         break;
       case 'auth/operation-not-allowed':
-        message = "Apple Sign-In is not enabled on this Firebase project. Go to Firebase Console > Authentication > Sign-in method and enable Apple.";
+        message = "Selected sign-in method is currently unavailable. Please sign in with Google or Email.";
         break;
       case 'auth/internal-error':
         if (errorMessage.includes('partition')) {
-          message = "Browser cross-site restrictions (Partitioned Cookies) detected. Try using a non-private window or another browser.";
+          message = "Browser cross-site restrictions detected. Try using a standard browser window.";
         }
         break;
     }
@@ -1592,7 +1593,7 @@ export default function App() {
         onOpenSubscriptionModal={() => setIsSubscriptionModalOpen(true)}
       />
 
-      <main className="relative pt-28 sm:pt-32 pb-20 px-3 sm:px-6 max-w-6xl mx-auto">
+      <main className={cn("relative pt-20 sm:pt-28 pb-28 sm:pb-20 px-3.5 sm:px-8 lg:px-12 mx-auto transition-all", step === 'landing' ? "max-w-[1560px]" : "max-w-6xl")}>
         <AnimatePresence mode="wait">
           {activeTab === 'gym' ? (
             <motion.div
@@ -2159,240 +2160,37 @@ export default function App() {
           {step === 'landing' && (
             <motion.div
               key="landing"
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="space-y-16 text-center"
+              exit={{ opacity: 0, y: -15 }}
+              className="w-full"
             >
-              <div className="space-y-6">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-primary/10 border border-brand-primary/20 text-brand-primary text-xs font-bold uppercase tracking-widest">
-                  <div className="w-1.5 h-1.5 rounded-full bg-brand-primary animate-pulse" />
-                  Premium AI Coaching
-                </div>
-                <h1 className="text-6xl md:text-8xl font-display font-bold tracking-tighter leading-[0.9] max-w-4xl mx-auto">
-                  Unlock Your <span className="text-brand-primary italic drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]">Peak</span> Physique
-                </h1>
-                <p className="text-gray-400 text-xl max-w-2xl mx-auto font-light leading-relaxed">
-                  The elite digital coach that turns your data and photos into a structured, professional transformation plan.
-                </p>
-                <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
-                  {!user ? (
-                    <>
-                      <a 
-                        href="https://unlckdbrand.com/unlckd-pro-trainer" 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 px-8 py-4 bg-brand-primary text-brand-dark font-bold rounded-full hover:bg-brand-primary/90 transition-all hover:scale-105 hover:shadow-[0_0_20px_rgba(16,185,129,0.3)] shadow-lg shadow-brand-primary/10"
-                      >
-                        <Sparkles className="w-5 h-5" />
-                        Purchase Pro Access
-                      </a>
-                      <a 
-                        href="https://unlckdbrand.com/unlckd-pro-trainer-premium" 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 px-8 py-4 bg-transparent border-2 border-[#D4AF37]/40 text-[#D4AF37] font-bold rounded-full hover:bg-[#D4AF37]/10 transition-all hover:scale-105 animate-gold-glow group"
-                      >
-                        <Trophy className="w-5 h-5 text-[#D4AF37] group-hover:rotate-12 transition-transform" />
-                        Purchase Premium
-                      </a>
-                    </>
-                  ) : !isPremium ? (
-                    <a 
-                      href="https://unlckdbrand.com/unlckd-pro-trainer-premium-upgrade" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 px-8 py-4 bg-transparent border-2 border-[#D4AF37]/40 text-[#D4AF37] font-bold rounded-full hover:bg-[#D4AF37]/10 transition-all hover:scale-105 animate-gold-glow group"
-                    >
-                      <Trophy className="w-5 h-5 text-[#D4AF37] group-hover:rotate-12 transition-transform" />
-                      Upgrade to Premium
-                    </a>
-                  ) : null}
-                </div>
-              </div>
-
-              <div className="space-y-6">
-                {/* Top Row: Featured Services */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Featured: Pro Gym Hub */}
-                  <Card 
-                    className={cn(
-                      "p-8 bg-brand-primary/5 border-2 transition-all cursor-pointer group relative overflow-hidden",
-                      isPremium ? "border-amber-400/50 shadow-[0_0_15px_rgba(251,191,36,0.2)]" : "border-brand-primary/20 animate-pulse-border"
-                    )} 
-                    onClick={() => {
-                      if (!user) {
-                        handleSignIn();
-                        return;
-                      }
-                      if (!hasAccess) {
-                        setStep('no-access');
-                        return;
-                      }
-                      if (!isPremium) {
-                        setShowGymAuth(true);
-                      } else {
-                        setActiveTab('gym');
-                      }
-                    }}
-                  >
-                    {isPremium && (
-                      <motion.div
-                        animate={{
-                          opacity: [0.1, 0.3, 0.1],
-                        }}
-                        transition={{
-                          duration: 4,
-                          repeat: Infinity,
-                          ease: "easeInOut"
-                        }}
-                        className="absolute inset-0 bg-amber-400/10 pointer-events-none"
-                      />
-                    )}
-                    <motion.div
-                      animate={{
-                        boxShadow: [
-                          "0 0 0px rgba(251, 191, 36, 0)",
-                          "0 0 20px rgba(251, 191, 36, 0.3)",
-                          "0 0 0px rgba(251, 191, 36, 0)"
-                        ]
-                      }}
-                      transition={{
-                        duration: 3,
-                        repeat: Infinity,
-                        ease: "easeInOut"
-                      }}
-                      className="absolute inset-0 rounded-xl"
-                    />
-                    <div className="absolute inset-0 bg-brand-primary/5 group-hover:bg-brand-primary/10 transition-colors" />
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-brand-primary/10 blur-3xl -mr-32 -mt-32 group-hover:bg-brand-primary/20 transition-colors" />
-                    <div className="absolute bottom-0 left-0 w-64 h-64 bg-brand-primary/5 blur-3xl -ml-32 -mb-32 group-hover:bg-brand-primary/10 transition-colors" />
-                    <div className="flex flex-col items-center text-center gap-6 relative z-10 h-full justify-center">
-                      <div className="w-16 h-16 rounded-2xl bg-brand-primary/20 flex items-center justify-center group-hover:scale-110 group-hover:bg-brand-primary/30 transition-all duration-500 shadow-[0_0_20px_rgba(16,185,129,0.3)]">
-                        <Lock className="w-8 h-8 text-brand-primary" />
-                      </div>
-                      <div className="max-w-md mx-auto">
-                        <h3 className="font-display font-bold text-2xl tracking-tight text-white mb-2">Pro Gym Hub</h3>
-                        <p className="text-sm text-gray-400 leading-relaxed italic">"Your private high-performance optimization center. Access professional training environments."</p>
-                        {!isPremium && (
-                          <div className="mt-4 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-[#D4AF37]">
-                            <Zap className="w-3 h-3 fill-[#D4AF37]" />
-                            Premium Access Required
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </Card>
-
-                  {/* Featured: Full Transformation Report */}
-                  <Card className="p-8 bg-brand-primary border-transparent hover:brightness-110 transition-all cursor-pointer group relative overflow-hidden" onClick={() => handleStart('full')}>
-                    <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 blur-3xl -mr-24 -mt-24 group-hover:bg-white/20 transition-colors" />
-                    <div className="flex flex-col items-center text-center gap-6 relative z-10 h-full justify-center">
-                      <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center group-hover:scale-110 transition-all duration-500 backdrop-blur-sm">
-                        <FileText className="w-8 h-8 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="font-display font-bold text-2xl tracking-tight text-white">Full Transformation Report</h3>
-                        <p className="text-white/70 mt-2 text-sm leading-relaxed max-w-sm">The complete assessment, training, and nutrition package for serious results.</p>
-                      </div>
-                    </div>
-                  </Card>
-                </div>
-
-                {/* Bottom Row: Core Services */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  <Card className="p-6 bg-white/[0.02] backdrop-blur-sm border-white/5 hover:border-brand-primary/50 transition-all cursor-pointer group relative overflow-hidden" onClick={() => handleStart('assessment')}>
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/5 blur-3xl -mr-16 -mt-16 group-hover:bg-brand-primary/10 transition-colors" />
-                    <div className="flex flex-col items-center text-center gap-4 relative z-10">
-                      <div className="w-12 h-12 rounded-xl bg-brand-primary/10 flex items-center justify-center group-hover:scale-110 group-hover:bg-brand-primary/20 transition-all duration-500">
-                        <Camera className="w-6 h-6 text-brand-primary" />
-                      </div>
-                      <div>
-                        <h3 className="font-display font-bold text-lg tracking-tight">Physique Assessment</h3>
-                        <p className="text-xs text-gray-500 mt-1 leading-relaxed">Detailed visual review and category ratings.</p>
-                      </div>
-                    </div>
-                  </Card>
-                  
-                  <Card className="p-6 bg-white/[0.02] backdrop-blur-sm border-white/5 hover:border-brand-primary/50 transition-all cursor-pointer group relative overflow-hidden" onClick={() => handleStart('workout')}>
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/5 blur-3xl -mr-16 -mt-16 group-hover:bg-brand-primary/10 transition-colors" />
-                    <div className="flex flex-col items-center text-center gap-4 relative z-10">
-                      <div className="w-12 h-12 rounded-xl bg-brand-primary/10 flex items-center justify-center group-hover:scale-110 group-hover:bg-brand-primary/20 transition-all duration-500">
-                        <Dumbbell className="w-6 h-6 text-brand-primary" />
-                      </div>
-                      <div>
-                        <h3 className="font-display font-bold text-lg tracking-tight">Workout Plan</h3>
-                        <p className="text-xs text-gray-500 mt-1 leading-relaxed">Tailored training split with sets and reps.</p>
-                      </div>
-                    </div>
-                  </Card>
-
-                  <Card className="p-6 bg-brand-primary/5 border-brand-primary/20 hover:border-brand-primary/50 transition-all cursor-pointer group relative overflow-hidden" onClick={() => handleStart('meal')}>
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/10 blur-3xl -mr-16 -mt-16 group-hover:bg-brand-primary/20 transition-colors" />
-                    <div className="flex flex-col items-center text-center gap-4 relative z-10">
-                      <div className="w-12 h-12 rounded-xl bg-brand-primary/10 flex items-center justify-center group-hover:scale-110 group-hover:bg-brand-primary/20 transition-all duration-500">
-                        <Utensils className="w-6 h-6 text-brand-primary" />
-                      </div>
-                      <div>
-                        <h3 className="font-display font-bold text-lg tracking-tight">Meal Plan</h3>
-                        <p className="text-xs text-gray-500 mt-1 leading-relaxed">Goal-matched nutrition and grocery lists.</p>
-                      </div>
-                    </div>
-                  </Card>
-
-                  <Card 
-                    className={cn(
-                      "p-6 bg-white/[0.02] backdrop-blur-sm border-white/5 transition-all group relative overflow-hidden",
-                      isPremium ? "hover:border-amber-400/50 cursor-pointer shadow-[0_0_15px_rgba(251,191,36,0.1)]" : "opacity-60 cursor-not-allowed bg-white/5 border-white/10"
-                    )} 
-                    onClick={() => handleStart('progress')}
-                  >
-                    {isPremium && (
-                      <motion.div
-                        animate={{
-                          boxShadow: [
-                            "0 0 0px rgba(251, 191, 36, 0)",
-                            "0 0 15px rgba(251, 191, 36, 0.2)",
-                            "0 0 0px rgba(251, 191, 36, 0)"
-                          ],
-                          borderColor: [
-                            "rgba(251, 191, 36, 0.1)",
-                            "rgba(251, 191, 36, 0.5)",
-                            "rgba(251, 191, 36, 0.1)"
-                          ]
-                        }}
-                        transition={{
-                          duration: 3,
-                          repeat: Infinity,
-                          ease: "easeInOut"
-                        }}
-                        className="absolute inset-0 rounded-xl border"
-                      />
-                    )}
-                    <div className={cn(
-                      "absolute top-0 right-0 w-32 h-32 blur-3xl -mr-16 -mt-16 transition-colors",
-                      isPremium ? "bg-brand-primary/5 group-hover:bg-brand-primary/10" : "bg-gray-500/5"
-                    )} />
-                    <div className="flex flex-col items-center text-center gap-4 relative z-10">
-                      <div className={cn(
-                        "w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-500",
-                        isPremium ? "bg-brand-primary/10 group-hover:scale-110 group-hover:bg-brand-primary/20" : "bg-gray-500/20"
-                      )}>
-                        <Activity className={cn("w-6 h-6", isPremium ? "text-brand-primary" : "text-gray-500")} />
-                      </div>
-                      <div>
-                        <h3 className="font-display font-bold text-lg tracking-tight">Progress Engine</h3>
-                        <p className="text-xs text-gray-500 mt-1 leading-relaxed">Weekly photo comparison and feedback.</p>
-                        {!isPremium && (
-                          <div className="mt-4 flex items-center justify-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-amber-500/80">
-                            <Zap className="w-3 h-3 fill-amber-500" />
-                            Premium Locked
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </Card>
-                </div>
+              <LandingPage
+                user={user}
+                hasAccess={hasAccess || false}
+                isPremium={isPremium}
+                userProfile={userProfile}
+                onGetStarted={() => handleStart('full')}
+                onStartPath={(selectedPath) => handleStart(selectedPath)}
+                onOpenGymHub={() => {
+                  if (!user) {
+                    handleSignIn();
+                    return;
+                  }
+                  if (!hasAccess) {
+                    setStep('no-access');
+                    return;
+                  }
+                  if (!isPremium) {
+                    setShowGymAuth(true);
+                  } else {
+                    setActiveTab('gym');
+                  }
+                }}
+                onSignIn={handleSignIn}
+              />
+            </motion.div>
+          )}
 
                 {/* Support & FAQ Modal */}
                 <AnimatePresence>
@@ -2635,11 +2433,6 @@ export default function App() {
                       </div>
                     )}
                   </AnimatePresence>
-
-
-                </div>
-            </motion.div>
-          )}
 
           {step === 'intake' && (
             <motion.div

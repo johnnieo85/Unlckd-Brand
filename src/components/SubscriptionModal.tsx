@@ -4,22 +4,20 @@ import {
   X, 
   Check, 
   ShieldCheck, 
-  Zap, 
-  Users, 
   CreditCard, 
   Calendar, 
   RefreshCw, 
   AlertCircle, 
-  Sparkles,
-  ArrowRight,
-  ArrowLeft,
-  Download,
-  Lock,
-  CheckCircle2,
-  Receipt
+  ArrowRight, 
+  ArrowLeft, 
+  Lock, 
+  CheckCircle2, 
+  Receipt,
+  Users,
+  ChevronRight
 } from 'lucide-react';
 import { Button } from './ui/Button';
-import { Badge } from './ui/Card';
+import { Badge } from './ui/Badge';
 import { cn } from '../lib/utils';
 import { UserProfile, SubscriptionPlanType, BillingCycleType, ClientCountBand } from '../types';
 import { SUBSCRIPTION_PLANS, CLIENT_COUNT_BANDS, getPriceForPlan } from '../lib/subscriptions';
@@ -67,6 +65,22 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
   const currentBand = userProfile.clientBand || '1-5';
   const currentStatus = userProfile.status || 'active';
 
+  // Format Renewal Date cleanly
+  const renewalDateFormatted = (() => {
+    if (userProfile.renewalDate) {
+      try {
+        const d = new Date(userProfile.renewalDate + 'T00:00:00');
+        if (!isNaN(d.getTime())) {
+          return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
+        }
+      } catch {
+        // Fallback
+      }
+      return userProfile.renewalDate.toUpperCase();
+    }
+    return '13 SEP 2026';
+  })();
+
   const handleOpenCheckout = (
     targetPlan: SubscriptionPlanType,
     targetBand?: ClientCountBand
@@ -98,13 +112,13 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
       });
       onProfileUpdated(updated);
       setSuccessMessage(
-        `Successfully updated plan to ${
+        `Plan updated to ${
           targetPlan === 'free'
-            ? 'Free Tier'
+            ? 'Free'
             : targetPlan === 'pro'
-            ? 'Pro Member'
-            : `Coach Tier (${targetBand || selectedCoachBand} Clients)`
-        }!`
+            ? 'Pro'
+            : `Coach (${targetBand || selectedCoachBand} Clients)`
+        }.`
       );
       setTimeout(() => setSuccessMessage(null), 4000);
       setCheckoutPlan(null);
@@ -130,7 +144,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
       });
       onProfileUpdated(updated);
       setPurchaseComplete(true);
-      setSuccessMessage(`Payment successful! Welcome to UNLCKD ${checkoutPlan.plan === 'pro' ? 'Pro Member' : 'Coach Tier'}.`);
+      setSuccessMessage(`Payment confirmed. Welcome to ${checkoutPlan.plan === 'pro' ? 'Pro' : 'Coach'}.`);
     } catch (err) {
       console.error('Failed to complete purchase:', err);
     } finally {
@@ -154,50 +168,15 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
       onProfileUpdated(updatedProfile);
       setSuccessMessage(
         newCancelState
-          ? 'Subscription set to cancel at end of billing period.'
-          : 'Subscription reactivated successfully!'
+          ? 'Membership will end at the conclusion of your current billing period.'
+          : 'Membership reactivated.'
       );
       setTimeout(() => setSuccessMessage(null), 4000);
     } catch (err) {
-      console.error('Failed to update cancel status:', err);
+      console.error('Failed to update cancellation state:', err);
     } finally {
       setIsUpdating(false);
     }
-  };
-
-  const handleExportAssessmentJSON = () => {
-    const assessmentPayload = {
-      appMetadata: {
-        appName: 'UNLCKD AI Transformation Platform',
-        environment: 'Production Cloud Run / Firestore',
-        exportDate: new Date().toISOString()
-      },
-      recurringBillingObjects: SUBSCRIPTION_PLANS,
-      clientCountBands: CLIENT_COUNT_BANDS,
-      currentUserSubscriptionState: {
-        userId: userProfile.userId,
-        email: userProfile.email,
-        plan: userProfile.plan || 'free',
-        billingCycle: userProfile.billingCycle || 'monthly',
-        renewalDate: userProfile.renewalDate || 'N/A',
-        status: userProfile.status || 'active',
-        clientBand: userProfile.clientBand || '1-5',
-        subscriptionId: userProfile.subscriptionId || 'N/A',
-        cancelAtPeriodEnd: !!userProfile.cancelAtPeriodEnd
-      }
-    };
-
-    const blob = new Blob([JSON.stringify(assessmentPayload, null, 2)], {
-      type: 'application/json'
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `unlckd-subscription-assessment-${userProfile.userId.slice(0, 6)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
   };
 
   // Pricing calculations for checkout view
@@ -213,78 +192,52 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
-          className="fixed inset-0 bg-black/80 backdrop-blur-md"
+          className="fixed inset-0 bg-black/85 backdrop-blur-sm"
         />
 
         {/* Modal Container */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
+          initial={{ opacity: 0, scale: 0.96, y: 16 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative w-full max-w-5xl bg-[#0b1320] border border-white/10 rounded-3xl shadow-2xl overflow-hidden my-auto max-h-[90vh] flex flex-col"
+          exit={{ opacity: 0, scale: 0.96, y: 16 }}
+          className="relative w-full max-w-5xl bg-[#0D0D0D] border border-[#292929] rounded-[6px] shadow-2xl overflow-hidden my-auto max-h-[92vh] flex flex-col text-white"
         >
           {/* Header */}
-          <div className="p-6 sm:p-8 border-b border-white/10 bg-gradient-to-r from-brand-dark via-[#111927] to-brand-dark flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shrink-0">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <Badge className="bg-brand-primary/20 text-brand-primary border-brand-primary/30 text-xs font-black uppercase tracking-wider">
-                  <CreditCard className="w-3 h-3 mr-1" />
-                  Membership & Billing
-                </Badge>
-                {checkoutPlan ? (
-                  <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30 text-xs font-bold">
-                    Step 2 of 2: Purchase Checkout
-                  </Badge>
-                ) : currentStatus === 'active' ? (
-                  <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-xs font-bold">
-                    <Check className="w-3 h-3 mr-1" /> Active Status
-                  </Badge>
-                ) : (
-                  <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-xs font-bold">
-                    <AlertCircle className="w-3 h-3 mr-1" /> {currentStatus.replace('_', ' ').toUpperCase()}
-                  </Badge>
-                )}
-              </div>
-              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                {checkoutPlan ? 'Complete Plan Purchase' : 'Purchase & Manage Membership Plans'}
+          <div className="p-6 sm:p-8 border-b border-[#292929] bg-[#111111] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 shrink-0">
+            <div className="space-y-1.5 min-w-0">
+              <span className="text-[11px] font-mono font-bold tracking-widest text-[#00DFA2] uppercase block">
+                MEMBERSHIP
+              </span>
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-display font-black text-white uppercase tracking-tight">
+                {checkoutPlan ? 'SECURE CHECKOUT' : 'CHOOSE YOUR LEVEL.'}
               </h2>
-              <p className="text-gray-400 text-xs sm:text-sm mt-1">
+              <p className="text-xs sm:text-sm text-[#A1A1A1] font-sans">
                 {checkoutPlan 
-                  ? 'Review your plan selection, choose billing frequency, and complete your secure checkout.'
-                  : 'Select a plan below to purchase, upgrade, or manage your recurring subscription.'}
+                  ? 'Confirm your plan details and billing method to activate your account.'
+                  : 'Training evolves. Your membership should too.'}
               </p>
             </div>
 
-            <div className="flex items-center gap-2 self-end sm:self-auto">
+            <div className="flex items-center gap-3 self-end sm:self-auto shrink-0">
               {checkoutPlan && !purchaseComplete && (
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setCheckoutPlan(null)}
-                  className="gap-1.5 text-xs font-bold border-white/10 text-gray-300 hover:text-white hover:bg-white/5"
+                  className="gap-1.5 text-xs font-mono font-bold border-[#292929] text-[#A1A1A1] hover:text-white"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
-                  <span>Back to Plans</span>
+                  <span>ALL PLANS</span>
                 </Button>
               )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleExportAssessmentJSON}
-                className="gap-2 text-xs font-bold border-white/10 text-gray-300 hover:text-white hover:bg-white/5"
-                title="Download pricing & schema assessment JSON"
-              >
-                <Download className="w-3.5 h-3.5 text-brand-primary" />
-                <span>Export Assessment</span>
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
+              <button
+                type="button"
                 onClick={onClose}
-                className="text-gray-400 hover:text-white hover:bg-white/10 rounded-full"
+                className="p-2 rounded-[4px] border border-[#292929] bg-[#171717] text-[#A1A1A1] hover:text-white hover:border-[#444444] transition-colors cursor-pointer"
+                aria-label="Close"
               >
-                <X className="w-5 h-5" />
-              </Button>
+                <X className="w-4 h-4" />
+              </button>
             </div>
           </div>
 
@@ -293,202 +246,192 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
-              className="bg-emerald-500/15 border-b border-emerald-500/30 px-6 py-3 text-emerald-300 text-xs font-bold flex items-center gap-2 shrink-0"
+              className="bg-[#00DFA2]/10 border-b border-[#00DFA2]/30 px-6 py-3 text-[#00DFA2] text-xs font-mono font-bold flex items-center gap-2 shrink-0"
             >
-              <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+              <Check className="w-4 h-4 text-[#00DFA2] shrink-0" />
               <span>{successMessage}</span>
             </motion.div>
           )}
 
-          {/* Main Content Area */}
+          {/* Modal Body */}
           <div className="p-6 sm:p-8 space-y-8 overflow-y-auto">
-            {/* IF IN CHECKOUT MODE */}
+            {/* CHECKOUT FLOW */}
             {checkoutPlan && checkoutPriceObj && checkoutPlanObj ? (
               purchaseComplete ? (
-                /* PURCHASE SUCCESS RECEIPT SCREEN */
+                /* RECEIPT SCREEN */
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
+                  initial={{ opacity: 0, scale: 0.98 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="bg-[#0f192b] border border-emerald-500/40 rounded-3xl p-8 sm:p-10 text-center space-y-6 shadow-2xl"
+                  className="bg-[#111111] border border-[#00DFA2]/40 rounded-[6px] p-8 sm:p-10 text-center space-y-6 shadow-2xl"
                 >
-                  <div className="w-16 h-16 bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 rounded-full flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/20">
-                    <CheckCircle2 className="w-10 h-10" />
+                  <div className="w-14 h-14 bg-[#00DFA2]/10 text-[#00DFA2] border border-[#00DFA2]/30 rounded-[4px] flex items-center justify-center mx-auto">
+                    <CheckCircle2 className="w-8 h-8" />
                   </div>
 
-                  <div className="space-y-2">
-                    <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-xs font-black uppercase tracking-wider">
-                      Payment Confirmed
-                    </Badge>
-                    <h3 className="text-2xl sm:text-3xl font-black text-white">
-                      Purchase Successful!
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] font-mono font-bold tracking-widest text-[#00DFA2] uppercase block">
+                      PAYMENT CONFIRMED
+                    </span>
+                    <h3 className="text-2xl sm:text-3xl font-display font-black text-white uppercase tracking-tight">
+                      MEMBERSHIP ACTIVATED
                     </h3>
-                    <p className="text-gray-300 text-sm max-w-lg mx-auto">
-                      Thank you for purchasing <strong className="text-amber-300">{checkoutPlanObj.name}</strong>. Your UNLCKD account features have been unlocked instantly!
+                    <p className="text-[#A1A1A1] text-xs max-w-md mx-auto">
+                      Your account has been upgraded to <strong className="text-white">{checkoutPlanObj.name}</strong>. All features are active immediately.
                     </p>
                   </div>
 
-                  {/* Receipt Box */}
-                  <div className="max-w-md mx-auto bg-black/40 border border-white/10 rounded-2xl p-5 text-left text-xs space-y-3 font-mono">
-                    <div className="flex items-center justify-between pb-2 border-b border-white/10 text-gray-400">
-                      <span>Transaction ID</span>
-                      <span className="text-gray-200">TXN-UNLCKD-{Math.floor(100000 + Math.random() * 900000)}</span>
+                  {/* Clean Receipt Box */}
+                  <div className="max-w-md mx-auto bg-[#080808] border border-[#292929] rounded-[4px] p-5 text-left text-xs space-y-3 font-mono">
+                    <div className="flex items-center justify-between pb-2 border-b border-[#292929] text-[#6C6C6C] text-[10px]">
+                      <span>TRANSACTION REF</span>
+                      <span className="text-white">TXN-{Math.floor(100000 + Math.random() * 900000)}</span>
                     </div>
-                    <div className="flex justify-between text-gray-300">
-                      <span>Plan Selected:</span>
-                      <span className="font-bold text-white capitalize">{checkoutPlanObj.name}</span>
+                    <div className="flex justify-between text-[#A1A1A1]">
+                      <span>Plan:</span>
+                      <span className="font-bold text-white uppercase">{checkoutPlanObj.name}</span>
                     </div>
-                    <div className="flex justify-between text-gray-300">
-                      <span>Billing Frequency:</span>
-                      <span className="font-bold text-white capitalize">{selectedCycle}</span>
+                    <div className="flex justify-between text-[#A1A1A1]">
+                      <span>Frequency:</span>
+                      <span className="font-bold text-white uppercase">{selectedCycle}</span>
                     </div>
                     {checkoutPlan.plan === 'coach' && (
-                      <div className="flex justify-between text-gray-300">
-                        <span>Client Roster Size:</span>
-                        <span className="font-bold text-amber-400">{checkoutPlan.band || selectedCoachBand} Clients</span>
+                      <div className="flex justify-between text-[#A1A1A1]">
+                        <span>Client Capacity:</span>
+                        <span className="font-bold text-purple-300">{checkoutPlan.band || selectedCoachBand} Clients</span>
                       </div>
                     )}
-                    <div className="flex justify-between text-gray-300 pt-2 border-t border-white/10 font-sans font-extrabold text-sm text-white">
-                      <span>Total Billed Today:</span>
-                      <span className="text-emerald-400">${checkoutPriceObj.price.toFixed(2)}</span>
+                    <div className="flex justify-between text-white pt-2 border-t border-[#292929] font-bold text-sm">
+                      <span>Total Billed:</span>
+                      <span className="text-[#00DFA2] font-mono font-black">${checkoutPriceObj.price.toFixed(2)}</span>
                     </div>
                   </div>
 
-                  <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
+                  <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
                     <Button
                       onClick={onClose}
-                      className="bg-brand-primary text-brand-dark font-extrabold text-sm py-3 px-8 hover:bg-brand-primary/90 rounded-xl shadow-lg shadow-brand-primary/20"
+                      className="font-mono font-bold text-xs uppercase px-8 py-3 bg-brand-primary text-black"
                     >
-                      Start Using UNLCKD Now
+                      RETURN TO TRAINING
                     </Button>
                     <Button
                       variant="outline"
                       onClick={() => setCheckoutPlan(null)}
-                      className="text-xs border-white/20 text-gray-300 hover:text-white"
+                      className="font-mono font-bold text-xs uppercase border-[#292929] text-[#A1A1A1]"
                     >
-                      View All Plans & Receipts
+                      VIEW MEMBERSHIP TIERS
                     </Button>
                   </div>
                 </motion.div>
               ) : (
-                /* CHECKOUT & PAYMENT FORM VIEW */
+                /* CHECKOUT FORM */
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                   {/* Left Column: Order Summary */}
-                  <div className="lg:col-span-5 space-y-6">
-                    <div className="bg-[#0f1828] border border-white/10 rounded-2xl p-6 space-y-6">
-                      <div className="flex items-center justify-between pb-4 border-b border-white/10">
-                        <h3 className="text-lg font-black text-white flex items-center gap-2">
-                          <Receipt className="w-5 h-5 text-brand-primary" />
-                          Order Summary
-                        </h3>
-                        <Badge className="bg-brand-primary/10 text-brand-primary border-brand-primary/20 text-xs font-mono font-bold">
+                  <div className="lg:col-span-5 space-y-4">
+                    <div className="bg-[#111111] border border-[#292929] rounded-[6px] p-6 space-y-6">
+                      <div className="flex items-center justify-between pb-3 border-b border-[#292929]">
+                        <span className="text-[11px] font-mono font-bold tracking-widest text-[#00DFA2] uppercase">
+                          ORDER SUMMARY
+                        </span>
+                        <Badge variant="neutral" className="text-[9px] font-mono">
                           {selectedCycle.toUpperCase()}
                         </Badge>
                       </div>
 
                       <div className="space-y-4">
                         <div>
-                          <div className="text-xl font-extrabold text-white">
+                          <div className="text-xl font-display font-black text-white uppercase">
                             {checkoutPlanObj.name}
                           </div>
-                          <p className="text-xs text-gray-400 mt-1">
+                          <p className="text-xs text-[#A1A1A1] mt-1">
                             {checkoutPlanObj.tagline}
                           </p>
                         </div>
 
-                        {/* Billing Frequency Switcher inside Order Summary */}
-                        <div className="bg-black/40 p-1.5 rounded-xl border border-white/10 flex items-center gap-1">
+                        {/* Frequency segmented toggle */}
+                        <div className="bg-[#080808] p-1 rounded-[4px] border border-[#292929] flex items-center gap-1">
                           <button
                             type="button"
                             onClick={() => setSelectedCycle('monthly')}
                             className={cn(
-                              "flex-1 py-1.5 rounded-lg text-xs font-bold transition-all",
+                              "flex-1 py-1.5 rounded-[3px] text-[11px] font-mono font-bold uppercase transition-colors cursor-pointer",
                               selectedCycle === 'monthly'
-                                ? "bg-brand-primary text-brand-dark shadow"
-                                : "text-gray-400 hover:text-white"
+                                ? "bg-[#171717] text-white border border-[#333333]"
+                                : "text-[#A1A1A1] hover:text-white"
                             )}
                           >
-                            Monthly Billing
+                            MONTHLY
                           </button>
                           <button
                             type="button"
                             onClick={() => setSelectedCycle('annual')}
                             className={cn(
-                              "flex-1 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1",
+                              "flex-1 py-1.5 rounded-[3px] text-[11px] font-mono font-bold uppercase transition-colors flex items-center justify-center gap-1 cursor-pointer",
                               selectedCycle === 'annual'
-                                ? "bg-brand-primary text-brand-dark shadow"
-                                : "text-gray-400 hover:text-white"
+                                ? "bg-[#171717] text-white border border-[#333333]"
+                                : "text-[#A1A1A1] hover:text-white"
                             )}
                           >
-                            <span>Annual</span>
-                            <span className="bg-emerald-500/20 text-emerald-300 text-[9px] px-1 rounded uppercase">
-                              Save 33%
-                            </span>
+                            <span>ANNUAL</span>
+                            <span className="text-[9px] text-[#00DFA2]">SAVE 33%</span>
                           </button>
                         </div>
 
-                        {/* Coach Band Summary */}
+                        {/* Coach Band */}
                         {checkoutPlan.plan === 'coach' && (
-                          <div className="p-3 bg-amber-400/10 border border-amber-400/20 rounded-xl flex items-center justify-between text-xs">
-                            <span className="text-amber-300 font-bold">Selected Client Roster:</span>
-                            <span className="text-white font-extrabold">{checkoutPlan.band || selectedCoachBand} Clients</span>
+                          <div className="p-3 bg-[#080808] border border-[#292929] rounded-[4px] flex items-center justify-between text-xs font-mono">
+                            <span className="text-[#A1A1A1]">Client Roster:</span>
+                            <span className="text-white font-bold">{checkoutPlan.band || selectedCoachBand} Clients</span>
                           </div>
                         )}
 
                         {/* Line Items */}
-                        <div className="space-y-2.5 text-xs text-gray-300 pt-3 border-t border-white/10">
+                        <div className="space-y-2 text-xs font-mono text-[#A1A1A1] pt-3 border-t border-[#292929]">
                           <div className="flex justify-between">
-                            <span>Base Plan Price ({selectedCycle}):</span>
-                            <span className="font-bold text-white">${checkoutPriceObj.price.toFixed(2)}</span>
+                            <span>Base Rate:</span>
+                            <span className="text-white font-bold">${checkoutPriceObj.price.toFixed(2)}</span>
                           </div>
                           {selectedCycle === 'annual' && (
-                            <div className="flex justify-between text-emerald-400 font-bold">
-                              <span>Annual Savings Discount:</span>
-                              <span>Included</span>
+                            <div className="flex justify-between text-[#00DFA2]">
+                              <span>Annual Savings:</span>
+                              <span>Applied (33%)</span>
                             </div>
                           )}
-                          <div className="flex justify-between">
-                            <span>Taxes & Processing Fees:</span>
-                            <span className="text-gray-400">$0.00</span>
-                          </div>
-                          <div className="flex justify-between text-base font-black text-white pt-3 border-t border-white/10">
-                            <span>Total Due Today:</span>
-                            <span className="text-emerald-400">${checkoutPriceObj.price.toFixed(2)}</span>
+                          <div className="flex justify-between text-sm font-bold text-white pt-3 border-t border-[#292929]">
+                            <span>Total Due:</span>
+                            <span className="text-[#00DFA2] font-black">${checkoutPriceObj.price.toFixed(2)}</span>
                           </div>
                         </div>
                       </div>
 
-                      {/* Guarantees */}
-                      <div className="p-4 bg-white/5 rounded-xl space-y-2 text-xs text-gray-400">
-                        <div className="flex items-center gap-2 text-gray-200 font-bold">
-                          <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                          <span>Instant Unlocked Access</span>
+                      <div className="p-3 bg-[#080808] border border-[#292929] rounded-[4px] space-y-1 text-xs text-[#A1A1A1]">
+                        <div className="flex items-center gap-1.5 text-white font-bold">
+                          <ShieldCheck className="w-3.5 h-3.5 text-[#00DFA2]" />
+                          <span>Direct Activation</span>
                         </div>
-                        <p className="text-[11px] leading-relaxed">
-                          Your membership updates immediately. Cancel anytime directly in your profile settings with 1 click.
+                        <p className="text-[11px] text-[#6C6C6C]">
+                          Immediate access upon confirmation. Manage or cancel renewal anytime.
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  {/* Right Column: Payment Details Form */}
-                  <div className="lg:col-span-7 space-y-6">
-                    <form onSubmit={handleCompletePurchase} className="bg-[#0f1828] border border-white/10 rounded-2xl p-6 sm:p-8 space-y-6">
-                      <div className="flex items-center justify-between pb-4 border-b border-white/10">
-                        <h3 className="text-lg font-black text-white flex items-center gap-2">
-                          <CreditCard className="w-5 h-5 text-brand-primary" />
-                          Payment Details
-                        </h3>
-                        <div className="flex items-center gap-1.5">
-                          <Badge className="bg-black/60 text-gray-300 border-white/10 text-[10px] font-mono">
-                            <Lock className="w-3 h-3 text-emerald-400 mr-1" /> 256-Bit SSL
-                          </Badge>
-                        </div>
+                  {/* Right Column: Payment Form */}
+                  <div className="lg:col-span-7">
+                    <form onSubmit={handleCompletePurchase} className="bg-[#111111] border border-[#292929] rounded-[6px] p-6 sm:p-8 space-y-6">
+                      <div className="flex items-center justify-between pb-3 border-b border-[#292929]">
+                        <span className="text-[11px] font-mono font-bold tracking-widest text-white uppercase flex items-center gap-2">
+                          <CreditCard className="w-4 h-4 text-brand-primary" />
+                          PAYMENT DETAILS
+                        </span>
+                        <Badge variant="neutral" className="text-[9px] font-mono">
+                          <Lock className="w-3 h-3 text-[#00DFA2] mr-1" /> ENCRYPTED
+                        </Badge>
                       </div>
 
                       <div className="space-y-4">
-                        {/* Name on Card */}
+                        {/* Name */}
                         <div className="space-y-1.5">
-                          <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">
+                          <label className="text-[10px] font-mono font-bold text-[#A1A1A1] uppercase block">
                             Cardholder Name
                           </label>
                           <input
@@ -496,35 +439,32 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                             required
                             value={checkoutCardName}
                             onChange={(e) => setCheckoutCardName(e.target.value)}
-                            placeholder="Full Name on Credit Card"
-                            className="w-full bg-black/40 border border-white/15 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-brand-primary transition-colors"
+                            placeholder="Full Name"
+                            className="w-full bg-[#080808] border border-[#292929] rounded-[4px] px-3.5 py-2 text-xs font-mono text-white placeholder-[#6C6C6C] focus:border-brand-primary outline-none"
                           />
                         </div>
 
                         {/* Card Number */}
                         <div className="space-y-1.5">
-                          <label className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center justify-between">
+                          <div className="flex items-center justify-between text-[10px] font-mono text-[#A1A1A1] uppercase">
                             <span>Card Number</span>
-                            <span className="text-[10px] text-gray-400 font-mono">Visa, Mastercard, Amex</span>
-                          </label>
-                          <div className="relative">
-                            <input
-                              type="text"
-                              required
-                              value={checkoutCardNumber}
-                              onChange={(e) => setCheckoutCardNumber(e.target.value)}
-                              placeholder="4242 4242 4242 4242"
-                              className="w-full bg-black/40 border border-white/15 rounded-xl pl-11 pr-4 py-2.5 text-sm font-mono text-white placeholder-gray-500 focus:outline-none focus:border-brand-primary transition-colors"
-                            />
-                            <CreditCard className="w-4 h-4 text-brand-primary absolute left-4 top-1/2 -translate-y-1/2" />
+                            <span className="text-[#6C6C6C]">VISA / MC / AMEX</span>
                           </div>
+                          <input
+                            type="text"
+                            required
+                            value={checkoutCardNumber}
+                            onChange={(e) => setCheckoutCardNumber(e.target.value)}
+                            placeholder="4242 4242 4242 4242"
+                            className="w-full bg-[#080808] border border-[#292929] rounded-[4px] px-3.5 py-2 text-xs font-mono text-white placeholder-[#6C6C6C] focus:border-brand-primary outline-none"
+                          />
                         </div>
 
-                        {/* Expiry & CVC & Zip */}
+                        {/* Expiry / CVC / Zip */}
                         <div className="grid grid-cols-3 gap-3">
                           <div className="space-y-1.5">
-                            <label className="text-[11px] font-bold text-gray-300 uppercase tracking-wider">
-                              Expires
+                            <label className="text-[10px] font-mono font-bold text-[#A1A1A1] uppercase block">
+                              Expiry
                             </label>
                             <input
                               type="text"
@@ -532,12 +472,12 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                               value={checkoutExpiry}
                               onChange={(e) => setCheckoutExpiry(e.target.value)}
                               placeholder="MM/YY"
-                              className="w-full bg-black/40 border border-white/15 rounded-xl px-3 py-2 text-xs font-mono text-white placeholder-gray-500 text-center focus:outline-none focus:border-brand-primary transition-colors"
+                              className="w-full bg-[#080808] border border-[#292929] rounded-[4px] px-3 py-2 text-xs font-mono text-white placeholder-[#6C6C6C] text-center focus:border-brand-primary outline-none"
                             />
                           </div>
 
                           <div className="space-y-1.5">
-                            <label className="text-[11px] font-bold text-gray-300 uppercase tracking-wider">
+                            <label className="text-[10px] font-mono font-bold text-[#A1A1A1] uppercase block">
                               CVC
                             </label>
                             <input
@@ -546,13 +486,13 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                               value={checkoutCvc}
                               onChange={(e) => setCheckoutCvc(e.target.value)}
                               placeholder="CVC"
-                              className="w-full bg-black/40 border border-white/15 rounded-xl px-3 py-2 text-xs font-mono text-white placeholder-gray-500 text-center focus:outline-none focus:border-brand-primary transition-colors"
+                              className="w-full bg-[#080808] border border-[#292929] rounded-[4px] px-3 py-2 text-xs font-mono text-white placeholder-[#6C6C6C] text-center focus:border-brand-primary outline-none"
                             />
                           </div>
 
                           <div className="space-y-1.5">
-                            <label className="text-[11px] font-bold text-gray-300 uppercase tracking-wider">
-                              ZIP Code
+                            <label className="text-[10px] font-mono font-bold text-[#A1A1A1] uppercase block">
+                              Postal Code
                             </label>
                             <input
                               type="text"
@@ -560,34 +500,33 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                               value={checkoutZip}
                               onChange={(e) => setCheckoutZip(e.target.value)}
                               placeholder="90210"
-                              className="w-full bg-black/40 border border-white/15 rounded-xl px-3 py-2 text-xs font-mono text-white placeholder-gray-500 text-center focus:outline-none focus:border-brand-primary transition-colors"
+                              className="w-full bg-[#080808] border border-[#292929] rounded-[4px] px-3 py-2 text-xs font-mono text-white placeholder-[#6C6C6C] text-center focus:border-brand-primary outline-none"
                             />
                           </div>
                         </div>
                       </div>
 
-                      {/* Submit Purchase Button */}
-                      <div className="pt-4 border-t border-white/10 space-y-3">
+                      <div className="pt-3 border-t border-[#292929] space-y-3">
                         <Button
                           type="submit"
                           disabled={isUpdating}
-                          className="w-full bg-brand-primary text-brand-dark hover:bg-brand-primary/90 font-black text-sm py-3.5 rounded-xl shadow-lg shadow-brand-primary/20 flex items-center justify-center gap-2 cursor-pointer"
+                          className="w-full font-mono font-bold text-xs uppercase py-3 bg-brand-primary text-black hover:bg-[#00DFA2]/90 flex items-center justify-center gap-2 cursor-pointer"
                         >
                           {isUpdating ? (
                             <div className="flex items-center gap-2">
-                              <RefreshCw className="w-4 h-4 animate-spin" />
-                              <span>Processing Secure Payment...</span>
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              <span>PROCESSING...</span>
                             </div>
                           ) : (
                             <>
-                              <Lock className="w-4 h-4" />
-                              <span>Pay ${checkoutPriceObj.price.toFixed(2)} & Activate {checkoutPlanObj.name}</span>
+                              <Lock className="w-3.5 h-3.5" />
+                              <span>PAY ${checkoutPriceObj.price.toFixed(2)} & ACTIVATE</span>
                             </>
                           )}
                         </Button>
 
-                        <p className="text-[11px] text-gray-400 text-center">
-                          By clicking Pay, you authorize UNLCKD to process recurring billing for this plan until canceled.
+                        <p className="text-[10px] font-mono text-[#6C6C6C] text-center uppercase tracking-wide">
+                          RECURRING BILLING APPLIES UNTIL CANCELED.
                         </p>
                       </div>
                     </form>
@@ -595,262 +534,365 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                 </div>
               )
             ) : (
-              /* DEFAULT PLANS LIST VIEW */
-              <>
-                {/* Active Subscription Summary Card */}
-                <div className="bg-[#0f1828] border border-white/10 rounded-2xl p-5 sm:p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-6 shadow-inner">
-                  <div className="space-y-2">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
-                      Current Active Firestore Membership
+              /* ============================================================ */
+              /* EDITORIAL PRICING COLUMNS (3 COLUMNS)                        */
+              /* ============================================================ */
+              <div className="space-y-8">
+                {/* Current Membership Header Banner */}
+                <div className="bg-[#111111] border border-[#292929] rounded-[6px] p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-mono font-bold tracking-widest text-[#A1A1A1] uppercase block">
+                      CURRENT MEMBERSHIP
                     </span>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <span className="text-xl font-extrabold text-white capitalize">
-                        {currentPlan === 'free'
-                          ? 'Free Tier'
-                          : currentPlan === 'pro'
-                          ? 'Pro Member'
-                          : `Coach Tier (${currentBand} Clients)`}
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <span className="text-lg font-display font-black text-white uppercase">
+                        {currentPlan === 'free' ? 'START (FREE TIER)' : currentPlan === 'pro' ? 'PRO' : `COACH (${currentBand} CLIENTS)`}
                       </span>
-                      <Badge className="bg-brand-primary/10 text-brand-primary border-brand-primary/20 text-xs font-mono font-bold">
-                        {currentCycle.toUpperCase()}
+                      <Badge variant={currentPlan === 'coach' ? 'coach' : currentPlan === 'pro' ? 'pro' : 'neutral'} className="text-[9px] font-mono">
+                        {currentStatus.toUpperCase()}
                       </Badge>
-                      {userProfile.subscriptionId && (
-                        <span className="text-[11px] font-mono text-gray-500">
-                          ID: {userProfile.subscriptionId}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap items-center gap-4 text-xs text-gray-400 pt-1">
-                      <div className="flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 text-brand-primary" />
-                        <span>Renewal Date: <strong className="text-gray-200">{userProfile.renewalDate || 'N/A'}</strong></span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>Status: <strong className="text-emerald-400 capitalize">{currentStatus}</strong></span>
-                      </div>
+                      <span className="text-xs font-mono text-[#A1A1A1]">
+                        • RENEWS {renewalDateFormatted}
+                      </span>
                     </div>
                   </div>
 
+                  {/* Secondary cancellation trigger */}
                   {currentPlan !== 'free' && (
-                    <div className="flex items-center gap-3 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-white/10">
-                      <Button
-                        variant="outline"
-                        size="sm"
+                    <div className="pt-2 sm:pt-0 border-t sm:border-t-0 border-[#292929]">
+                      <button
+                        type="button"
                         disabled={isUpdating}
                         onClick={handleToggleCancel}
                         className={cn(
-                          "text-xs font-bold transition-all",
+                          "text-[11px] font-mono font-bold uppercase transition-colors cursor-pointer",
                           userProfile.cancelAtPeriodEnd
-                            ? "border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
-                            : "border-red-500/30 text-red-400 hover:bg-red-500/10"
+                            ? "text-[#00DFA2] hover:underline"
+                            : "text-[#A1A1A1] hover:text-white hover:underline"
                         )}
                       >
-                        <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
-                        {userProfile.cancelAtPeriodEnd ? 'Reactivate Plan' : 'Cancel at Period End'}
-                      </Button>
+                        {userProfile.cancelAtPeriodEnd ? 'REACTIVATE MEMBERSHIP' : 'CANCEL AT PERIOD END'}
+                      </button>
                     </div>
                   )}
                 </div>
 
-                {/* Billing Cycle Selector Toggle */}
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/5 p-2 rounded-2xl border border-white/10">
-                  <div className="text-xs text-gray-300 font-bold px-3">
-                    Select Preferred Billing Frequency:
+                {/* Restrained Segmented Billing Control */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-[#292929] pb-5">
+                  <div>
+                    <span className="text-[11px] font-mono font-bold tracking-widest text-[#A1A1A1] uppercase block">
+                      BILLING CYCLE
+                    </span>
+                    <p className="text-xs text-[#6C6C6C] font-sans">Save 33% with an annual commitment</p>
                   </div>
 
-                  <div className="flex items-center bg-[#070b14] p-1 rounded-xl border border-white/10 w-full sm:w-auto">
+                  <div className="flex items-center bg-[#080808] p-1 rounded-[4px] border border-[#292929] w-full sm:w-auto">
                     <button
                       type="button"
                       onClick={() => setSelectedCycle('monthly')}
                       className={cn(
-                        "flex-1 sm:flex-none px-5 py-2 rounded-lg text-xs font-bold transition-all",
+                        "flex-1 sm:flex-none px-4 py-1.5 rounded-[3px] text-xs font-mono font-bold uppercase transition-colors cursor-pointer",
                         selectedCycle === 'monthly'
-                          ? "bg-brand-primary text-brand-dark shadow-md"
-                          : "text-gray-400 hover:text-white"
+                          ? "bg-[#171717] text-white border border-[#333333]"
+                          : "text-[#A1A1A1] hover:text-white"
                       )}
                     >
-                      Monthly Billing
+                      MONTHLY
                     </button>
                     <button
                       type="button"
                       onClick={() => setSelectedCycle('annual')}
                       className={cn(
-                        "flex-1 sm:flex-none px-5 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5",
+                        "flex-1 sm:flex-none px-4 py-1.5 rounded-[3px] text-xs font-mono font-bold uppercase transition-colors flex items-center justify-center gap-1.5 cursor-pointer",
                         selectedCycle === 'annual'
-                          ? "bg-brand-primary text-brand-dark shadow-md"
-                          : "text-gray-400 hover:text-white"
+                          ? "bg-[#171717] text-white border border-[#333333]"
+                          : "text-[#A1A1A1] hover:text-white"
                       )}
                     >
-                      <span>Annual Billing</span>
-                      <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase">
-                        Save 33%
-                      </span>
+                      <span>ANNUAL</span>
+                      <span className="text-[10px] text-[#00DFA2] font-mono">SAVE 33%</span>
                     </button>
                   </div>
                 </div>
 
-                {/* Subscription Plans Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {SUBSCRIPTION_PLANS.map((planObj) => {
-                    const isCurrent =
-                      currentPlan === planObj.plan &&
-                      (planObj.plan !== 'coach' || currentBand === selectedCoachBand);
-
-                    let priceDisplay = '$0';
-                    let periodText = '/month';
-
-                    if (planObj.plan === 'free') {
-                      priceDisplay = '$0';
-                      periodText = '/month';
-                    } else if (planObj.plan === 'pro') {
-                      const pr = getPriceForPlan('pro', selectedCycle);
-                      priceDisplay = `$${pr.price}`;
-                      periodText = pr.periodLabel;
-                    } else if (planObj.plan === 'coach') {
-                      const pr = getPriceForPlan('coach', selectedCycle, selectedCoachBand);
-                      priceDisplay = `$${pr.price}`;
-                      periodText = pr.periodLabel;
-                    }
-
-                    return (
-                      <div
-                        key={planObj.id}
-                        className={cn(
-                          "relative bg-[#0d1525] border rounded-3xl p-6 flex flex-col justify-between transition-all duration-300 hover:border-brand-primary/50 shadow-lg",
-                          planObj.isPopular
-                            ? "border-brand-primary/50 bg-gradient-to-b from-[#111c33] to-[#0d1525] shadow-brand-primary/10"
-                            : isCurrent
-                            ? "border-emerald-500/50 bg-[#0d1829]"
-                            : "border-white/10"
-                        )}
-                      >
-                        {/* Badge header */}
-                        {planObj.badge && (
-                          <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                            <Badge className="bg-brand-primary text-brand-dark font-black text-[10px] uppercase tracking-wider px-3 py-0.5 border-none shadow-md">
-                              {planObj.badge}
+                {/* Editorial Columns */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+                  
+                  {/* -------------------------------------------------- */}
+                  {/* 1. START ($0)                                      */}
+                  {/* -------------------------------------------------- */}
+                  <div className={cn(
+                    "bg-[#111111] border rounded-[6px] p-6 flex flex-col justify-between transition-colors",
+                    currentPlan === 'free' ? "border-[#444444]" : "border-[#292929]"
+                  )}>
+                    <div className="space-y-5">
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-xl font-display font-black text-white uppercase tracking-tight">
+                            START
+                          </h3>
+                          {currentPlan === 'free' && (
+                            <Badge variant="neutral" className="text-[9px] font-mono">
+                              CURRENT
                             </Badge>
-                          </div>
-                        )}
-
-                        <div className="space-y-4">
-                          {/* Title & Tagline */}
-                          <div>
-                            <h3 className="text-xl font-extrabold text-white">
-                              {planObj.name}
-                            </h3>
-                            <p className="text-gray-400 text-xs mt-1 leading-relaxed">
-                              {planObj.tagline}
-                            </p>
-                          </div>
-
-                          {/* Coach Client Count Band Selector */}
-                          {planObj.plan === 'coach' && (
-                            <div className="space-y-2 pt-2 border-t border-white/10">
-                              <label className="text-[10px] font-black uppercase tracking-wider text-amber-400 flex items-center justify-between">
-                                <span>Client Roster Size</span>
-                                <span>{selectedCoachBand} Clients</span>
-                              </label>
-                              <div className="grid grid-cols-2 gap-1.5">
-                                {CLIENT_COUNT_BANDS.map((b) => (
-                                  <button
-                                    type="button"
-                                    onClick={() => setSelectedCoachBand(b.band)}
-                                    className={cn(
-                                      "px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition-all text-left",
-                                      selectedCoachBand === b.band
-                                        ? "bg-amber-400/20 text-amber-300 border-amber-400/50 shadow-sm"
-                                        : "bg-black/30 border-white/10 text-gray-400 hover:text-white"
-                                    )}
-                                  >
-                                    {b.label}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
                           )}
-
-                          {/* Pricing Display */}
-                          <div className="pt-2 border-t border-white/10">
-                            <div className="flex items-baseline gap-1">
-                              <span className="text-3xl sm:text-4xl font-black text-white">
-                                {priceDisplay}
-                              </span>
-                              <span className="text-gray-400 text-xs font-semibold">
-                                {periodText}
-                              </span>
-                            </div>
-                            {selectedCycle === 'annual' && planObj.plan !== 'free' && (
-                              <p className="text-[10px] text-emerald-400 font-bold mt-1">
-                                Billed annually (${getPriceForPlan(planObj.plan, 'annual', selectedCoachBand).price}/yr)
-                              </p>
-                            )}
-                          </div>
-
-                          {/* Features List */}
-                          <div className="space-y-2 pt-2 border-t border-white/10">
-                            <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">
-                              Included Capabilities
-                            </div>
-                            <ul className="space-y-2">
-                              {planObj.features.map((feat, idx) => (
-                                <li key={idx} className="flex items-start gap-2 text-xs text-gray-300">
-                                  <Check className="w-3.5 h-3.5 text-brand-primary shrink-0 mt-0.5" />
-                                  <span>{feat}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
                         </div>
+                        <p className="text-xs text-[#A1A1A1] mt-1">
+                          Core baseline physique analysis
+                        </p>
+                      </div>
 
-                        {/* Action Button */}
-                        <div className="pt-6 mt-6 border-t border-white/10">
-                          <Button
-                            disabled={isUpdating || isCurrent}
-                            onClick={() => handleOpenCheckout(planObj.plan, selectedCoachBand)}
-                            className={cn(
-                              "w-full font-bold text-xs py-3 transition-all cursor-pointer shadow-md",
-                              isCurrent
-                                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 cursor-default"
-                                : planObj.plan === 'coach'
-                                ? "bg-amber-400 text-black hover:bg-amber-300 font-extrabold"
-                                : planObj.plan === 'pro'
-                                ? "bg-brand-primary text-brand-dark hover:bg-brand-primary/90 font-extrabold"
-                                : "bg-white/10 text-gray-200 hover:bg-white/20"
-                            )}
-                          >
-                            {isCurrent ? (
-                              <span className="flex items-center justify-center gap-1">
-                                <Check className="w-3.5 h-3.5" /> Current Active Plan
-                              </span>
-                            ) : planObj.plan === 'free' ? (
-                              <span className="flex items-center justify-center gap-1">
-                                Select Free Tier
-                                <ArrowRight className="w-3.5 h-3.5" />
-                              </span>
-                            ) : (
-                              <span className="flex items-center justify-center gap-1">
-                                Purchase {planObj.name}
-                                <ArrowRight className="w-3.5 h-3.5" />
-                              </span>
-                            )}
-                          </Button>
+                      {/* Pricing */}
+                      <div className="pt-3 border-t border-[#292929]">
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-3xl sm:text-4xl font-mono font-black text-white">
+                            $0
+                          </span>
+                        </div>
+                        <p className="text-[10px] font-mono text-[#6C6C6C] uppercase mt-0.5">
+                          FREE ALWAYS
+                        </p>
+                      </div>
+
+                      {/* Benefits */}
+                      <div className="space-y-2.5 pt-3 border-t border-[#292929]">
+                        <span className="text-[10px] font-mono font-bold tracking-widest text-[#A1A1A1] uppercase block">
+                          CORE BENEFITS
+                        </span>
+                        <ul className="space-y-2 text-xs text-[#A1A1A1] font-sans">
+                          <li className="flex items-start gap-2">
+                            <Check className="w-3.5 h-3.5 text-white shrink-0 mt-0.5" />
+                            <span>1 Full Transformation AI Report</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <Check className="w-3.5 h-3.5 text-white shrink-0 mt-0.5" />
+                            <span>Basic Gym Hub workout tracking</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <Check className="w-3.5 h-3.5 text-white shrink-0 mt-0.5" />
+                            <span>Personal meal & macro logging</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <Check className="w-3.5 h-3.5 text-white shrink-0 mt-0.5" />
+                            <span>Standard processing queue</span>
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+
+                    {/* Action Button */}
+                    <div className="pt-6 mt-6 border-t border-[#292929]">
+                      <Button
+                        variant="outline"
+                        disabled={isUpdating || currentPlan === 'free'}
+                        onClick={() => handleDirectPlanUpdate('free')}
+                        className="w-full min-h-[44px] text-xs font-mono font-bold tracking-wider uppercase border-[#292929] text-white hover:border-[#444444]"
+                      >
+                        {currentPlan === 'free' ? 'CURRENT PLAN' : 'GET STARTED →'}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* -------------------------------------------------- */}
+                  {/* 2. PRO ($14.99) - RECOMMENDED (Elevated & Scaled)  */}
+                  {/* -------------------------------------------------- */}
+                  <div className={cn(
+                    "bg-[#171717] border-2 rounded-[6px] p-6 sm:p-7 flex flex-col justify-between relative transition-all shadow-2xl lg:-translate-y-2",
+                    currentPlan === 'pro' 
+                      ? "border-[#00DFA2]" 
+                      : "border-[#00DFA2] shadow-[0_0_25px_rgba(0,223,162,0.12)]"
+                  )}>
+                    {/* Top Label */}
+                    <div className="absolute -top-3 left-6">
+                      <span className="bg-brand-primary text-black font-mono font-extrabold text-[10px] uppercase tracking-wider px-2.5 py-0.5 rounded-[3px] shadow">
+                        RECOMMENDED
+                      </span>
+                    </div>
+
+                    <div className="space-y-5">
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-2xl font-display font-black text-white uppercase tracking-tight">
+                            PRO
+                          </h3>
+                          {currentPlan === 'pro' && (
+                            <Badge variant="pro" className="text-[9px] font-mono">
+                              CURRENT
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-[#A1A1A1] mt-1">
+                          For serious athletes & physique transformation
+                        </p>
+                      </div>
+
+                      {/* Pricing */}
+                      <div className="pt-3 border-t border-[#292929]">
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-4xl sm:text-5xl font-mono font-black text-white tracking-tight">
+                            {selectedCycle === 'annual' ? '$9.99' : '$14.99'}
+                          </span>
+                          <span className="text-xs font-mono font-bold text-brand-primary uppercase">
+                            /MONTH
+                          </span>
+                        </div>
+                        <p className="text-[10px] font-mono text-[#A1A1A1] mt-0.5">
+                          {selectedCycle === 'annual' ? 'BILLED $119.88 ANNUALLY (SAVE 33%)' : 'BILLED MONTHLY • CANCEL ANYTIME'}
+                        </p>
+                      </div>
+
+                      {/* Benefits */}
+                      <div className="space-y-2.5 pt-3 border-t border-[#292929]">
+                        <span className="text-[10px] font-mono font-bold tracking-widest text-[#00DFA2] uppercase block">
+                          PREMIUM ATHLETE BENEFITS
+                        </span>
+                        <ul className="space-y-2 text-xs text-white font-sans">
+                          <li className="flex items-start gap-2">
+                            <Check className="w-3.5 h-3.5 text-[#00DFA2] shrink-0 mt-0.5" />
+                            <span className="font-semibold">Unlimited AI Transformation Reports</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <Check className="w-3.5 h-3.5 text-[#00DFA2] shrink-0 mt-0.5" />
+                            <span>Full Gym Hub sync & progress logs</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <Check className="w-3.5 h-3.5 text-[#00DFA2] shrink-0 mt-0.5" />
+                            <span>HD PDF report exports & printing</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <Check className="w-3.5 h-3.5 text-[#00DFA2] shrink-0 mt-0.5" />
+                            <span>Advanced recovery protocols</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <Check className="w-3.5 h-3.5 text-[#00DFA2] shrink-0 mt-0.5" />
+                            <span>Priority AI generation queue</span>
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+
+                    {/* Action Button */}
+                    <div className="pt-6 mt-6 border-t border-[#292929]">
+                      <Button
+                        variant="primary"
+                        disabled={isUpdating || currentPlan === 'pro'}
+                        onClick={() => handleOpenCheckout('pro')}
+                        className="w-full min-h-[44px] text-xs font-mono font-black tracking-wider uppercase py-3 bg-brand-primary text-black hover:bg-[#00DFA2]/90 shadow-none cursor-pointer"
+                      >
+                        {currentPlan === 'pro' ? 'CURRENT PLAN' : 'CHOOSE PRO →'}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* -------------------------------------------------- */}
+                  {/* 3. COACH ($49+)                                    */}
+                  {/* -------------------------------------------------- */}
+                  <div className={cn(
+                    "bg-[#111111] border rounded-[6px] p-6 flex flex-col justify-between transition-colors",
+                    currentPlan === 'coach' ? "border-purple-500/50" : "border-[#292929]"
+                  )}>
+                    <div className="space-y-5">
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-xl font-display font-black text-white uppercase tracking-tight">
+                            COACH
+                          </h3>
+                          {currentPlan === 'coach' && (
+                            <Badge variant="coach" className="text-[9px] font-mono">
+                              CURRENT
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-[#A1A1A1] mt-1">
+                          Trainer & business management tools
+                        </p>
+                      </div>
+
+                      {/* Simplified Client Roster Band Selector */}
+                      <div className="space-y-1.5 pt-2 border-t border-[#292929]">
+                        <div className="flex items-center justify-between text-[10px] font-mono text-[#A1A1A1] uppercase">
+                          <span>CLIENT ROSTER</span>
+                          <span className="text-white font-bold">{selectedCoachBand} CLIENTS</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {CLIENT_COUNT_BANDS.map((b) => (
+                            <button
+                              key={b.band}
+                              type="button"
+                              onClick={() => setSelectedCoachBand(b.band)}
+                              className={cn(
+                                "px-2.5 py-1.5 min-h-[38px] rounded-[3px] text-[10px] font-mono font-bold border transition-colors text-left cursor-pointer",
+                                selectedCoachBand === b.band
+                                  ? "bg-purple-500/20 text-purple-300 border-purple-500/40"
+                                  : "bg-[#080808] border-[#292929] text-[#A1A1A1] hover:text-white"
+                              )}
+                            >
+                              {b.label}
+                            </button>
+                          ))}
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
 
-                {/* Assessment Note */}
-                <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-xs text-gray-400 flex items-start gap-3">
-                  <Sparkles className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="text-gray-200 block mb-0.5">Note on Purchasing & Billing Integration</strong>
-                    Purchasing any plan directly activates your membership tier in Firestore state (<code className="bg-black/50 px-1.5 py-0.5 rounded text-amber-300">userProfile.plan</code>, <code className="bg-black/50 px-1.5 py-0.5 rounded text-amber-300">userProfile.billingCycle</code>, <code className="bg-black/50 px-1.5 py-0.5 rounded text-amber-300">userProfile.status</code>) and unlocks immediate UNLCKD capabilities.
+                      {/* Pricing */}
+                      <div className="pt-3 border-t border-[#292929]">
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-3xl sm:text-4xl font-mono font-black text-white">
+                            ${selectedCycle === 'annual'
+                              ? CLIENT_COUNT_BANDS.find(b => b.band === selectedCoachBand)?.pricing.annualMonthlyEquivalent.toFixed(0)
+                              : CLIENT_COUNT_BANDS.find(b => b.band === selectedCoachBand)?.pricing.monthlyPrice}
+                          </span>
+                          <span className="text-xs font-mono font-bold text-purple-300 uppercase">
+                            /MONTH
+                          </span>
+                        </div>
+                        <p className="text-[10px] font-mono text-[#6C6C6C] uppercase mt-0.5">
+                          {selectedCycle === 'annual'
+                            ? `BILLED $${CLIENT_COUNT_BANDS.find(b => b.band === selectedCoachBand)?.pricing.annualPrice} ANNUALLY`
+                            : 'BILLED MONTHLY'}
+                        </p>
+                      </div>
+
+                      {/* Benefits */}
+                      <div className="space-y-2.5 pt-3 border-t border-[#292929]">
+                        <span className="text-[10px] font-mono font-bold tracking-widest text-[#A1A1A1] uppercase block">
+                          TRAINER & BUSINESS BENEFITS
+                        </span>
+                        <ul className="space-y-2 text-xs text-[#A1A1A1] font-sans">
+                          <li className="flex items-start gap-2">
+                            <Check className="w-3.5 h-3.5 text-purple-400 shrink-0 mt-0.5" />
+                            <span>Everything in Pro included</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <Check className="w-3.5 h-3.5 text-purple-400 shrink-0 mt-0.5" />
+                            <span>Client Hub roster management</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <Check className="w-3.5 h-3.5 text-purple-400 shrink-0 mt-0.5" />
+                            <span>Push routines directly to clients</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <Check className="w-3.5 h-3.5 text-purple-400 shrink-0 mt-0.5" />
+                            <span>Custom branding on reports</span>
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+
+                    {/* Action Button */}
+                    <div className="pt-6 mt-6 border-t border-[#292929]">
+                      <Button
+                        variant="secondary"
+                        disabled={isUpdating || (currentPlan === 'coach' && currentBand === selectedCoachBand)}
+                        onClick={() => handleOpenCheckout('coach', selectedCoachBand)}
+                        className="w-full min-h-[44px] text-xs font-mono font-bold tracking-wider uppercase border-[#292929] text-white hover:border-[#444444] cursor-pointer"
+                      >
+                        {currentPlan === 'coach' && currentBand === selectedCoachBand ? 'CURRENT PLAN' : 'CHOOSE COACH →'}
+                      </Button>
+                    </div>
                   </div>
+
                 </div>
-              </>
+              </div>
             )}
           </div>
         </motion.div>

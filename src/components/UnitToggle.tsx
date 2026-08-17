@@ -25,7 +25,7 @@ export function UnitToggle<T extends string>({
   const isA = value === unitA;
 
   return (
-    <div className={cn("inline-flex items-center gap-1 p-0.5 rounded-full bg-black/60 border border-white/10 select-none", className)}>
+    <div className={cn("inline-flex items-center p-0.5 rounded-[4px] bg-[#080808] border border-[#292929] select-none", className)}>
       <button
         type="button"
         onClick={(e) => {
@@ -33,11 +33,11 @@ export function UnitToggle<T extends string>({
           onChange(unitA);
         }}
         className={cn(
-          "rounded-full font-mono font-black uppercase tracking-wider transition-all duration-200 cursor-pointer",
+          "rounded-[3px] font-sans font-bold uppercase tracking-wider transition-colors cursor-pointer",
           size === 'sm' ? "px-2 py-0.5 text-[9px]" : "px-3 py-1 text-xs",
           isA
-            ? "bg-emerald-500 text-brand-dark shadow-md shadow-emerald-500/20 font-black"
-            : "text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20"
+            ? "bg-brand-primary text-black font-extrabold"
+            : "text-[#A1A1A1] hover:text-white"
         )}
       >
         {labelA || unitA.toUpperCase()}
@@ -49,11 +49,11 @@ export function UnitToggle<T extends string>({
           onChange(unitB);
         }}
         className={cn(
-          "rounded-full font-mono font-black uppercase tracking-wider transition-all duration-200 cursor-pointer",
+          "rounded-[3px] font-sans font-bold uppercase tracking-wider transition-colors cursor-pointer",
           size === 'sm' ? "px-2 py-0.5 text-[9px]" : "px-3 py-1 text-xs",
           !isA
-            ? "bg-emerald-500 text-brand-dark shadow-md shadow-emerald-500/20 font-black"
-            : "text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20"
+            ? "bg-brand-primary text-black font-extrabold"
+            : "text-[#A1A1A1] hover:text-white"
         )}
       >
         {labelB || unitB.toUpperCase()}

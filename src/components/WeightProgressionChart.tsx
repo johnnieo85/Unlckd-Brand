@@ -81,29 +81,29 @@ export function WeightProgressionChart({
     .filter(d => !isNaN(d.value) && d.value > 0);
 
   return (
-    <Card className="p-4 sm:p-6 lg:p-8 bg-brand-surface border-white/5 overflow-hidden">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-white/5">
+    <Card className="p-4 sm:p-6 bg-[#111111] border border-[#292929] overflow-hidden rounded-[6px]">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-[#292929]">
         <div className="flex items-center gap-3 shrink-0">
-          <div className="p-2 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
-            <TrendingUp className="w-5 h-5 text-emerald-500" />
+          <div className="p-2 bg-[#00DFA2]/10 rounded-[4px] border border-[#00DFA2]/20">
+            <TrendingUp className="w-4 h-4 text-brand-primary" />
           </div>
           <div>
-            <h3 className="font-extrabold text-gray-100 uppercase tracking-wider text-sm sm:text-base">Weight Progression</h3>
-            <p className="text-[10px] text-gray-400 font-medium">Historical weight & body fat trends</p>
+            <h3 className="font-display font-bold text-white uppercase tracking-normal text-base sm:text-lg">Weight Progression</h3>
+            <p className="text-[11px] text-[#A1A1A1] font-sans">Historical weight & body fat trends</p>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {/* Metric Selector: Weight vs Body Fat */}
-          <div className="flex items-center p-1 bg-black/50 border border-white/10 rounded-xl shadow-inner shrink-0">
+          <div className="flex items-center p-0.5 bg-[#080808] border border-[#292929] rounded-[4px] shrink-0">
             <button 
               type="button"
               onClick={() => setChartMetric('weight')}
               className={cn(
-                "px-3 py-1 rounded-lg text-[10px] uppercase font-black transition-all cursor-pointer",
+                "px-3 py-1 rounded-[3px] text-[10px] uppercase font-bold tracking-wider transition-colors cursor-pointer",
                 chartMetric === 'weight' 
-                  ? "bg-emerald-500 text-brand-dark shadow-md shadow-emerald-500/20 font-black" 
-                  : "text-gray-400 hover:text-gray-200"
+                  ? "bg-brand-primary text-black font-extrabold" 
+                  : "text-[#A1A1A1] hover:text-white"
               )}
             >
               Weight
@@ -112,10 +112,10 @@ export function WeightProgressionChart({
               type="button"
               onClick={() => setChartMetric('bodyFat')}
               className={cn(
-                "px-3 py-1 rounded-lg text-[10px] uppercase font-black transition-all cursor-pointer",
+                "px-3 py-1 rounded-[3px] text-[10px] uppercase font-bold tracking-wider transition-colors cursor-pointer",
                 chartMetric === 'bodyFat' 
-                  ? "bg-purple-500 text-white shadow-md shadow-purple-500/20 font-black" 
-                  : "text-gray-400 hover:text-gray-200"
+                  ? "bg-purple-500 text-white font-extrabold" 
+                  : "text-[#A1A1A1] hover:text-white"
               )}
             >
               Body Fat
@@ -135,9 +135,9 @@ export function WeightProgressionChart({
           )}
 
           {/* Current Value Display */}
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 border border-white/10 rounded-xl text-[10px] font-mono font-bold text-gray-300 shrink-0">
-            <span className="text-gray-400 uppercase font-sans text-[9px] tracking-wider font-extrabold">Current:</span>
-            <span className="text-brand-primary font-black">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#171717] border border-[#292929] rounded-[4px] text-xs font-mono font-bold text-white shrink-0">
+            <span className="text-[#6C6C6C] uppercase font-sans text-[10px] tracking-wider font-bold">Current:</span>
+            <span className="text-brand-primary font-bold">
               {currentDisplayVal}
             </span>
           </div>
@@ -147,7 +147,7 @@ export function WeightProgressionChart({
             variant="ghost" 
             size="sm" 
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="text-gray-400 hover:text-white p-1.5 h-8 w-8 rounded-lg hover:bg-white/5 shrink-0"
+            className="text-[#A1A1A1] hover:text-white p-1.5 h-8 w-8 rounded-[4px] hover:bg-[#171717] shrink-0"
           >
             {isCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
           </Button>
@@ -155,38 +155,38 @@ export function WeightProgressionChart({
       </div>
 
       {!isCollapsed && (
-        <div className="h-64 sm:h-72 w-full pt-4">
+        <div className="h-64 sm:h-72 w-full pt-2">
           {loading ? (
-            <div className="h-full flex items-center justify-center text-xs font-mono text-gray-500">
+            <div className="h-full flex items-center justify-center text-xs font-mono text-[#6C6C6C]">
               Loading progress history...
             </div>
           ) : chartData.length < 2 ? (
-            <div className="h-full flex flex-col items-center justify-center gap-2 border border-dashed border-white/10 rounded-2xl bg-white/[0.01]">
-              <TrendingUp className="w-8 h-8 text-gray-600" />
-              <p className="text-xs font-mono text-gray-400 font-bold">At least 2 entries required to display graph</p>
-              <p className="text-[10px] text-gray-500">Log body weight in measurements to track progression over time.</p>
+            <div className="h-full flex flex-col items-center justify-center gap-2 border border-dashed border-[#292929] rounded-[4px] bg-[#080808]/50">
+              <TrendingUp className="w-6 h-6 text-[#6C6C6C]" />
+              <p className="text-xs font-sans text-[#A1A1A1] font-bold uppercase tracking-wider">At least 2 entries required to display graph</p>
+              <p className="text-[11px] text-[#6C6C6C]">Log body weight in measurements to track progression over time.</p>
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="weightGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={chartMetric === 'weight' ? '#10B981' : '#A855F7'} stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor={chartMetric === 'weight' ? '#10B981' : '#A855F7'} stopOpacity={0}/>
+                    <stop offset="5%" stopColor={chartMetric === 'weight' ? '#00DFA2' : '#A855F7'} stopOpacity={0.25}/>
+                    <stop offset="95%" stopColor={chartMetric === 'weight' ? '#00DFA2' : '#A855F7'} stopOpacity={0}/>
                   </linearGradient>
                 </defs>
                 <XAxis 
                   dataKey="date" 
-                  stroke="#6B7280" 
+                  stroke="#6C6C6C" 
                   fontSize={10}
                   tickLine={false}
-                  axisLine={{ stroke: 'rgba(255,255,255,0.05)' }}
+                  axisLine={{ stroke: '#292929' }}
                 />
                 <YAxis 
-                  stroke="#6B7280" 
+                  stroke="#6C6C6C" 
                   fontSize={10}
                   tickLine={false}
-                  axisLine={{ stroke: 'rgba(255,255,255,0.05)' }}
+                  axisLine={{ stroke: '#292929' }}
                   domain={['dataMin - 2', 'dataMax + 2']}
                 />
                 <Tooltip 
@@ -194,13 +194,13 @@ export function WeightProgressionChart({
                     if (active && payload && payload.length) {
                       const data = payload[0].payload;
                       return (
-                        <div className="bg-[#0A0A0A] border border-white/10 p-3 rounded-xl shadow-2xl">
-                          <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">{label}</p>
-                          <p className="text-sm font-black text-brand-primary">
+                        <div className="bg-[#080808] border border-[#292929] p-3 rounded-[4px] shadow-2xl">
+                          <p className="text-[10px] font-bold text-[#6C6C6C] uppercase tracking-widest mb-1">{label}</p>
+                          <p className="text-sm font-bold text-brand-primary">
                             {data.value} {chartMetric === 'weight' ? graphWeightUnit : '%'}
                           </p>
                           {chartMetric === 'weight' && data.originalUnit !== graphWeightUnit && (
-                            <p className="text-[10px] text-gray-400 font-bold mt-1">
+                            <p className="text-[10px] text-[#A1A1A1] font-medium mt-1">
                               Logged as: {data.originalValue} {data.originalUnit}
                             </p>
                           )}
@@ -213,8 +213,8 @@ export function WeightProgressionChart({
                 <Area 
                   type="monotone" 
                   dataKey="value" 
-                  stroke={chartMetric === 'weight' ? '#10B981' : '#A855F7'} 
-                  strokeWidth={3}
+                  stroke={chartMetric === 'weight' ? '#00DFA2' : '#A855F7'} 
+                  strokeWidth={2}
                   fillOpacity={1} 
                   fill="url(#weightGrad)" 
                 />
