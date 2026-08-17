@@ -13,6 +13,7 @@ import {
   Target
 } from 'lucide-react';
 import { Path, UserProfile } from '../types';
+import { cn } from '../lib/utils';
 import gymInteriorImg from '../assets/images/gym_interior_dark.jpg';
 import physiqueScanImg from '../assets/images/physique_scan_tech.jpg';
 
@@ -37,50 +38,65 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   onOpenGymHub,
   onSignIn
 }) => {
+  const [imageLoaded, setImageLoaded] = React.useState(false);
+  const [imageError, setImageError] = React.useState(false);
+
   return (
     <div className="w-full space-y-14 sm:space-y-18 lg:space-y-24 pb-16 bg-transparent">
       
       {/* ============================================================ */}
       {/* 1. HERO SECTION: FULL-BLEED SEAMLESS ATHLETE INTEGRATION     */}
       {/* ============================================================ */}
-      <section className="relative w-full min-h-[560px] sm:min-h-[620px] lg:min-h-[680px] xl:min-h-[720px] flex items-center bg-transparent overflow-hidden border-0 outline-none shadow-none">
+      <section className="relative w-full min-h-[520px] sm:min-h-[600px] lg:min-h-[680px] xl:min-h-[720px] flex items-center bg-transparent overflow-hidden border-0 outline-none shadow-none">
         
         {/* ATHLETE COMPOSITION: Positioned absolutely as transparent hero layer */}
-        <div className="absolute right-0 bottom-0 top-auto lg:top-0 w-full lg:w-[58%] xl:w-[60%] h-[65%] sm:h-[72%] lg:h-full pointer-events-none z-0 flex items-end justify-end overflow-hidden bg-transparent border-0 outline-none shadow-none">
+        <div className="absolute right-0 bottom-0 top-auto lg:top-0 w-full lg:w-[58%] xl:w-[60%] h-[58%] sm:h-[68%] lg:h-full pointer-events-none z-0 flex items-end justify-end overflow-hidden bg-transparent border-0 outline-none shadow-none">
           <div className="relative w-full h-full flex items-end justify-end bg-transparent border-0 outline-none shadow-none">
             <img
               src="https://unlckdprotrainer.com/assets/unlckd-athletes-cutout.png"
               alt="Elite Athletic Performance Team"
-              className="w-full max-w-[560px] sm:max-w-[720px] lg:max-w-[1040px] max-h-full object-contain object-bottom-right bg-transparent border-0 outline-none shadow-none"
+              loading="eager"
+              decoding="async"
+              // @ts-ignore
+              fetchPriority="high"
+              onLoad={() => setImageLoaded(true)}
+              onError={() => setImageError(true)}
+              className={cn(
+                "w-full max-w-[460px] sm:max-w-[700px] lg:max-w-[1040px] max-h-full object-contain object-bottom-right bg-transparent border-0 outline-none shadow-none transition-opacity duration-300",
+                imageLoaded ? "opacity-100" : "opacity-90"
+              )}
               style={{
-                WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 85%, rgba(0,0,0,0) 100%)',
-                maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 85%, rgba(0,0,0,0) 100%)'
+                WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 82%, rgba(0,0,0,0) 100%)',
+                maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 82%, rgba(0,0,0,0) 100%)',
+                transform: 'translateZ(0)',
+                WebkitBackfaceVisibility: 'hidden',
+                imageRendering: '-webkit-optimize-contrast'
               }}
             />
             
             {/* Subtle atmospheric ambient glow behind athletes */}
-            <div className="absolute right-1/4 top-1/3 w-[450px] h-[450px] bg-[#00DFA2]/[0.03] rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute right-1/4 top-1/3 w-[300px] sm:w-[450px] h-[300px] sm:h-[450px] bg-[#00DFA2]/[0.035] rounded-full blur-3xl pointer-events-none" />
           </div>
         </div>
 
         {/* LEFT SIDE CONTENT: Dominant Headline, Eyebrow, Supporting Copy & Primary CTA */}
-        <div className="relative z-10 w-full lg:w-[48%] xl:w-[42%] space-y-6 sm:space-y-8 text-left py-6 sm:py-8 bg-transparent">
+        <div className="relative z-10 w-full lg:w-[50%] xl:w-[42%] space-y-5 sm:space-y-8 text-left py-4 sm:py-8 bg-transparent">
           
           {/* Eyebrow */}
           <div className="inline-flex items-center">
-            <span className="text-xs sm:text-sm font-mono font-bold tracking-widest text-[#00DFA2] uppercase">
+            <span className="text-[11px] sm:text-sm font-mono font-bold tracking-widest text-[#00DFA2] uppercase">
               PREMIUM AI COACHING
             </span>
           </div>
 
-          {/* Primary Dominant Headline (88-112px on desktop) */}
-          <h1 className="text-6xl sm:text-7xl md:text-8xl lg:text-[5.75rem] xl:text-[6.75rem] font-display font-black leading-[0.88] tracking-tight uppercase text-white drop-shadow-sm">
+          {/* Primary Dominant Headline (Responsive on 375px mobile through 1440px desktop) */}
+          <h1 className="text-5xl sm:text-7xl md:text-8xl lg:text-[5.75rem] xl:text-[6.75rem] font-display font-black leading-[0.9] sm:leading-[0.88] tracking-tight uppercase text-white drop-shadow-sm">
             UNLOCK <br />
             YOUR <span className="text-[#00DFA2]">PEAK.</span>
           </h1>
 
           {/* Supporting Copy (16-18px, max 460px wide) */}
-          <p className="text-[#A1A1A1] text-base sm:text-lg leading-relaxed font-sans max-w-[460px]">
+          <p className="text-[#A1A1A1] text-sm sm:text-lg leading-relaxed font-sans max-w-[460px]">
             The elite digital coach that turns your data and photos into a structured, professional transformation plan.
           </p>
 
@@ -89,7 +105,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <button
               type="button"
               onClick={onGetStarted}
-              className="inline-flex items-center justify-center gap-3.5 px-10 py-4 sm:px-11 sm:py-4.5 bg-[#00DFA2] text-[#080808] font-sans font-black text-base sm:text-lg uppercase tracking-wider rounded-[4px] hover:bg-[#00DFA2]/90 active:scale-[0.98] transition-all cursor-pointer shadow-none border-0"
+              className="inline-flex items-center justify-center gap-3.5 px-8 py-3.5 sm:px-11 sm:py-4.5 bg-[#00DFA2] text-[#080808] font-sans font-black text-base sm:text-lg uppercase tracking-wider rounded-[4px] hover:bg-[#00DFA2]/90 active:scale-[0.98] transition-all cursor-pointer shadow-none border-0 min-h-[48px]"
             >
               <span>GET STARTED</span>
               <ArrowRight className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.5]" />
