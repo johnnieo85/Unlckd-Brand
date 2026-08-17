@@ -87,28 +87,33 @@ const cleanPlainTextWithoutUrls = (text: string): string => {
   if (!text) return '';
   let cleaned = String(text);
   
-  // 1. Replace markdown links with their text: [Exercise Name](https://...) -> Exercise Name
-  cleaned = cleaned.replace(/\[([^\]\n\r]+)\]\s*\((?:https?:\/\/[^\s\)]+|[^\)\n\r]+)\)/gi, '$1');
+  // 1. Replace all forms of markdown links (including multi-line): [Exercise Name](https://...) -> Exercise Name
+  cleaned = cleaned.replace(/\[([^\]]+)\]\s*\((?:https?:\/\/[^)]+|[^\)]*)\)/gis, '$1');
   
   // 2. Remove isolated or attached parenthesized web addresses: (https://www.youtube.com/...)
-  cleaned = cleaned.replace(/\(\s*https?:\/\/[^\s\)]+\s*\)/gi, '');
+  cleaned = cleaned.replace(/\(\s*https?:\/\/[^)]*\)/gis, '');
   
   // 3. Remove raw URLs: https://www.youtube.com/... or https://...
-  cleaned = cleaned.replace(/https?:\/\/[^\s\),;"]+/gi, '');
+  cleaned = cleaned.replace(/https?:\/\/[^\s\)\],;"]+/gi, '');
   
   // 4. Remove residual brackets around words: [Exercise Name] -> Exercise Name
-  cleaned = cleaned.replace(/\[([^\]\n\r]+)\]/g, '$1');
+  cleaned = cleaned.replace(/\[([^\]]+)\]/g, '$1');
   
-  // 5. Remove empty parentheses / brackets
+  // 5. Clean leftover search queries or tutorial artifacts
+  cleaned = cleaned.replace(/,?\s*search_query=[^\s\)\],;"]+/gi, '');
+  cleaned = cleaned.replace(/\+?exercise\+tutorial/gi, '');
+  cleaned = cleaned.replace(/\+?exercise-tutorial/gi, '');
+  
+  // 6. Remove empty parentheses / brackets
   cleaned = cleaned.replace(/\(\s*\)/g, '').replace(/\[\s*\]/g, '');
   
-  // 6. Reframe timeline as a recommended timeframe to develop a healthier / desired physique
+  // 7. Reframe timeline as a recommended timeframe to develop a healthier / desired physique
   cleaned = cleaned.replace(/Moving forward into (?:this|the|a) (\d+(?:-\s*week|\s+week))\s+(?:block|phase|cycle|protocol|program)[,\s]*/gi, 'To develop a healthier and more desired physique, a recommended $1 timeframe is advised: ');
   cleaned = cleaned.replace(/Actionable Coaching Directives:\s*Moving forward into [^,.:]*[,\s:]*/gi, 'Actionable Coaching Directives: To develop a healthier and more desired physique, a recommended 12-week timeframe is advised: ');
   cleaned = cleaned.replace(/\b(?:into|throughout|during)\s+(?:this|the)\s+(\d+(?:-\s*week|\s+week))\s+(block|phase|cycle|protocol|program)\b/gi, 'across a recommended $1 timeframe');
   cleaned = cleaned.replace(/\b(?:this|the|a)\s+(\d+(?:-\s*week|\s+week))\s+(block|phase|cycle|protocol|program|timeline)\b/gi, 'recommended $1 timeframe');
   
-  // 7. Normalize whitespace and punctuation spacing
+  // 8. Normalize whitespace and punctuation spacing
   cleaned = cleaned.replace(/[ \t]+/g, ' ')
     .replace(/[ \t]+([.,;:!?])/g, '$1')
     .trim();
@@ -118,14 +123,17 @@ const cleanPlainTextWithoutUrls = (text: string): string => {
 
 const formatPhysiqueCoachNarrative = (text: string) => cleanPlainTextWithoutUrls(text);
 
-const FormattedEvaluation = ({ content }: { content: string }) => {
+const FormattedEvaluation = ({ content, isAssessment = false }: { content: string; isAssessment?: boolean }) => {
   if (!content) return null;
-  const cleaned = cleanEvaluationText(content);
+  const cleaned = isAssessment ? cleanPlainTextWithoutUrls(content) : cleanEvaluationText(content);
   return (
     <div className="markdown-body text-xs text-gray-300 leading-relaxed print:text-gray-700 break-words [word-break:break-word] overflow-wrap-anywhere">
       <ReactMarkdown
         components={{
           a: ({ node, children, href, ...props }) => {
+            if (isAssessment) {
+              return <span>{children}</span>;
+            }
             const title = Array.isArray(children) ? children.join('') : (children as string) || 'Link';
             return (
               <a
@@ -148,7 +156,7 @@ const FormattedEvaluation = ({ content }: { content: string }) => {
   );
 };
 
-const RatingTable = ({ title, ratings = [], summary, photo }: { title: string; ratings?: Rating[]; summary?: string; photo?: string | null }) => (
+const RatingTable = ({ title, ratings = [], summary, photo, isAssessment = false }: { title: string; ratings?: Rating[]; summary?: string; photo?: string | null; isAssessment?: boolean }) => (
   <div className="space-y-6">
     <h2 className="text-2xl sm:text-3xl font-display font-bold text-brand-primary tracking-tight flex items-center gap-3 print:text-black">
       <div className="w-8 h-8 rounded-lg bg-brand-primary/10 flex items-center justify-center no-print shrink-0">
@@ -199,7 +207,7 @@ const RatingTable = ({ title, ratings = [], summary, photo }: { title: string; r
                     </div>
                   </td>
                   <td className="px-3 sm:px-6 py-3.5 break-words [word-break:break-word]">
-                    <FormattedEvaluation content={r.evaluation} />
+                    <FormattedEvaluation content={r.evaluation} isAssessment={isAssessment} />
                   </td>
                 </tr>
               ))}
@@ -210,7 +218,7 @@ const RatingTable = ({ title, ratings = [], summary, photo }: { title: string; r
           <div className="p-4 sm:p-6 bg-brand-primary/5 border border-brand-primary/10 rounded-2xl text-xs sm:text-sm text-gray-300 leading-relaxed italic relative overflow-hidden print:bg-gray-50 print:border-gray-200 print:text-gray-700 break-words">
             <div className="absolute top-0 left-0 w-1 h-full bg-brand-primary/40 print:bg-gray-400" />
             <div className="markdown-body">
-              <ReactMarkdown>{cleanPlainTextWithoutUrls(summary)}</ReactMarkdown>
+              <ReactMarkdown>{isAssessment ? cleanPlainTextWithoutUrls(summary) : cleanPlainTextWithoutUrls(summary)}</ReactMarkdown>
             </div>
           </div>
         )}
@@ -3568,10 +3576,10 @@ export default function App() {
                 <section className="space-y-16 pt-16 border-t border-gray-800">
                     {path !== 'progress' ? (
                       <>
-                        <RatingTable title="Front View Comparison" ratings={report.frontViewAnalysis?.ratings} summary={report.frontViewAnalysis?.summary} photo={photos.front} />
-                        <RatingTable title="Left Side Comparison" ratings={report.leftViewAnalysis?.ratings} summary={report.leftViewAnalysis?.summary} photo={photos.left} />
-                        <RatingTable title="Back View Comparison" ratings={report.backViewAnalysis?.ratings} summary={report.backViewAnalysis?.summary} photo={photos.back} />
-                        <RatingTable title="Right Side Comparison" ratings={report.rightViewAnalysis?.ratings} summary={report.rightViewAnalysis?.summary} photo={photos.right} />
+                        <RatingTable title="Front View Comparison" ratings={report.frontViewAnalysis?.ratings} summary={report.frontViewAnalysis?.summary} photo={photos.front} isAssessment={path === 'assessment'} />
+                        <RatingTable title="Left Side Comparison" ratings={report.leftViewAnalysis?.ratings} summary={report.leftViewAnalysis?.summary} photo={photos.left} isAssessment={path === 'assessment'} />
+                        <RatingTable title="Back View Comparison" ratings={report.backViewAnalysis?.ratings} summary={report.backViewAnalysis?.summary} photo={photos.back} isAssessment={path === 'assessment'} />
+                        <RatingTable title="Right Side Comparison" ratings={report.rightViewAnalysis?.ratings} summary={report.rightViewAnalysis?.summary} photo={photos.right} isAssessment={path === 'assessment'} />
                       </>
                     ) : (
                       <>
@@ -3633,7 +3641,7 @@ export default function App() {
               {(path !== 'meal' && path !== 'workout') && (
                 <section className="space-y-8 pt-16 border-t border-gray-800">
                   <h2 className="text-3xl font-display font-bold text-brand-primary">Final Summary / Next-Phase Improvement Plan</h2>
-                  <RatingTable title="Strategic Ratings" ratings={report.finalSummary?.ratings} />
+                  <RatingTable title="Strategic Ratings" ratings={report.finalSummary?.ratings} isAssessment={path === 'assessment'} />
                   
                   <div className="space-y-4">
                     <h3 className="text-xl font-display font-bold text-gray-200">Coaching-Oriented Next Steps</h3>

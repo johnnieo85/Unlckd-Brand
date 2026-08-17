@@ -1039,6 +1039,61 @@ export async function generateTransformationReport(
       activities: []
     };
 
+    // Strip any hyperlinks and URLs from assessment reports (keep clean exercise names only)
+    if (path === 'assessment') {
+      const stripLinks = (val: string): string => {
+        if (!val) return '';
+        let s = String(val);
+        // Replace markdown links with their text: [Exercise](http...) -> Exercise
+        s = s.replace(/\[([^\]\n\r]+)\]\s*\((?:https?:\/\/[^\)]+|[^\)]*)\)/gi, '$1');
+        // Remove parenthesized URLs
+        s = s.replace(/\(\s*https?:\/\/[^\)]*\)/gi, '');
+        // Remove raw URLs
+        s = s.replace(/https?:\/\/[^\s\)\],;"]+/gi, '');
+        // Remove leftover brackets around words: [Exercise] -> Exercise
+        s = s.replace(/\[([^\]]+)\]/g, '$1');
+        // Clean leftover search queries or tutorial artifacts
+        s = s.replace(/,?\s*search_query=[^\s\)\],;"]+/gi, '');
+        s = s.replace(/\(\s*\)/g, '').replace(/\[\s*\]/g, '');
+        // Normalize recommended timeframe phrasing
+        s = s.replace(/Moving forward into (?:this|the|a) (\d+(?:-\s*week|\s+week))\s+(?:block|phase|cycle|protocol|program)[,\s]*/gi, 'To develop a healthier and more desired physique, a recommended $1 timeframe is advised: ');
+        s = s.replace(/Actionable Coaching Directives:\s*Moving forward into [^,.:]*[,\s:]*/gi, 'Actionable Coaching Directives: To develop a healthier and more desired physique, a recommended 12-week timeframe is advised: ');
+        s = s.replace(/\b(?:into|throughout|during)\s+(?:this|the)\s+(\d+(?:-\s*week|\s+week))\s+(block|phase|cycle|protocol|program)\b/gi, 'across a recommended $1 timeframe');
+        s = s.replace(/\b(?:this|the|a)\s+(\d+(?:-\s*week|\s+week))\s+(block|phase|cycle|protocol|program|timeline)\b/gi, 'recommended $1 timeframe');
+        return s.replace(/[ \t]+/g, ' ').replace(/[ \t]+([.,;:!?])/g, '$1').trim();
+      };
+
+      if (finalResult.trainerSummary) finalResult.trainerSummary = stripLinks(finalResult.trainerSummary);
+      if (finalResult.toplineSummary) finalResult.toplineSummary = stripLinks(finalResult.toplineSummary);
+      if (finalResult.goalAlignmentSummary) finalResult.goalAlignmentSummary = stripLinks(finalResult.goalAlignmentSummary);
+      if (finalResult.nutritionStrategy) finalResult.nutritionStrategy = stripLinks(finalResult.nutritionStrategy);
+      
+      const sanitizeView = (v: any) => {
+        if (!v) return;
+        if (v.summary) v.summary = stripLinks(v.summary);
+        if (Array.isArray(v.ratings)) {
+          v.ratings.forEach((r: any) => {
+            if (r.evaluation) r.evaluation = stripLinks(r.evaluation);
+          });
+        }
+      };
+
+      sanitizeView(finalResult.frontViewAnalysis);
+      sanitizeView(finalResult.leftViewAnalysis);
+      sanitizeView(finalResult.rightViewAnalysis);
+      sanitizeView(finalResult.backViewAnalysis);
+      if (finalResult.finalSummary) {
+        if (Array.isArray(finalResult.finalSummary.ratings)) {
+          finalResult.finalSummary.ratings.forEach((r: any) => {
+            if (r.evaluation) r.evaluation = stripLinks(r.evaluation);
+          });
+        }
+        if (Array.isArray(finalResult.finalSummary.nextSteps)) {
+          finalResult.finalSummary.nextSteps = finalResult.finalSummary.nextSteps.map(step => stripLinks(step));
+        }
+      }
+    }
+
     // Validation checks for completeness
     const checks: { name: string; pass: boolean; error: string }[] = [];
     const numWeeksExpected = getPlanDurationWeeks(cleanUserData.planDuration);
