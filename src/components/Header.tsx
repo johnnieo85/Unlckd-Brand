@@ -210,11 +210,9 @@ export const Header: React.FC<HeaderProps> = ({
                       )}
                       {isCoach ? (
                         <Badge variant="coach" className="text-[8px] h-3.5 px-1 py-0">Coach</Badge>
-                      ) : hasAccess ? (
-                        <Badge variant="pro" className="text-[8px] h-3.5 px-1 py-0">Pro</Badge>
-                      ) : (
+                      ) : !hasAccess ? (
                         <Badge variant="danger" className="text-[8px] h-3.5 px-1 py-0">Restricted</Badge>
-                      )}
+                      ) : null}
                     </div>
                     <div 
                       className={cn(
