@@ -117,14 +117,14 @@
     height: 6px;
   }
   .progress-report-modal-wrapper::-webkit-scrollbar-track {
-    background: #070b14;
+    background: #080808;
   }
   .progress-report-modal-wrapper::-webkit-scrollbar-thumb {
-    background: rgba(16, 185, 129, 0.3);
-    border-radius: 9999px;
+    background: #292929;
+    border-radius: 4px;
   }
   .progress-report-modal-wrapper::-webkit-scrollbar-thumb:hover {
-    background: rgba(16, 185, 129, 0.6);
+    background: #444444;
   }
 
   @media print {
@@ -138,8 +138,8 @@
     }
     
     html, body, #root, #root > div, main, .min-h-screen {
-      background: #070b14 !important;
-      color: #f3f4f6 !important;
+      background: #080808 !important;
+      color: #ffffff !important;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
       width: 100% !important;
@@ -179,7 +179,7 @@
       height: auto !important;
       min-height: 100% !important;
       max-height: none !important;
-      background: #070b14 !important;
+      background: #080808 !important;
       overflow: visible !important;
       overflow-x: visible !important;
       overflow-y: visible !important;
@@ -205,17 +205,17 @@
     .progress-report-grid {
       display: grid !important;
       grid-template-columns: 5fr 7fr !important;
-      gap: 0.5rem !important;
+      gap: 0.75rem !important;
     }
 
     .progress-report-card {
       break-inside: avoid !important;
       page-break-inside: avoid !important;
-      background-color: #0d1424 !important;
-      border: 1px solid rgba(255, 255, 255, 0.15) !important;
+      background-color: #111111 !important;
+      border: 1px solid #292929 !important;
       box-shadow: none !important;
-      padding: 0.5rem 0.6rem !important;
-      border-radius: 0.5rem !important;
+      padding: 0.75rem !important;
+      border-radius: 4px !important;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
@@ -263,7 +263,7 @@
 
     a {
       text-decoration: none !important;
-      color: #10b981 !important;
+      color: #00DFA2 !important;
     }
   }
 }

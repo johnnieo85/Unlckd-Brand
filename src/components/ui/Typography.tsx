@@ -89,11 +89,17 @@ export const MetricDisplay: React.FC<{
   className?: string;
 }> = ({ value, unit, label, className }) => {
   return (
-    <div className={cn("flex flex-col", className)}>
+    <div className={cn("flex flex-col w-full", className)}>
       {label && (
-        <span className="text-[11px] font-bold uppercase tracking-widest text-[#6C6C6C] mb-0.5">
-          {label}
-        </span>
+        <div className="w-full">
+          {typeof label === 'string' ? (
+            <span className="text-[11px] font-bold uppercase tracking-widest text-[#6C6C6C] mb-0.5 block">
+              {label}
+            </span>
+          ) : (
+            label
+          )}
+        </div>
       )}
       <div className="flex items-baseline gap-1.5">
         <span className="font-display font-black text-white text-3xl sm:text-5xl lg:text-6xl tracking-tight tabular-nums leading-none">

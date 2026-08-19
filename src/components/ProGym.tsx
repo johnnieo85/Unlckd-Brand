@@ -81,7 +81,6 @@ import { UnitToggle } from './UnitToggle';
 import { ExerciseCard } from './ExerciseCard';
 import { ProgressReportModal } from './ProgressReportModal';
 import { checkReportOverlaps } from '../utils/reportOverlap';
-import { WhoopSyncModal } from './WhoopSyncModal';
 import { RecoveryScheduleView } from './RecoveryScheduleView';
 import { gymService } from '../services/gymService';
 import { DailyLog, SavedReport, Measurement, UserProfile, Badge as UserBadge, RecoverySession } from '../types';
@@ -866,12 +865,21 @@ export const ProGym = ({
   const [chartMetric, setChartMetric] = useState<'weight' | 'bodyFat'>('weight');
   const [graphWeightUnit, setGraphWeightUnit] = useState<'lbs' | 'kg'>('lbs');
   const [isWeightCollapsed, setIsWeightCollapsed] = useState(true);
+  const [waterDisplayUnit, setWaterDisplayUnit] = useState<'imperial' | 'metric'>(() => {
+    const saved = safeStorage.get('unlckd_water_unit_pref');
+    if (saved === 'imperial' || saved === 'metric') return saved;
+    return 'metric';
+  });
+
+  const handleSetWaterDisplayUnit = (unit: 'imperial' | 'metric') => {
+    setWaterDisplayUnit(unit);
+    safeStorage.set('unlckd_water_unit_pref', unit);
+  };
   const [isSavingHydration, setIsSavingHydration] = useState(false);
   const [isSavingSteps, setIsSavingSteps] = useState(false);
   const [isSleepCollapsed, setIsSleepCollapsed] = useState(true);
   const [isRecoveryCollapsed, setIsRecoveryCollapsed] = useState(true);
   const [isSavingSleep, setIsSavingSleep] = useState(false);
-  const [isWhoopModalOpen, setIsWhoopModalOpen] = useState(false);
   const [isMonthlyBadgeModalOpen, setIsMonthlyBadgeModalOpen] = useState(false);
   const [isAccomplishmentBadgesCollapsed, setIsAccomplishmentBadgesCollapsed] = useState(true);
   const [showAllAccomplishmentBadges, setShowAllAccomplishmentBadges] = useState(false);
@@ -943,38 +951,6 @@ export const ProGym = ({
     if (onProfileUpdate) onProfileUpdate();
     setBadgeSyncToast(`🏆 Outstanding! The "${targetGoalToSync.badgeName}" Monthly Badge has been added to your profile!`);
     setTimeout(() => setBadgeSyncToast(null), 3500);
-  };
-
-  const handleApplyWhoopData = async (data: {
-    sleepHours?: number;
-    sleepQuality?: 'Poor' | 'Fair' | 'Good' | 'Excellent';
-    sleepNotes?: string;
-    steps?: number;
-    recoveryScore?: number;
-    hrvMs?: number;
-    restingHeartRate?: number;
-    dayStrain?: number;
-  }) => {
-    if (!log) return;
-    const updatedLog: DailyLog = {
-      ...log,
-      ...(data.sleepHours !== undefined ? { sleepHours: data.sleepHours } : {}),
-      ...(data.sleepQuality !== undefined ? { sleepQuality: data.sleepQuality } : {}),
-      ...(data.sleepNotes !== undefined ? { sleepNotes: data.sleepNotes } : {}),
-      ...(data.steps !== undefined ? { steps: data.steps } : {})
-    };
-    setLog(updatedLog);
-    try {
-      const updates: Partial<DailyLog> = {};
-      if (data.sleepHours !== undefined) updates.sleepHours = data.sleepHours;
-      if (data.sleepQuality !== undefined) updates.sleepQuality = data.sleepQuality;
-      if (data.sleepNotes !== undefined) updates.sleepNotes = data.sleepNotes;
-      if (data.steps !== undefined) updates.steps = data.steps;
-
-      await gymService.updateDailyLog(selectedDate, updates);
-    } catch (e) {
-      console.error("Error applying WHOOP data to daily log:", e);
-    }
   };
 
   const handleSaveHydration = async () => {
@@ -3247,26 +3223,82 @@ export const ProGym = ({
                 {/* WATER */}
                 <div className="space-y-1.5 pt-4 md:pt-0 md:px-4">
                   <MetricDisplay
-                    label="WATER"
-                    value={log.waterUnit === 'oz' ? `${(log.water / 33.814).toFixed(1)}` : `${(log.water / 1000).toFixed(1)}`}
+                    label={
+                      <div className="flex items-center justify-between gap-1 w-full mb-0.5">
+                        <span className="text-[11px] font-bold uppercase tracking-widest text-[#6C6C6C]">
+                          WATER
+                        </span>
+                        <div className="flex items-center bg-[#080808] border border-[#292929] rounded-[4px] p-0.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSetWaterDisplayUnit('imperial');
+                            }}
+                            className={cn(
+                              "px-1.5 py-0.5 rounded-[2px] text-[9px] font-mono font-bold uppercase transition-colors cursor-pointer",
+                              waterDisplayUnit === 'imperial'
+                                ? "bg-[#171717] text-[#00DFA2] border border-[#00DFA2]/30"
+                                : "text-[#6C6C6C] hover:text-[#A1A1A1] border border-transparent"
+                            )}
+                            title="Imperial: Fluid Ounces (FL OZ)"
+                          >
+                            FL OZ
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSetWaterDisplayUnit('metric');
+                            }}
+                            className={cn(
+                              "px-1.5 py-0.5 rounded-[2px] text-[9px] font-mono font-bold uppercase transition-colors cursor-pointer",
+                              waterDisplayUnit === 'metric'
+                                ? "bg-[#171717] text-[#00DFA2] border border-[#00DFA2]/30"
+                                : "text-[#6C6C6C] hover:text-[#A1A1A1] border border-transparent"
+                            )}
+                            title="Metric: Milliliters / Liters (ML / L)"
+                          >
+                            ML
+                          </button>
+                        </div>
+                      </div>
+                    }
+                    value={
+                      waterDisplayUnit === 'imperial'
+                        ? `${Math.round((log.water || 0) / 29.5735)}`
+                        : (log.water || 0) >= 1000
+                        ? `${((log.water || 0) / 1000).toFixed(1)}`
+                        : `${Math.round(log.water || 0)}`
+                    }
                     unit={
-                      <span className="text-xs font-mono text-[#6C6C6C]">
-                        L ({log.water} {log.waterUnit})
-                      </span>
+                      waterDisplayUnit === 'imperial' ? (
+                        <span className="text-xs font-mono text-[#6C6C6C]">
+                          FL OZ / {Math.round((log.waterGoal || 3000) / 29.5735)} FL OZ
+                        </span>
+                      ) : (log.water || 0) >= 1000 ? (
+                        <span className="text-xs font-mono text-[#6C6C6C]">
+                          L / {((log.waterGoal || 3000) / 1000).toFixed(1)} L
+                        </span>
+                      ) : (
+                        <span className="text-xs font-mono text-[#6C6C6C]">
+                          ML / {Math.round(log.waterGoal || 3000)} ML
+                        </span>
+                      )
                     }
                   />
                   <div className="flex items-center gap-1.5 pt-2">
                     <button 
-                      onClick={() => updateWater(log.waterUnit === 'oz' ? -8 : -250)} 
+                      onClick={() => updateWater(waterDisplayUnit === 'imperial' ? -Math.round(8 * 29.5735) : -250)} 
                       className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-gray-400 cursor-pointer"
                     >
-                      -{log.waterUnit === 'oz' ? '8oz' : '250ml'}
+                      {waterDisplayUnit === 'imperial' ? '-8 FL OZ' : '-250 ML'}
                     </button>
                     <button 
-                      onClick={() => updateWater(log.waterUnit === 'oz' ? 8 : 250)} 
+                      onClick={() => updateWater(waterDisplayUnit === 'imperial' ? Math.round(8 * 29.5735) : 250)} 
                       className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-[#00DFA2] cursor-pointer"
                     >
-                      +{log.waterUnit === 'oz' ? '8oz' : '250ml'}
+                      {waterDisplayUnit === 'imperial' ? '+8 FL OZ' : '+250 ML'}
                     </button>
                   </div>
                 </div>
@@ -5029,13 +5061,6 @@ export const ProGym = ({
         userProfile={userProfile}
         selectedDate={selectedDate}
         onReportSaved={onReportSaved}
-      />
-
-      <WhoopSyncModal 
-        isOpen={isWhoopModalOpen}
-        onClose={() => setIsWhoopModalOpen(false)}
-        currentLog={log}
-        onApplyWhoopData={handleApplyWhoopData}
       />
 
       {/* Toast Notification Alert */}

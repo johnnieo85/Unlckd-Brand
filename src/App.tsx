@@ -78,6 +78,11 @@ import { ProgressReportModal } from './components/ProgressReportModal';
 import { SubscriptionModal } from './components/SubscriptionModal';
 import { ClientData } from './components/ClientHub';
 import { LandingPage } from './components/LandingPage';
+import { SyncStatusIndicator } from './components/SyncStatusIndicator';
+import { UpdateReadyBanner } from './components/UpdateReadyBanner';
+import { InternetRequiredModal } from './components/InternetRequiredModal';
+import { offlineIndexedDb } from './services/offline/indexedDb';
+import { networkStatus } from './services/offline/networkStatus';
 
 const cleanEvaluationText = (text: string) => {
   if (!text) return '';
@@ -816,6 +821,8 @@ export default function App() {
   const [newPassword, setNewPassword] = useState('');
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const [passwordUpdated, setPasswordUpdated] = useState(false);
+  const [isInternetRequiredModalOpen, setIsInternetRequiredModalOpen] = useState(false);
+  const [internetRequiredFeature, setInternetRequiredFeature] = useState<string>('AI Transformation Engine');
 
   const faqs = [
     {
@@ -1303,12 +1310,23 @@ export default function App() {
   };
 
   const handleSignIn = () => {
-    setAuthError(null);
+    if (!networkStatus.getIsOnline()) {
+      setAuthError("CONNECT TO SIGN IN: An internet connection is required to authenticate this device.");
+    } else {
+      setAuthError(null);
+    }
     setIsAuthModalOpen(true);
   };
 
   const handleSignOut = async () => {
     try {
+      const pendingUploads = await offlineIndexedDb.getPendingUploadsCount(auth.currentUser?.uid);
+      if (pendingUploads > 0) {
+        const confirmSignOut = window.confirm(
+          "UNSYNCED CHANGES\n\nThis device still has changes and queued photos that have not reached UNLCKD.\n\nReconnect and sync before removing offline data.\n\nDo you want to sign out anyway?"
+        );
+        if (!confirmSignOut) return;
+      }
       await signOut(auth);
       setSavedReports([]);
       setHasAccess(null);
@@ -1483,6 +1501,13 @@ export default function App() {
         }
       }
       
+      if (errorMessage.includes('INTERNET_REQUIRED') || !networkStatus.getIsOnline()) {
+        setInternetRequiredFeature('AI Transformation & Physique Engine');
+        setIsInternetRequiredModalOpen(true);
+        setStep('photos');
+        return;
+      }
+
       setLastError(errorMessage);
       setStep('error');
     } finally {
@@ -4893,6 +4918,20 @@ export default function App() {
           refreshProfile();
         }}
       />
+
+      <InternetRequiredModal
+        isOpen={isInternetRequiredModalOpen}
+        onClose={() => setIsInternetRequiredModalOpen(false)}
+        onRetry={() => {
+          if (step === 'processing' || isResubmitting) {
+            processReport(isResubmitting);
+          }
+        }}
+        featureName={internetRequiredFeature}
+      />
+
+      <SyncStatusIndicator />
+      <UpdateReadyBanner />
     </div>
   );
 }

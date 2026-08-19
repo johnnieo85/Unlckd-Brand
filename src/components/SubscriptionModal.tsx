@@ -22,6 +22,8 @@ import { cn } from '../lib/utils';
 import { UserProfile, SubscriptionPlanType, BillingCycleType, ClientCountBand } from '../types';
 import { SUBSCRIPTION_PLANS, CLIENT_COUNT_BANDS, getPriceForPlan } from '../lib/subscriptions';
 import { updateSubscriptionPlan, updateUserProfile } from '../services/accessService';
+import { networkStatus } from '../services/offline/networkStatus';
+import { InternetRequiredModal } from './InternetRequiredModal';
 
 interface SubscriptionModalProps {
   isOpen: boolean;
@@ -57,6 +59,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
   const [checkoutCvc, setCheckoutCvc] = useState('888');
   const [checkoutZip, setCheckoutZip] = useState('90210');
   const [purchaseComplete, setPurchaseComplete] = useState(false);
+  const [showInternetRequired, setShowInternetRequired] = useState(false);
 
   if (!isOpen || !userProfile) return null;
 
@@ -85,6 +88,10 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
     targetPlan: SubscriptionPlanType,
     targetBand?: ClientCountBand
   ) => {
+    if (!networkStatus.getIsOnline()) {
+      setShowInternetRequired(true);
+      return;
+    }
     if (targetPlan === 'free') {
       handleDirectPlanUpdate('free');
       return;
@@ -100,6 +107,10 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
     targetPlan: SubscriptionPlanType,
     targetBand?: ClientCountBand
   ) => {
+    if (!networkStatus.getIsOnline()) {
+      setShowInternetRequired(true);
+      return;
+    }
     setIsUpdating(true);
     setSuccessMessage(null);
     try {
@@ -133,6 +144,11 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
     e.preventDefault();
     if (!checkoutPlan) return;
 
+    if (!networkStatus.getIsOnline()) {
+      setShowInternetRequired(true);
+      return;
+    }
+
     setIsUpdating(true);
     try {
       const updated = await updateSubscriptionPlan(userProfile.userId, {
@@ -153,6 +169,10 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
   };
 
   const handleToggleCancel = async () => {
+    if (!networkStatus.getIsOnline()) {
+      setShowInternetRequired(true);
+      return;
+    }
     setIsUpdating(true);
     try {
       const newCancelState = !userProfile.cancelAtPeriodEnd;
@@ -896,6 +916,13 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
             )}
           </div>
         </motion.div>
+
+        <InternetRequiredModal
+          isOpen={showInternetRequired}
+          onClose={() => setShowInternetRequired(false)}
+          title="INTERNET REQUIRED"
+          featureName="Subscription & Billing Changes"
+        />
       </div>
     </AnimatePresence>
   );

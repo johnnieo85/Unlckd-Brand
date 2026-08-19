@@ -149,6 +149,9 @@ function safeParseJson(text: string): any {
  * AI CALL RETRY HELPER
  */
 async function withRetry<T>(fn: () => Promise<T>, retries = 8, delay = 10000): Promise<T> {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    throw new Error("INTERNET_REQUIRED: This feature needs a connection. Your offline data is safe.");
+  }
   try {
     return await fn();
   } catch (error: any) {

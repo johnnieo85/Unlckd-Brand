@@ -12,16 +12,17 @@ import {
   History, 
   Users, 
   ShieldCheck, 
-  Sparkles,
-  Camera,
-  Trash2,
-  TrendingUp,
-  CreditCard,
-  Flame,
-  ArrowRight,
-  Edit3,
-  CheckCircle2,
-  Calendar
+  Sparkles, 
+  Camera, 
+  Trash2, 
+  TrendingUp, 
+  CreditCard, 
+  Flame, 
+  ArrowRight, 
+  Edit3, 
+  CheckCircle2, 
+  Calendar,
+  HardDrive
 } from 'lucide-react';
 import { Card } from './ui/Card';
 import { Badge } from './ui/Badge';
@@ -33,6 +34,7 @@ import { cn } from '../lib/utils';
 import { updateUserProfile } from '../services/accessService';
 import { getLevelInfo } from '../lib/levels';
 import { gymService } from '../services/gymService';
+import { offlineIndexedDb } from '../services/offline/indexedDb';
 
 interface ProfilePageProps {
   userProfile: UserProfile | null;
@@ -89,6 +91,21 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isEditingMeasurements, setIsEditingMeasurements] = useState(false);
   const [isAllBadgesExpanded, setIsAllBadgesExpanded] = useState(false);
+
+  // State for offline storage on this device
+  const [availableOffline, setAvailableOffline] = useState(true);
+
+  useEffect(() => {
+    offlineIndexedDb.getSetting('AVAILABLE_OFFLINE_ON_THIS_DEVICE', true).then((val) => {
+      setAvailableOffline(val);
+    });
+  }, []);
+
+  const handleToggleOfflineStorage = async () => {
+    const nextVal = !availableOffline;
+    setAvailableOffline(nextVal);
+    await offlineIndexedDb.setSetting('AVAILABLE_OFFLINE_ON_THIS_DEVICE', nextVal);
+  };
 
   // Sync avatar & age on external update
   useEffect(() => {
@@ -537,7 +554,14 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               className="w-20 h-20 sm:w-24 sm:h-24 rounded-[6px] overflow-hidden border border-[#292929] bg-[#080808] flex items-center justify-center relative cursor-pointer group-hover:border-brand-primary transition-all shadow-inner"
             >
               {avatarUrl ? (
-                <img src={avatarUrl} alt={fullName} className="w-full h-full object-cover" />
+                <img 
+                  src={avatarUrl} 
+                  alt={fullName} 
+                  loading="eager"
+                  decoding="async"
+                  onError={() => setAvatarUrl('')}
+                  className="w-full h-full object-cover" 
+                />
               ) : (
                 <span className="text-2xl sm:text-3xl font-display font-black text-brand-primary tracking-wider">
                   {computeInitials(fullName)}
@@ -1293,6 +1317,47 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               >
                 {isAllBadgesExpanded ? 'SHOW LESS MILESTONES' : `VIEW ALL ${DEFAULT_YEAR_BADGES.length} ACHIEVEMENTS`}
               </Button>
+            </div>
+          </Card>
+
+          {/* DEVICE STORAGE & OFFLINE PERSISTENCE */}
+          <Card className="p-5 sm:p-6 bg-[#111111] border border-[#292929] rounded-[6px] space-y-4">
+            <div className="flex items-center justify-between border-b border-[#292929] pb-3">
+              <div className="flex items-center gap-2">
+                <HardDrive className="w-4 h-4 text-brand-primary" />
+                <h3 className="text-sm font-display font-bold uppercase tracking-wider text-white">
+                  DEVICE SETTINGS
+                </h3>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-4 p-3.5 bg-[#080808] border border-[#292929] rounded-[4px]">
+              <div className="space-y-1 pr-2">
+                <div className="text-xs font-mono font-bold text-white uppercase tracking-wider">
+                  AVAILABLE OFFLINE ON THIS DEVICE
+                </div>
+                <p className="text-xs text-[#A1A1A1] leading-relaxed">
+                  Keep workouts, tracking data and recently viewed plans available when you're offline.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleToggleOfflineStorage}
+                role="switch"
+                aria-checked={availableOffline}
+                className={cn(
+                  "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                  availableOffline ? "bg-brand-primary" : "bg-[#292929]"
+                )}
+              >
+                <span
+                  className={cn(
+                    "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-black shadow-lg ring-0 transition duration-200 ease-in-out",
+                    availableOffline ? "translate-x-5" : "translate-x-0"
+                  )}
+                />
+              </button>
             </div>
           </Card>
 

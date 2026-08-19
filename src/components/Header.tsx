@@ -225,7 +225,13 @@ export const Header: React.FC<HeaderProps> = ({
                           "w-5 h-5 rounded-full overflow-hidden border bg-black shrink-0",
                           isCoach ? "border-purple-400/80" : "border-[#292929]"
                         )}>
-                          <img src={userProfile.avatarUrl} alt={displayName} className="w-full h-full object-cover" />
+                          <img 
+                            src={userProfile.avatarUrl} 
+                            alt={displayName} 
+                            loading="eager" 
+                            decoding="async" 
+                            className="w-full h-full object-cover" 
+                          />
                         </div>
                       )}
                       <span className={isCoach ? "text-purple-300" : ""}>{displayName}</span>
@@ -281,8 +287,15 @@ export const Header: React.FC<HeaderProps> = ({
               className="md:hidden border-t border-[#292929] bg-[#111111] px-4 py-4 space-y-3 shadow-2xl overflow-hidden"
             >
               <div className="flex items-center justify-between text-[10px] font-mono font-bold uppercase tracking-widest text-[#6C6C6C] pb-2 border-b border-[#292929]">
-                <span>Logged in as {displayName}</span>
-                <span>Level {getLevelInfo(userProfile?.xp || 0).level}</span>
+                <div className="flex items-center gap-2 min-w-0">
+                  {userProfile?.avatarUrl && (
+                    <div className="w-5 h-5 rounded-full overflow-hidden border border-[#292929] bg-black shrink-0">
+                      <img src={userProfile.avatarUrl} alt={displayName} loading="eager" decoding="async" className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                  <span className="truncate">Logged in as {displayName}</span>
+                </div>
+                <span className="shrink-0 ml-2">Level {getLevelInfo(userProfile?.xp || 0).level}</span>
               </div>
               
               <div className="grid grid-cols-2 gap-2">

@@ -28,6 +28,9 @@ export interface FirestoreErrorInfo {
 }
 
 function handleFirestoreError(error: any, operation: FirestoreErrorInfo['operationType'], path: string | null): never {
+  const errMsg = error?.message || 'Unknown Firestore error';
+  const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+
   const authInfo = auth.currentUser ? {
     userId: auth.currentUser.uid,
     email: auth.currentUser.email || '',
@@ -47,11 +50,15 @@ function handleFirestoreError(error: any, operation: FirestoreErrorInfo['operati
   };
 
   const errorInfo: FirestoreErrorInfo = {
-    error: error.message || 'Unknown Firestore error',
+    error: errMsg,
     operationType: operation,
     path,
     authInfo
   };
+
+  if (isOffline || errMsg.includes('offline') || errMsg.includes('client is offline')) {
+    console.info('HistoryService offline notice:', operation, path);
+  }
 
   throw new Error(JSON.stringify(errorInfo));
 }
