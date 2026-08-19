@@ -868,12 +868,22 @@ export const ProGym = ({
   const [waterDisplayUnit, setWaterDisplayUnit] = useState<'imperial' | 'metric'>(() => {
     const saved = safeStorage.get('unlckd_water_unit_pref');
     if (saved === 'imperial' || saved === 'metric') return saved;
-    return 'metric';
+    return 'imperial';
   });
 
   const handleSetWaterDisplayUnit = (unit: 'imperial' | 'metric') => {
     setWaterDisplayUnit(unit);
     safeStorage.set('unlckd_water_unit_pref', unit);
+    if (!log) return;
+    if (unit === 'imperial' && log.waterUnit === 'ml') {
+      const newWater = Math.round((log.water || 0) / 29.5735);
+      const newGoal = Math.round((log.waterGoal || 3000) / 29.5735);
+      setLog({ ...log, waterUnit: 'oz', water: newWater, waterGoal: newGoal });
+    } else if (unit === 'metric' && log.waterUnit === 'oz') {
+      const newWater = Math.round((log.water || 0) * 29.5735);
+      const newGoal = Math.round((log.waterGoal || 101) * 29.5735);
+      setLog({ ...log, waterUnit: 'ml', water: newWater, waterGoal: newGoal });
+    }
   };
   const [isSavingHydration, setIsSavingHydration] = useState(false);
   const [isSavingSteps, setIsSavingSteps] = useState(false);
@@ -2594,27 +2604,41 @@ export const ProGym = ({
     await loadData(selectedDate);
   };
 
+  const getCanonicalWater = () => {
+    const raw = Number(log?.water) || 0;
+    if (log?.waterUnit === 'oz' && raw > 0 && raw < 250) {
+      return raw * 29.5735;
+    }
+    return raw;
+  };
+
+  const getCanonicalWaterGoal = () => {
+    const raw = Number(log?.waterGoal) || 3000;
+    if (raw < 250) {
+      return raw * 29.5735;
+    }
+    return raw;
+  };
+
   const toggleWaterUnit = () => {
     if (!log) return;
-    const newUnit: 'ml' | 'oz' = log.waterUnit === 'ml' ? 'oz' : 'ml';
-    // Optional: convert current values
-    let newWater = log.water;
-    let newGoal = log.waterGoal;
-    if (newUnit === 'oz') {
-      newWater = Math.round(log.water / 29.5735);
-      newGoal = Math.round(log.waterGoal / 29.5735);
-    } else {
-      newWater = Math.round(log.water * 29.5735);
-      newGoal = Math.round(log.waterGoal * 29.5735);
-    }
-    const updated = { ...log, waterUnit: newUnit, water: newWater, waterGoal: newGoal };
-    setLog(updated);
+    const nextPref = waterDisplayUnit === 'imperial' ? 'metric' : 'imperial';
+    handleSetWaterDisplayUnit(nextPref);
   };
 
   const updateWater = (amount: number) => {
     if (!log) return;
-    const newWater = Math.max(0, log.water + amount);
-    setLog({ ...log, water: newWater });
+    if (log.waterUnit === 'oz') {
+      const isOunces = Math.abs(amount) < 100;
+      const delta = isOunces ? amount : Math.round(amount / 29.5735);
+      const newWater = Math.max(0, Math.round((log.water || 0) + delta));
+      setLog({ ...log, water: newWater });
+    } else {
+      const isOunces = Math.abs(amount) < 100;
+      const delta = isOunces ? Math.round(amount * 29.5735) : amount;
+      const newWater = Math.max(0, Math.round((log.water || 0) + delta));
+      setLog({ ...log, water: newWater });
+    }
   };
 
   const saveHydration = async () => {
@@ -3194,26 +3218,26 @@ export const ProGym = ({
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 divide-y md:divide-y-0 md:divide-x divide-[#292929]">
                 {/* STEPS */}
-                <div className="space-y-1.5 pt-4 md:pt-0 md:px-4 first:pl-0">
+                <div className="space-y-1.5 pt-4 md:pt-0 md:px-4 first:pl-0 min-w-0">
                   <MetricDisplay
                     label="STEPS"
                     value={(log.steps || 0).toLocaleString()}
                     unit={
-                      <span className="text-xs font-mono text-[#6C6C6C]">
+                      <span className="text-[11px] sm:text-xs font-mono text-[#6C6C6C] whitespace-nowrap">
                         / {(log.stepGoal || 10000).toLocaleString()}
                       </span>
                     }
                   />
-                  <div className="flex items-center gap-1.5 pt-2">
+                  <div className="flex items-center gap-1.5 pt-2 w-full">
                     <button 
                       onClick={() => updateSteps(-500)} 
-                      className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-gray-400 cursor-pointer"
+                      className="flex-1 text-center py-1 px-1 text-[10px] sm:text-xs font-mono font-bold rounded bg-white/5 hover:bg-white/10 text-gray-400 cursor-pointer transition-colors whitespace-nowrap"
                     >
                       -500
                     </button>
                     <button 
                       onClick={() => updateSteps(500)} 
-                      className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-[#00DFA2] cursor-pointer"
+                      className="flex-1 text-center py-1 px-1 text-[10px] sm:text-xs font-mono font-bold rounded bg-white/5 hover:bg-white/10 text-[#00DFA2] cursor-pointer transition-colors whitespace-nowrap"
                     >
                       +500
                     </button>
@@ -3221,7 +3245,7 @@ export const ProGym = ({
                 </div>
 
                 {/* WATER */}
-                <div className="space-y-1.5 pt-4 md:pt-0 md:px-4">
+                <div className="space-y-1.5 pt-4 md:pt-0 md:px-4 min-w-0">
                   <MetricDisplay
                     label={
                       <div className="flex items-center justify-between gap-1 w-full mb-0.5">
@@ -3265,38 +3289,63 @@ export const ProGym = ({
                       </div>
                     }
                     value={
-                      waterDisplayUnit === 'imperial'
-                        ? `${Math.round((log.water || 0) / 29.5735)}`
-                        : (log.water || 0) >= 1000
-                        ? `${((log.water || 0) / 1000).toFixed(1)}`
-                        : `${Math.round(log.water || 0)}`
+                      (() => {
+                        if (waterDisplayUnit === 'imperial') {
+                          return log.waterUnit === 'oz'
+                            ? `${Math.round(log.water || 0)}`
+                            : `${Math.round((log.water || 0) / 29.5735)}`;
+                        }
+                        const ml = log.waterUnit === 'oz'
+                          ? (log.water || 0) * 29.5735
+                          : (log.water || 0);
+                        return ml >= 1000 ? `${(ml / 1000).toFixed(1)}` : `${Math.round(ml)}`;
+                      })()
                     }
                     unit={
-                      waterDisplayUnit === 'imperial' ? (
-                        <span className="text-xs font-mono text-[#6C6C6C]">
-                          FL OZ / {Math.round((log.waterGoal || 3000) / 29.5735)} FL OZ
-                        </span>
-                      ) : (log.water || 0) >= 1000 ? (
-                        <span className="text-xs font-mono text-[#6C6C6C]">
-                          L / {((log.waterGoal || 3000) / 1000).toFixed(1)} L
-                        </span>
-                      ) : (
-                        <span className="text-xs font-mono text-[#6C6C6C]">
-                          ML / {Math.round(log.waterGoal || 3000)} ML
-                        </span>
-                      )
+                      (() => {
+                        if (waterDisplayUnit === 'imperial') {
+                          const targetOz = log.waterUnit === 'oz'
+                            ? Math.round(log.waterGoal || 101)
+                            : Math.round((log.waterGoal || 3000) / 29.5735);
+                          return (
+                            <span className="text-[11px] sm:text-xs font-mono text-[#6C6C6C] whitespace-nowrap">
+                              / {targetOz} FL OZ
+                            </span>
+                          );
+                        }
+                        const goalMl = log.waterUnit === 'oz'
+                          ? (log.waterGoal || 101) * 29.5735
+                          : (log.waterGoal || 3000);
+                        const currentMl = log.waterUnit === 'oz'
+                          ? (log.water || 0) * 29.5735
+                          : (log.water || 0);
+                        if (currentMl >= 1000) {
+                          return (
+                            <span className="text-[11px] sm:text-xs font-mono text-[#6C6C6C] whitespace-nowrap">
+                              / {(goalMl / 1000).toFixed(1)} L
+                            </span>
+                          );
+                        }
+                        return (
+                          <span className="text-[11px] sm:text-xs font-mono text-[#6C6C6C] whitespace-nowrap">
+                            / {Math.round(goalMl)} ML
+                          </span>
+                        );
+                      })()
                     }
                   />
-                  <div className="flex items-center gap-1.5 pt-2">
+                  <div className="flex items-center gap-1.5 pt-2 w-full">
                     <button 
-                      onClick={() => updateWater(waterDisplayUnit === 'imperial' ? -Math.round(8 * 29.5735) : -250)} 
-                      className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-gray-400 cursor-pointer"
+                      onClick={() => updateWater(waterDisplayUnit === 'imperial' ? -8 : -250)} 
+                      className="flex-1 text-center py-1 px-1 text-[10px] sm:text-xs font-mono font-bold rounded bg-white/5 hover:bg-white/10 text-gray-400 cursor-pointer transition-colors whitespace-nowrap"
+                      title={waterDisplayUnit === 'imperial' ? "Subtract 8 Fluid Ounces" : "Subtract 250 Milliliters"}
                     >
                       {waterDisplayUnit === 'imperial' ? '-8 FL OZ' : '-250 ML'}
                     </button>
                     <button 
-                      onClick={() => updateWater(waterDisplayUnit === 'imperial' ? Math.round(8 * 29.5735) : 250)} 
-                      className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-[#00DFA2] cursor-pointer"
+                      onClick={() => updateWater(waterDisplayUnit === 'imperial' ? 8 : 250)} 
+                      className="flex-1 text-center py-1 px-1 text-[10px] sm:text-xs font-mono font-bold rounded bg-white/5 hover:bg-white/10 text-[#00DFA2] cursor-pointer transition-colors whitespace-nowrap"
+                      title={waterDisplayUnit === 'imperial' ? "Add 8 Fluid Ounces" : "Add 250 Milliliters"}
                     >
                       {waterDisplayUnit === 'imperial' ? '+8 FL OZ' : '+250 ML'}
                     </button>
@@ -3304,42 +3353,42 @@ export const ProGym = ({
                 </div>
 
                 {/* PROTEIN */}
-                <div className="space-y-1.5 pt-4 md:pt-0 md:px-4">
+                <div className="space-y-1.5 pt-4 md:pt-0 md:px-4 min-w-0">
                   <MetricDisplay
                     label="PROTEIN"
                     value={`${getNutritionTotals().protein}`}
                     unit={
-                      <span className="text-xs font-mono text-[#6C6C6C]">
+                      <span className="text-[11px] sm:text-xs font-mono text-[#6C6C6C] whitespace-nowrap">
                         G / {targetProteinGrams}G
                       </span>
                     }
                   />
-                  <span className="text-[11px] font-mono text-[#6C6C6C] block pt-2">
+                  <span className="text-[11px] font-mono text-[#6C6C6C] block pt-2 truncate">
                     {getNutritionTotals().calories} CAL CONSUMED
                   </span>
                 </div>
 
                 {/* SLEEP */}
-                <div className="space-y-1.5 pt-4 md:pt-0 md:px-4">
+                <div className="space-y-1.5 pt-4 md:pt-0 md:px-4 last:pr-0 min-w-0">
                   <MetricDisplay
                     label="SLEEP"
                     value={`${Math.floor(log.sleepHours || 0)}`}
                     unit={
-                      <span className="text-xs font-mono text-[#6C6C6C]">
+                      <span className="text-[11px] sm:text-xs font-mono text-[#6C6C6C] whitespace-nowrap">
                         H {Math.round(((log.sleepHours || 0) % 1) * 60)}M / {log.sleepGoal || 8}H
                       </span>
                     }
                   />
-                  <div className="flex items-center gap-1.5 pt-2">
+                  <div className="flex items-center gap-1.5 pt-2 w-full">
                     <button 
                       onClick={() => updateSleepHours(-0.5)} 
-                      className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-gray-400 cursor-pointer"
+                      className="flex-1 text-center py-1 px-1 text-[10px] sm:text-xs font-mono font-bold rounded bg-white/5 hover:bg-white/10 text-gray-400 cursor-pointer transition-colors whitespace-nowrap"
                     >
                       -0.5h
                     </button>
                     <button 
                       onClick={() => updateSleepHours(0.5)} 
-                      className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-[#00DFA2] cursor-pointer"
+                      className="flex-1 text-center py-1 px-1 text-[10px] sm:text-xs font-mono font-bold rounded bg-white/5 hover:bg-white/10 text-[#00DFA2] cursor-pointer transition-colors whitespace-nowrap"
                     >
                       +0.5h
                     </button>

@@ -11,17 +11,25 @@ import { cn } from '../lib/utils';
 interface WeightProgressionChartProps {
   initialMeasurements?: Measurement[];
   defaultCollapsed?: boolean;
+  weightUnit?: 'lbs' | 'kg';
 }
 
 export function WeightProgressionChart({
   initialMeasurements,
-  defaultCollapsed = false
+  defaultCollapsed = false,
+  weightUnit
 }: WeightProgressionChartProps) {
   const [measurements, setMeasurements] = useState<Measurement[]>(initialMeasurements || []);
   const [chartMetric, setChartMetric] = useState<'weight' | 'bodyFat'>('weight');
-  const [graphWeightUnit, setGraphWeightUnit] = useState<'lbs' | 'kg'>('lbs');
+  const [graphWeightUnit, setGraphWeightUnit] = useState<'lbs' | 'kg'>(weightUnit || 'lbs');
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
   const [loading, setLoading] = useState(!initialMeasurements || initialMeasurements.length === 0);
+
+  useEffect(() => {
+    if (weightUnit) {
+      setGraphWeightUnit(weightUnit);
+    }
+  }, [weightUnit]);
 
   useEffect(() => {
     if (initialMeasurements && initialMeasurements.length > 0) {

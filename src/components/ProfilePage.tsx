@@ -428,7 +428,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   // Weight Net Progression Calculation
   const weightProgressionDelta = (() => {
     const currentW = Number(weight) || 0;
-    let startW = userProfile?.weight || currentW;
+    let startW = currentW;
     if (earliestWeightLog && typeof earliestWeightLog.weight === 'number' && earliestWeightLog.weight > 0) {
       let eWeight = earliestWeightLog.weight;
       const eUnit = earliestWeightLog.units?.weight || 'lbs';
@@ -436,6 +436,13 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
         eWeight = weightUnit === 'kg' ? eWeight * 0.453592 : eWeight / 0.453592;
       }
       startW = eWeight;
+    } else if (userProfile?.weight && typeof userProfile.weight === 'number') {
+      let pWeight = userProfile.weight;
+      const pUnit = userProfile.weightUnit || 'lbs';
+      if (pUnit !== weightUnit) {
+        pWeight = weightUnit === 'kg' ? pWeight * 0.453592 : pWeight / 0.453592;
+      }
+      startW = pWeight;
     }
     const delta = Number((currentW - startW).toFixed(1));
     const sign = delta > 0 ? '+' : delta < 0 ? '−' : '';
@@ -448,6 +455,72 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
       isZero: delta === 0
     };
   })();
+
+  const handleToggleWeightUnit = (unit: 'lbs' | 'kg') => {
+    if (unit === weightUnit) return;
+    if (unit === 'kg') {
+      const numW = weight === '' ? 0 : Number(weight);
+      if (numW > 0) setWeight(Math.round(numW * 0.453592 * 10) / 10);
+      const numGW = goalWeight === '' ? 0 : Number(goalWeight);
+      if (numGW > 0) setGoalWeight(Math.round(numGW * 0.453592 * 10) / 10);
+      setWeightUnit('kg');
+    } else {
+      const numW = weight === '' ? 0 : Number(weight);
+      if (numW > 0) setWeight(Math.round((numW / 0.453592) * 10) / 10);
+      const numGW = goalWeight === '' ? 0 : Number(goalWeight);
+      if (numGW > 0) setGoalWeight(Math.round((numGW / 0.453592) * 10) / 10);
+      setWeightUnit('lbs');
+    }
+  };
+
+  const handleToggleHeightUnit = (unit: 'ftin' | 'cm') => {
+    if (unit === heightUnit) return;
+    if (unit === 'cm') {
+      const f = feetInput === '' ? 0 : Number(feetInput);
+      const i = inchesInput === '' ? 0 : Number(inchesInput);
+      const totalInches = f * 12 + i;
+      setHeightCmInput(totalInches > 0 ? Math.round(totalInches * 2.54) : (initialHeightInches ? Math.round(initialHeightInches * 2.54) : 178));
+      setHeightUnit('cm');
+    } else {
+      const cm = heightCmInput === '' ? 0 : Number(heightCmInput);
+      const totalInches = cm > 0 ? Math.round(cm / 2.54) : (initialHeightInches || 70);
+      setFeetInput(totalInches > 0 ? Math.floor(totalInches / 12) : 5);
+      setInchesInput(totalInches > 0 ? Math.round(totalInches % 12) : 10);
+      setHeightUnit('ftin');
+    }
+  };
+
+  const handleToggleSystemUnits = (system: 'imperial' | 'metric') => {
+    if (system === 'metric') {
+      handleToggleWeightUnit('kg');
+      handleToggleHeightUnit('cm');
+      if (measurementLengthUnit !== 'cm') {
+        setMeasurements(prev => {
+          const updated: Record<string, string | number> = {};
+          Object.keys(prev).forEach(k => {
+            const v = prev[k];
+            updated[k] = v === '' ? '' : Math.round(Number(v) * 2.54 * 10) / 10;
+          });
+          return updated;
+        });
+        setMeasurementLengthUnit('cm');
+      }
+    } else {
+      handleToggleWeightUnit('lbs');
+      handleToggleHeightUnit('ftin');
+      if (measurementLengthUnit !== 'in') {
+        setMeasurements(prev => {
+          const updated: Record<string, string | number> = {};
+          Object.keys(prev).forEach(k => {
+            const v = prev[k];
+            updated[k] = v === '' ? '' : Math.round((Number(v) / 2.54) * 10) / 10;
+          });
+          return updated;
+        });
+        setMeasurementLengthUnit('in');
+      }
+    }
+  };
 
   // Editorial Measurements Pairing
   const armDisplay = (() => {
@@ -858,61 +931,152 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
       {/* 2. ATHLETE METRICS STRIP (Horizontal high-contrast layout)   */}
       {/* ============================================================ */}
       <section className="space-y-2">
-        <div className="flex items-center justify-between px-1">
-          <span className="text-[11px] font-mono font-bold tracking-widest text-[#A1A1A1] uppercase">
-            ATHLETE BIOMETRIC BASELINE
-          </span>
-          <span className="text-[10px] font-mono text-[#6C6C6C]">PERFORMANCE TARGETS</span>
+        <div className="flex items-center justify-between px-1 flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-mono font-bold tracking-widest text-[#A1A1A1] uppercase">
+              ATHLETE BIOMETRIC BASELINE
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
+            {/* Weight Switch (LB / KG) */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-mono text-[#6C6C6C] uppercase font-bold hidden xs:inline">WEIGHT</span>
+              <UnitToggle<'lbs' | 'kg'>
+                unitA="lbs"
+                unitB="kg"
+                labelA="LB"
+                labelB="KG"
+                value={weightUnit}
+                onChange={handleToggleWeightUnit}
+                size="sm"
+              />
+            </div>
+
+            {/* Height Switch (CM / FT & IN) */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-mono text-[#6C6C6C] uppercase font-bold hidden xs:inline">HEIGHT</span>
+              <UnitToggle<'ftin' | 'cm'>
+                unitA="ftin"
+                unitB="cm"
+                labelA="FT / IN"
+                labelB="CM"
+                value={heightUnit}
+                onChange={handleToggleHeightUnit}
+                size="sm"
+              />
+            </div>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 bg-[#111111] border border-[#292929] rounded-[6px] divide-y md:divide-y-0 md:divide-x divide-[#292929] overflow-hidden shadow-lg">
           {/* 1. Weight */}
           <div className="p-5 sm:p-6 space-y-1">
-            <div className="flex items-baseline gap-1.5">
+            <div className="flex items-center justify-between gap-1">
+              <div className="text-[11px] font-mono font-bold tracking-widest text-[#A1A1A1] uppercase">
+                WEIGHT
+              </div>
+              <div className="flex items-center bg-[#080808] border border-[#292929] rounded-[4px] p-0.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleToggleWeightUnit('lbs')}
+                  className={cn(
+                    "px-1.5 py-0.5 rounded-[2px] text-[9px] font-mono font-bold uppercase transition-colors cursor-pointer",
+                    weightUnit === 'lbs'
+                      ? "bg-brand-primary text-black font-extrabold"
+                      : "text-[#6C6C6C] hover:text-white"
+                  )}
+                >
+                  LB
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleToggleWeightUnit('kg')}
+                  className={cn(
+                    "px-1.5 py-0.5 rounded-[2px] text-[9px] font-mono font-bold uppercase transition-colors cursor-pointer",
+                    weightUnit === 'kg'
+                      ? "bg-brand-primary text-black font-extrabold"
+                      : "text-[#6C6C6C] hover:text-white"
+                  )}
+                >
+                  KG
+                </button>
+              </div>
+            </div>
+            <div className="flex items-baseline gap-1.5 pt-1">
               <span className="text-2xl sm:text-3xl lg:text-4xl font-mono font-black text-white tracking-tight">
                 {typeof weight === 'number' ? weight.toFixed(1) : (weight || '185')}
               </span>
               <span className="text-xs sm:text-sm font-mono font-bold text-brand-primary uppercase">
-                {weightUnit}
+                {weightUnit === 'lbs' ? 'LB' : 'KG'}
               </span>
-            </div>
-            <div className="text-[11px] font-mono font-bold tracking-widest text-[#A1A1A1] uppercase">
-              WEIGHT
             </div>
           </div>
 
           {/* 2. Height */}
           <div className="p-5 sm:p-6 space-y-1">
-            <div className="text-2xl sm:text-3xl lg:text-4xl font-mono font-black text-white tracking-tight">
-              {heightDisplayFormatted}
+            <div className="flex items-center justify-between gap-1">
+              <div className="text-[11px] font-mono font-bold tracking-widest text-[#A1A1A1] uppercase">
+                HEIGHT
+              </div>
+              <div className="flex items-center bg-[#080808] border border-[#292929] rounded-[4px] p-0.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleToggleHeightUnit('ftin')}
+                  className={cn(
+                    "px-1.5 py-0.5 rounded-[2px] text-[9px] font-mono font-bold uppercase transition-colors cursor-pointer",
+                    heightUnit === 'ftin'
+                      ? "bg-brand-primary text-black font-extrabold"
+                      : "text-[#6C6C6C] hover:text-white"
+                  )}
+                >
+                  FT/IN
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleToggleHeightUnit('cm')}
+                  className={cn(
+                    "px-1.5 py-0.5 rounded-[2px] text-[9px] font-mono font-bold uppercase transition-colors cursor-pointer",
+                    heightUnit === 'cm'
+                      ? "bg-brand-primary text-black font-extrabold"
+                      : "text-[#6C6C6C] hover:text-white"
+                  )}
+                >
+                  CM
+                </button>
+              </div>
             </div>
-            <div className="text-[11px] font-mono font-bold tracking-widest text-[#A1A1A1] uppercase">
-              HEIGHT
+            <div className="pt-1">
+              <span className="text-2xl sm:text-3xl lg:text-4xl font-mono font-black text-white tracking-tight">
+                {heightDisplayFormatted}
+              </span>
             </div>
           </div>
 
           {/* 3. Body Fat */}
           <div className="p-5 sm:p-6 space-y-1">
-            <div className="text-2xl sm:text-3xl lg:text-4xl font-mono font-black text-white tracking-tight">
-              {bodyFatFormatted}
-            </div>
             <div className="text-[11px] font-mono font-bold tracking-widest text-[#A1A1A1] uppercase">
               BODY FAT
+            </div>
+            <div className="pt-1">
+              <span className="text-2xl sm:text-3xl lg:text-4xl font-mono font-black text-white tracking-tight">
+                {bodyFatFormatted}
+              </span>
             </div>
           </div>
 
           {/* 4. Target Weight */}
           <div className="p-5 sm:p-6 space-y-1">
-            <div className="flex items-baseline gap-1.5">
+            <div className="text-[11px] font-mono font-bold tracking-widest text-[#A1A1A1] uppercase">
+              TARGET
+            </div>
+            <div className="flex items-baseline gap-1.5 pt-1">
               <span className="text-2xl sm:text-3xl lg:text-4xl font-mono font-black text-white tracking-tight">
                 {typeof goalWeight === 'number' ? goalWeight.toFixed(1) : (goalWeight || '175')}
               </span>
               <span className="text-xs sm:text-sm font-mono font-bold text-[#00DFA2] uppercase">
-                {weightUnit}
+                {weightUnit === 'lbs' ? 'LB' : 'KG'}
               </span>
-            </div>
-            <div className="text-[11px] font-mono font-bold tracking-widest text-[#A1A1A1] uppercase">
-              TARGET
             </div>
           </div>
         </div>
@@ -931,15 +1095,43 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
             {/* Dominant Current Weight Hero */}
             <div className="bg-[#111111] border border-[#292929] rounded-[6px] p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg">
               <div className="space-y-1">
-                <span className="text-[11px] font-mono font-bold tracking-widest text-[#A1A1A1] uppercase block">
-                  WEIGHT PROGRESSION
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-mono font-bold tracking-widest text-[#A1A1A1] uppercase block">
+                    WEIGHT PROGRESSION
+                  </span>
+                  <div className="flex items-center bg-[#080808] border border-[#292929] rounded-[4px] p-0.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleWeightUnit('lbs')}
+                      className={cn(
+                        "px-1.5 py-0.5 rounded-[2px] text-[9px] font-mono font-bold uppercase transition-colors cursor-pointer",
+                        weightUnit === 'lbs'
+                          ? "bg-brand-primary text-black font-extrabold"
+                          : "text-[#6C6C6C] hover:text-white"
+                      )}
+                    >
+                      LB
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleWeightUnit('kg')}
+                      className={cn(
+                        "px-1.5 py-0.5 rounded-[2px] text-[9px] font-mono font-bold uppercase transition-colors cursor-pointer",
+                        weightUnit === 'kg'
+                          ? "bg-brand-primary text-black font-extrabold"
+                          : "text-[#6C6C6C] hover:text-white"
+                      )}
+                    >
+                      KG
+                    </button>
+                  </div>
+                </div>
                 <div className="flex items-baseline gap-2">
                   <span className="text-4xl sm:text-5xl font-mono font-black text-white tracking-tight">
                     {typeof weight === 'number' ? weight.toFixed(1) : (weight || '185')}
                   </span>
                   <span className="text-base font-mono font-bold text-brand-primary uppercase">
-                    {weightUnit}
+                    {weightUnit === 'lbs' ? 'LB' : 'KG'}
                   </span>
                 </div>
               </div>
@@ -956,13 +1148,13 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                   {weightProgressionDelta.formatted}
                 </span>
                 <span className="text-[10px] font-mono text-[#6C6C6C]">
-                  TARGET: {typeof goalWeight === 'number' ? goalWeight.toFixed(1) : goalWeight} {weightUnit.toUpperCase()}
+                  TARGET: {typeof goalWeight === 'number' ? goalWeight.toFixed(1) : goalWeight} {weightUnit === 'lbs' ? 'LB' : 'KG'}
                 </span>
               </div>
             </div>
 
             {/* Progression Chart */}
-            <WeightProgressionChart defaultCollapsed={false} initialMeasurements={measurementsHistory} />
+            <WeightProgressionChart defaultCollapsed={false} initialMeasurements={measurementsHistory} weightUnit={weightUnit} />
           </div>
 
           {/* 2. BODY MEASUREMENTS: Editorial Data Grid */}

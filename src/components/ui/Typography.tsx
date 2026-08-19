@@ -101,12 +101,12 @@ export const MetricDisplay: React.FC<{
           )}
         </div>
       )}
-      <div className="flex items-baseline gap-1.5">
-        <span className="font-display font-black text-white text-3xl sm:text-5xl lg:text-6xl tracking-tight tabular-nums leading-none">
+      <div className="flex items-baseline gap-1.5 min-w-0">
+        <span className="font-display font-black text-white text-3xl sm:text-4xl lg:text-5xl tracking-tight tabular-nums leading-none shrink-0">
           {value}
         </span>
         {unit && (
-          <span className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-[#A1A1A1]">
+          <span className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-[#A1A1A1] truncate">
             {unit}
           </span>
         )}
