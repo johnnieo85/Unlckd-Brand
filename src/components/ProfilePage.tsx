@@ -35,6 +35,12 @@ import { updateUserProfile } from '../services/accessService';
 import { getLevelInfo } from '../lib/levels';
 import { gymService } from '../services/gymService';
 import { offlineIndexedDb } from '../services/offline/indexedDb';
+import { 
+  parseBodyFatPercentage, 
+  calculateNavyBodyFat, 
+  calculateBmiBodyFat, 
+  resolveAthleteBodyFat 
+} from '../lib/bodyFat';
 
 interface ProfilePageProps {
   userProfile: UserProfile | null;
@@ -139,9 +145,17 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   const [weight, setWeight] = useState<string | number>(userProfile?.weight ?? 185);
   const [weightUnit, setWeightUnit] = useState<'lbs' | 'kg'>(userProfile?.weightUnit || 'lbs');
   const [goalWeight, setGoalWeight] = useState<string | number>(userProfile?.goalWeight ?? 175);
+  const [bodyFatInput, setBodyFatInput] = useState<string | number>(userProfile?.bodyFat ?? '');
   const [measurementsHistory, setMeasurementsHistory] = useState<Measurement[]>([]);
   const [latestWeightLog, setLatestWeightLog] = useState<Measurement | null>(null);
   const [earliestWeightLog, setEarliestWeightLog] = useState<Measurement | null>(null);
+
+  // Sync bodyFat if updated externally
+  useEffect(() => {
+    if (userProfile?.bodyFat !== undefined && userProfile?.bodyFat !== null) {
+      setBodyFatInput(userProfile.bodyFat);
+    }
+  }, [userProfile?.bodyFat]);
 
   // Load measurements history for progression calculation
   useEffect(() => {
@@ -345,6 +359,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
     weight,
     weightUnit,
     goalWeight,
+    bodyFatInput,
     measurements,
     measurementLengthUnit
   ]);
@@ -359,6 +374,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
 
       const numericWeight = weight === '' ? 0 : Number(weight);
       const numericGoalWeight = goalWeight === '' ? 0 : Number(goalWeight);
+      const parsedBodyFat = parseBodyFatPercentage(bodyFatInput);
 
       const numericMeasurements = Object.keys(measurements).reduce((acc, k) => {
         const v = measurements[k];
@@ -366,9 +382,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
         return acc;
       }, {} as Record<string, number>);
 
-      await updateUserProfile(userProfile.userId, {
-        fullName,
-        avatarUrl,
+      const updatePayload: Partial<UserProfile> = {
+        fullName: fullName || '',
+        avatarUrl: avatarUrl || '',
         age: age === '' ? '' : String(age),
         height: calcHeightInches,
         heightUnit,
@@ -382,7 +398,13 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
             weight: weightUnit
           }
         }
-      });
+      };
+
+      if (parsedBodyFat !== null) {
+        updatePayload.bodyFat = parsedBodyFat;
+      }
+
+      await updateUserProfile(userProfile.userId, updatePayload);
       setSaveSuccess(true);
       onProfileUpdate();
       setTimeout(() => setSaveSuccess(false), 2000);
@@ -417,13 +439,93 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
     return `${gw.toFixed(1)} ${weightUnit.toUpperCase()}`;
   })();
 
-  // Body fat percentage from latest log or estimation
-  const bodyFatFormatted = (() => {
-    if (latestWeightLog?.bodyFat) {
-      return `${latestWeightLog.bodyFat}%`;
+  // Body fat percentage calculation with multi-tier scientific fallback
+  const athleteBodyFatInfo = React.useMemo(() => {
+    const calcHeightInches = heightUnit === 'cm'
+      ? (heightCmInput === '' ? (initialHeightInches || 70) : Math.round(Number(heightCmInput) / 2.54))
+      : ((feetInput === '' ? 5 : Number(feetInput)) * 12 + (inchesInput === '' ? 10 : Number(inchesInput)));
+
+    const calcHeightCm = heightUnit === 'cm'
+      ? Number(heightCmInput)
+      : Math.round(calcHeightInches * 2.54);
+
+    return resolveAthleteBodyFat({
+      weight,
+      weightUnit,
+      heightInches: calcHeightInches,
+      heightCm: calcHeightCm,
+      age: age || userProfile?.age,
+      sex: userProfile?.sex,
+      waist: measurements.waist,
+      neck: measurements.neck,
+      hips: measurements.hips,
+      measurementUnit: measurementLengthUnit,
+      manualBodyFat: bodyFatInput,
+      latestLoggedBodyFat: latestWeightLog?.bodyFat
+    });
+  }, [
+    bodyFatInput,
+    latestWeightLog?.bodyFat,
+    heightUnit,
+    heightCmInput,
+    feetInput,
+    inchesInput,
+    initialHeightInches,
+    weight,
+    weightUnit,
+    age,
+    userProfile?.age,
+    userProfile?.sex,
+    measurements.waist,
+    measurements.neck,
+    measurements.hips,
+    measurementLengthUnit
+  ]);
+
+  const bodyFatFormatted = athleteBodyFatInfo.formatted;
+
+  const handleAutoCalculateBodyFat = () => {
+    const calcHeightInches = heightUnit === 'cm'
+      ? (heightCmInput === '' ? (initialHeightInches || 70) : Math.round(Number(heightCmInput) / 2.54))
+      : ((feetInput === '' ? 5 : Number(feetInput)) * 12 + (inchesInput === '' ? 10 : Number(inchesInput)));
+
+    const calcHeightCm = heightUnit === 'cm'
+      ? Number(heightCmInput)
+      : Math.round(calcHeightInches * 2.54);
+
+    const waistVal = Number(measurements.waist) || 0;
+    const neckVal = Number(measurements.neck) || 0;
+    const hipsVal = Number(measurements.hips) || 0;
+    const waistInches = measurementLengthUnit === 'cm' ? waistVal / 2.54 : waistVal;
+    const neckInches = measurementLengthUnit === 'cm' ? neckVal / 2.54 : neckVal;
+    const hipsInches = measurementLengthUnit === 'cm' ? hipsVal / 2.54 : hipsVal;
+
+    let computed: number | null = null;
+    if (calcHeightInches > 0 && waistInches > 0 && neckInches > 0) {
+      computed = calculateNavyBodyFat({
+        sex: userProfile?.sex,
+        heightInches: calcHeightInches,
+        waistInches,
+        neckInches,
+        hipsInches: hipsInches > 0 ? hipsInches : undefined
+      });
     }
-    return '18.5%';
-  })();
+
+    if (computed === null) {
+      const rawW = Number(weight) || 0;
+      const wKg = weightUnit === 'kg' ? rawW : rawW * 0.453592;
+      computed = calculateBmiBodyFat({
+        weightKg: wKg,
+        heightCm: calcHeightCm,
+        age: age || userProfile?.age,
+        sex: userProfile?.sex
+      });
+    }
+
+    if (computed !== null) {
+      setBodyFatInput(computed);
+    }
+  };
 
   // Weight Net Progression Calculation
   const weightProgressionDelta = (() => {
@@ -921,6 +1023,35 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                     className="w-full bg-[#080808] border border-[#292929] rounded-[4px] px-3 py-2 text-xs text-white font-mono focus:border-brand-primary outline-none"
                   />
                 </div>
+
+                {/* Body Fat % */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-mono font-bold text-[#A1A1A1] uppercase">Body Fat %</label>
+                    <button
+                      type="button"
+                      onClick={handleAutoCalculateBodyFat}
+                      className="text-[9px] font-mono text-brand-primary hover:underline flex items-center gap-0.5 cursor-pointer"
+                      title="Calculate via US Navy formula or BMI"
+                    >
+                      <Sparkles className="w-2.5 h-2.5" />
+                      <span>AUTO CALC</span>
+                    </button>
+                  </div>
+                  <div className="relative flex items-center">
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="3"
+                      max="70"
+                      placeholder={athleteBodyFatInfo.bodyFatPercentage.toFixed(1)}
+                      value={bodyFatInput}
+                      onChange={(e) => setBodyFatInput(e.target.value)}
+                      className="w-full bg-[#080808] border border-[#292929] rounded-[4px] pl-3 pr-7 py-2 text-xs text-white font-mono focus:border-brand-primary outline-none"
+                    />
+                    <span className="absolute right-2.5 text-xs text-[#6C6C6C] font-mono font-bold">%</span>
+                  </div>
+                </div>
               </div>
             </Card>
           </motion.div>
@@ -1055,8 +1186,13 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
 
           {/* 3. Body Fat */}
           <div className="p-5 sm:p-6 space-y-1">
-            <div className="text-[11px] font-mono font-bold tracking-widest text-[#A1A1A1] uppercase">
-              BODY FAT
+            <div className="flex items-center justify-between gap-1">
+              <div className="text-[11px] font-mono font-bold tracking-widest text-[#A1A1A1] uppercase">
+                BODY FAT
+              </div>
+              <span className="text-[9px] font-mono font-extrabold px-1.5 py-0.5 rounded-[3px] bg-[#080808] text-brand-primary border border-[#292929] uppercase">
+                {athleteBodyFatInfo.source === 'manual' ? 'CUSTOM' : athleteBodyFatInfo.source === 'navy_method' ? 'US NAVY' : athleteBodyFatInfo.source === 'logged' ? 'LOGGED' : 'EST.'}
+              </span>
             </div>
             <div className="pt-1">
               <span className="text-2xl sm:text-3xl lg:text-4xl font-mono font-black text-white tracking-tight">

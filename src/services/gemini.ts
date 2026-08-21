@@ -418,6 +418,9 @@ async function generateHealthAndSupport(
       systemInstruction: `
         You are a master performance coach and nutritionist. Return ONLY valid JSON.
         
+        HEALTH METRICS PROTOCOL:
+        - healthMetrics.estimatedBodyFat MUST be a clean, realistic percentage string with one decimal or integer (e.g. "18.5%" or "22%"). NEVER output unformatted raw multi-digit numbers or ranges.
+        
         ${isDietRestricted ? `
         EATING STYLE PROTOCOL (NO FULL MEAL PLAN, NO DIET FADS):
         - DO NOT provide a full meal plan, day-to-day recipes, or meal tables.

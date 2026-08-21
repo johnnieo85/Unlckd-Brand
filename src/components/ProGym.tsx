@@ -86,6 +86,7 @@ import { gymService } from '../services/gymService';
 import { DailyLog, SavedReport, Measurement, UserProfile, Badge as UserBadge, RecoverySession } from '../types';
 import { cn, downloadFile, getLocalDateString, parseLocalDate, safeStorage, getPlanDurationWeeks } from '../lib/utils';
 import { assessWorkoutFocus } from '../utils/focusAssessor';
+import { parseBodyFatPercentage } from '../lib/bodyFat';
 import { getWeeklyQuote } from '../constants/quotes';
 import { updateUserProfile } from '../services/accessService';
 import { 
@@ -814,6 +815,7 @@ export const ProGym = ({
   userProfile, 
   onProfileUpdate,
   onReportSaved,
+  onViewReport,
   onHomeClick 
 }: { 
   latestReport: SavedReport | null; 
@@ -821,6 +823,7 @@ export const ProGym = ({
   userProfile: UserProfile | null; 
   onProfileUpdate?: () => void;
   onReportSaved?: () => void;
+  onViewReport?: (report?: SavedReport | null) => void;
   onHomeClick?: () => void 
 }) => {
   const numWeeks = getPlanDurationWeeks(latestReport?.userData?.planDuration);
@@ -3168,8 +3171,16 @@ export const ProGym = ({
                     <Button
                       variant="outline"
                       size="lg"
-                      onClick={() => setIsProgressReportOpen(true)}
+                      onClick={() => {
+                        const targetReport = latestReport || savedReports?.find(r => r.path === 'full' || (!r.path && r.report?.workoutPlan));
+                        if (onViewReport) {
+                          onViewReport(targetReport || null);
+                        } else {
+                          setIsProgressReportOpen(true);
+                        }
+                      }}
                       className="border-[#292929] text-white hover:bg-white/5 font-semibold text-sm uppercase tracking-wider px-6 py-3.5 rounded-xl cursor-pointer"
+                      title={latestReport?.userData?.name ? `View ${latestReport.userData.name} Full Transformation Report` : "View Current Transformation Program"}
                     >
                       VIEW PROGRAM →
                     </Button>
@@ -4209,7 +4220,12 @@ export const ProGym = ({
                                     <span className="text-[9px] text-gray-600 block">orig: {m.weight}{m.units.weight}</span>
                                   )}
                                 </td>
-                                <td className="py-4 font-mono text-gray-200">{m.bodyFat || 0}%</td>
+                                <td className="py-4 font-mono text-gray-200">
+                                  {(() => {
+                                    const parsed = parseBodyFatPercentage(m.bodyFat);
+                                    return parsed !== null ? `${parsed.toFixed(1)}%` : '--';
+                                  })()}
+                                </td>
                                 <td className="py-4 font-mono text-gray-200">
                                   <span className="block">{displayWaist.toFixed(1)} / {displayNeck.toFixed(1)}{measurementUnits.length}</span>
                                   {m.units?.length && m.units.length !== measurementUnits.length && (

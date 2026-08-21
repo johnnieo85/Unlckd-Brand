@@ -91,3 +91,37 @@ export function getPlanDurationWeeks(duration: string | undefined): number {
   const match = duration.match(/(\d+)/);
   return match ? parseInt(match[1]) : 12;
 }
+
+/**
+ * Recursively cleans an object or array to remove any `undefined` values,
+ * which are rejected by Firestore setDoc / updateDoc / addDoc.
+ */
+export function cleanFirestoreData<T>(data: T): T {
+  if (data === null || data === undefined) {
+    return data;
+  }
+  
+  if (Array.isArray(data)) {
+    return data
+      .filter((item) => item !== undefined)
+      .map((item) => cleanFirestoreData(item)) as unknown as T;
+  }
+  
+  if (typeof data === 'object') {
+    // Preserve Date, Firestore FieldValues or custom instances
+    const proto = Object.getPrototypeOf(data);
+    if (proto !== Object.prototype && proto !== null) {
+      return data;
+    }
+
+    const cleanObj: Record<string, any> = {};
+    for (const [key, value] of Object.entries(data as Record<string, any>)) {
+      if (value !== undefined) {
+        cleanObj[key] = cleanFirestoreData(value);
+      }
+    }
+    return cleanObj as T;
+  }
+  
+  return data;
+}

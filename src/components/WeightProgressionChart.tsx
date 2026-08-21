@@ -6,6 +6,7 @@ import { Button } from './ui/Button';
 import { UnitToggle } from './UnitToggle';
 import { Measurement } from '../types';
 import { gymService } from '../services/gymService';
+import { parseBodyFatPercentage } from '../lib/bodyFat';
 import { cn } from '../lib/utils';
 
 interface WeightProgressionChartProps {
@@ -50,7 +51,8 @@ export function WeightProgressionChart({
   const currentDisplayVal = (() => {
     if (!latestMeasurement) return '--';
     if (chartMetric === 'bodyFat') {
-      return latestMeasurement.bodyFat ? `${latestMeasurement.bodyFat}%` : '--';
+      const parsed = parseBodyFatPercentage(latestMeasurement.bodyFat);
+      return parsed !== null ? `${parsed.toFixed(1)}%` : '--';
     }
     let w = Number(latestMeasurement.weight);
     if (!w) return '--';
@@ -65,7 +67,7 @@ export function WeightProgressionChart({
   const chartData = [...measurements]
     .sort((a, b) => a.date.localeCompare(b.date))
     .map(m => {
-      const val = chartMetric === 'weight' ? Number(m.weight) : Number(m.bodyFat);
+      let val = chartMetric === 'weight' ? Number(m.weight) : (parseBodyFatPercentage(m.bodyFat) ?? 0);
       let displayVal = val;
       const loggedUnit = m.units?.weight || 'lbs';
       

@@ -1,6 +1,7 @@
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { User as FirebaseUser } from 'firebase/auth';
+import { cleanFirestoreData } from '../lib/utils';
 
 import { UserProfile, SubscriptionPlanType, BillingCycleType, SubscriptionStatusType, ClientCountBand } from '../types';
 
@@ -84,7 +85,8 @@ export async function ensureUserProfile(user: FirebaseUser): Promise<UserProfile
 
 export async function updateUserProfile(userId: string, data: Partial<UserProfile>): Promise<void> {
   const userRef = doc(db, 'users', userId);
-  await setDoc(userRef, data, { merge: true });
+  const cleanData = cleanFirestoreData(data);
+  await setDoc(userRef, cleanData, { merge: true });
 }
 
 export async function updateSubscriptionPlan(
@@ -119,7 +121,7 @@ export async function updateSubscriptionPlan(
     membershipTier: isTrainer ? 'trainer' : 'standard'
   };
 
-  await setDoc(userRef, updateData, { merge: true });
+  await setDoc(userRef, cleanFirestoreData(updateData), { merge: true });
   
   const updatedSnap = await getDoc(userRef);
   return updatedSnap.data() as UserProfile;

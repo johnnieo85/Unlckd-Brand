@@ -224,6 +224,7 @@ export interface UserProfile {
   weight?: number;
   weightUnit?: 'lbs' | 'kg';
   goalWeight?: number;
+  bodyFat?: number;
   bodyMeasurements?: {
     neck?: number;
     chest?: number;

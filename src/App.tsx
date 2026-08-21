@@ -1358,6 +1358,8 @@ export default function App() {
     setReport(saved.report);
     setViewingDate(saved.timestamp?.toDate ? saved.timestamp.toDate() : new Date());
     setStep('report');
+    setActiveTab('reports');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleStart = (selectedPath: Path) => {
@@ -1633,6 +1635,16 @@ export default function App() {
                 userProfile={userProfile} 
                 onProfileUpdate={refreshProfile}
                 onReportSaved={loadHistory}
+                onViewReport={(reportToView) => {
+                  const targetReport = reportToView || latestReport || savedReports.find(r => r.path === 'full' || (!r.path && r.report?.workoutPlan));
+                  if (targetReport) {
+                    handleViewSavedReport(targetReport);
+                  } else {
+                    alert("No Transformation Report found for Gym Hub. You can generate a new Transformation Report to view your full program breakdown.");
+                    setStep('landing');
+                    setActiveTab('reports');
+                  }
+                }}
                 onHomeClick={() => {
                   setStep('landing');
                   setActiveTab('reports');

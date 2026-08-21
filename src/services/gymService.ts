@@ -1,7 +1,8 @@
 import { collection, doc, setDoc, getDoc, getDocs, query, orderBy, limit, Timestamp, updateDoc, deleteDoc, where } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { DailyLog, Measurement, SavedReport } from '../types';
-import { getPlanDurationWeeks } from '../lib/utils';
+import { getPlanDurationWeeks, cleanFirestoreData } from '../lib/utils';
+import { parseBodyFatPercentage } from '../lib/bodyFat';
 
 enum OperationType {
   CREATE = 'create',
@@ -74,12 +75,12 @@ export const gymService = {
     const path = `users/${user.uid}/dailyLogs/${date}`;
     try {
       const docRef = doc(db, 'users', user.uid, 'dailyLogs', date);
-      await setDoc(docRef, {
+      await setDoc(docRef, cleanFirestoreData({
         ...data,
         id: date,
         date,
         lastUpdated: Timestamp.now()
-      }, { merge: true });
+      }), { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
     }
@@ -98,7 +99,14 @@ export const gymService = {
       );
 
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => doc.data() as Measurement);
+      return querySnapshot.docs.map(doc => {
+        const data = doc.data() as Measurement;
+        if (data.bodyFat !== undefined && data.bodyFat !== null) {
+          const parsed = parseBodyFatPercentage(data.bodyFat);
+          data.bodyFat = parsed !== null ? parsed : undefined;
+        }
+        return data;
+      });
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, path);
       return [];
@@ -131,11 +139,11 @@ export const gymService = {
     const path = `users/${user.uid}/measurements/${id}`;
     try {
       const docRef = doc(db, 'users', user.uid, 'measurements', id);
-      await setDoc(docRef, {
+      await setDoc(docRef, cleanFirestoreData({
         ...data,
         id,
         timestamp: new Date().toISOString()
-      });
+      }));
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
     }
@@ -218,7 +226,14 @@ export const gymService = {
       );
 
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => doc.data() as Measurement);
+      return querySnapshot.docs.map(doc => {
+        const data = doc.data() as Measurement;
+        if (data.bodyFat !== undefined && data.bodyFat !== null) {
+          const parsed = parseBodyFatPercentage(data.bodyFat);
+          data.bodyFat = parsed !== null ? parsed : undefined;
+        }
+        return data;
+      });
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, path);
       return [];
@@ -398,14 +413,14 @@ export const gymService = {
       // Main report weight & body fat
       const weightNum = parseFloat(report.userData?.weight || '');
       const bodyFatRaw = report.report?.healthMetrics?.estimatedBodyFat || '';
-      const bodyFatNum = parseFloat(bodyFatRaw.replace(/[^0-9.]/g, ''));
+      const bodyFatNum = parseBodyFatPercentage(bodyFatRaw);
       const mainDate = getReportDateString(report);
 
       if (!isNaN(weightNum) && weightNum > 0 && mainDate) {
         await this.addMeasurement({
           date: mainDate,
           weight: weightNum,
-          bodyFat: !isNaN(bodyFatNum) && bodyFatNum > 0 ? bodyFatNum : undefined,
+          bodyFat: bodyFatNum !== null ? bodyFatNum : undefined,
           units: { weight: unit, length: 'in' }
         });
         await this.updateDailyLog(mainDate, { weight: weightNum, weightUnit: unit });
